@@ -112,6 +112,13 @@ def init() -> bool:
         # permission before the first silent check.
         lib.win_sparkle_set_automatic_check_for_updates(1)
         lib.win_sparkle_init()
+        # Force a background check on THIS launch. win_sparkle_init()'s own
+        # automatic check is throttled to the check interval (and a prior
+        # manual check resets that timer), so it often stays silent on startup.
+        # This explicit check ignores the interval: it shows the update dialog
+        # whenever a newer version exists, and nothing when it doesn't (no
+        # "you're up to date" popup every launch).
+        lib.win_sparkle_check_update_without_ui()
         return True
     except Exception:
         return False
