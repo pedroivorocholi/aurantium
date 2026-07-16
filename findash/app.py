@@ -27,6 +27,9 @@ from .symbol_context import DEFAULT_GROUP, SymbolContext
 
 LAYOUTS_DIR = BUNDLE_DIR / "layouts"
 
+# Shareable single-layout file (JSON inside). Import also accepts plain .json.
+LAYOUT_EXT = ".findashlayout"
+
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
@@ -262,17 +265,11 @@ class MainWindow(QMainWindow):
 
     def _build_menus(self) -> None:
         m_file = self._menubar.addMenu("&File")
-        a_export = QAction("&Export Layout to File…", self)
-        a_export.triggered.connect(self.export_layout_dialog)
-        a_import = QAction("&Import Layout from File…", self)
-        a_import.triggered.connect(self.import_layout_dialog)
         a_quit = QAction("&Quit", self)
         a_quit.setShortcut(QKeySequence.StandardKey.Quit)
         a_quit.triggered.connect(self.close)
-        m_file.addAction(a_export)
-        m_file.addAction(a_import)
-        m_file.addSeparator()
         m_file.addAction(a_quit)
+        # Layout export/import/sharing all live in the Layout menu.
 
         # in-app named layouts (no folder picking)
         self._m_layout = self._menubar.addMenu("&Layout")
@@ -320,6 +317,10 @@ class MainWindow(QMainWindow):
         a_save.triggered.connect(self._save_named_layout)
         m.addAction(a_save)
 
+        a_import = QAction("Import Layout File…", self)
+        a_import.triggered.connect(self._import_layout_file)
+        m.addAction(a_import)
+
         names = self.layout_store.names()
         m.addSeparator()
         if names:
@@ -329,6 +330,13 @@ class MainWindow(QMainWindow):
                     lambda _=False, n=name: self._load_named_layout(n)
                 )
                 m.addAction(act)
+            exp_menu = m.addMenu("Export Layout")
+            for name in names:
+                act = QAction(name, self)
+                act.triggered.connect(
+                    lambda _=False, n=name: self._export_named_layout(n)
+                )
+                exp_menu.addAction(act)
             del_menu = m.addMenu("Delete Layout")
             for name in names:
                 act = QAction(name, self)
@@ -382,8 +390,13 @@ class MainWindow(QMainWindow):
 
     def _reset_to_default(self) -> None:
         default = LAYOUTS_DIR / "default.json"
-        if default.is_file() and self.load_layout(default):
-            return
+        if default.is_file():
+            try:
+                doc = json.loads(default.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                doc = None
+            if isinstance(doc, dict) and self.apply_layout(doc):
+                return
         self._open_core_four()
 
     def _rebuild_panels_menu(self) -> None:
@@ -550,37 +563,68 @@ class MainWindow(QMainWindow):
                 pass
         return True
 
-    # -- file export / import (for sharing layouts) --------------------------
+    # -- layout file sharing (export a saved layout / import one) -------------
 
-    def save_layout(self, path: Path) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self.serialize_layout(), indent=2))
-        self.statusBar().showMessage(f"Layout exported: {path.name}", 5000)
-
-    def load_layout(self, path: Path) -> bool:
-        try:
-            doc = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError) as exc:
-            QMessageBox.warning(self, "Import layout", f"Cannot read {path}:\n{exc}")
-            return False
-        ok = self.apply_layout(doc)
-        if ok:
-            self.statusBar().showMessage(f"Layout imported: {path.name}", 5000)
-        return ok
-
-    def export_layout_dialog(self) -> None:
+    def _export_named_layout(self, name: str) -> None:
+        """Write a saved layout to a shareable ``.findashlayout`` file."""
+        doc = self.layout_store.get(name)
+        if not doc:
+            return
+        payload = dict(doc)
+        payload["name"] = name  # so the recipient's import knows what to call it
         fn, _ = QFileDialog.getSaveFileName(
-            self, "Export layout", "findash-layout.json", "Layout (*.json)"
+            self,
+            "Export layout",
+            f"{name}{LAYOUT_EXT}",
+            f"findash layout (*{LAYOUT_EXT});;JSON (*.json)",
         )
-        if fn:
-            self.save_layout(Path(fn))
+        if not fn:
+            return
+        try:
+            Path(fn).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        except OSError as exc:
+            QMessageBox.warning(self, "Export layout", f"Couldn't save:\n{exc}")
+            return
+        self.statusBar().showMessage(f"Layout exported: {Path(fn).name}", 5000)
 
-    def import_layout_dialog(self) -> None:
+    def _import_layout_file(self) -> None:
+        """Import a shared layout file into the saved layouts, then load it."""
         fn, _ = QFileDialog.getOpenFileName(
-            self, "Import layout", "", "Layout (*.json)"
+            self,
+            "Import layout",
+            "",
+            f"findash layout (*{LAYOUT_EXT} *.json);;All files (*)",
         )
-        if fn:
-            self.load_layout(Path(fn))
+        if not fn:
+            return
+        path = Path(fn)
+        try:
+            doc = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            QMessageBox.warning(
+                self, "Import layout", f"Couldn't read {path.name}:\n{exc}"
+            )
+            return
+        if not isinstance(doc, dict) or "panels" not in doc:
+            QMessageBox.warning(
+                self,
+                "Import layout",
+                f"{path.name} isn't a valid findash layout file.",
+            )
+            return
+        name = str(doc.get("name") or path.stem).strip() or "Imported Layout"
+        if name in self.layout_store.names():
+            resp = QMessageBox.question(
+                self,
+                "Overwrite layout",
+                f"A layout named “{name}” already exists. Overwrite it?",
+            )
+            if resp != QMessageBox.StandardButton.Yes:
+                return
+        self.layout_store.put(name, doc)
+        self._rebuild_layout_menu()
+        self.apply_layout(doc)
+        self.statusBar().showMessage(f"Layout imported: {name}", 5000)
 
     def _open_core_four(self) -> None:
         self.add_panel("watchlist", area=QtAds.DockWidgetArea.LeftDockWidgetArea)
