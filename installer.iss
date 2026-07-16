@@ -5,7 +5,7 @@
 
 [Setup]
 AppName=findash
-AppVersion=1.0.4
+AppVersion=1.0.5
 AppPublisher=findash
 DefaultDirName={autopf}\findash
 DefaultGroupName=findash
@@ -21,7 +21,8 @@ ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
 
 [Files]
-Source: "dist\findash.exe"; DestDir: "{app}"; Flags: ignoreversion
+; One-folder build: copy dist\findash\ (findash.exe + _internal\...) into {app}.
+Source: "dist\findash\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "findash.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: ".env.example"; DestDir: "{app}"; Flags: ignoreversion
 

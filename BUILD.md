@@ -15,8 +15,10 @@ python -m venv .venv
 .venv\Scripts\pyinstaller findash.spec --noconfirm --clean
 ```
 
-Result: **`dist\findash.exe`** — a self-contained ~80 MB executable with its own icon
-and taskbar identity. Double-click to run; send it to anyone.
+Result: **`dist\findash\`** — a one-folder app (`findash.exe` + `_internal\`). It
+runs directly from its folder with no per-launch temp unpack, so startup is fast
+and it relaunches reliably after an auto-update. Distribute it via the installer
+(step 2), not as a loose folder.
 
 ## 1b. macOS — .app bundle
 

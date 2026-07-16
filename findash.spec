@@ -83,18 +83,21 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
+# One-FOLDER build (dist/findash/): the exe runs directly from the install
+# dir with its DLLs in _internal/ beside it — no per-launch %TEMP% unpack.
+# That means instant startup and, crucially, a reliable relaunch when the
+# installer starts the app after a silent auto-update (a one-file exe unpacking
+# 100 MB in the installer's context is what broke the post-update relaunch).
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
+    exclude_binaries=True,
     name="findash",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -104,9 +107,19 @@ exe = EXE(
     icon=_ICON,
 )
 
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name="findash",
+)
+
 if IS_MAC:
     app = BUNDLE(
-        exe,
+        coll,
         name="findash.app",
         icon=_ICON,
         bundle_identifier="findash.terminal.desktop",
