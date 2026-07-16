@@ -1,0 +1,119 @@
+# -*- mode: python ; coding: utf-8 -*-
+"""PyInstaller spec — builds a standalone findash app.
+
+Windows:  .venv\\Scripts\\pyinstaller findash.spec --noconfirm  ->  dist\\findash.exe
+macOS:    .venv/bin/pyinstaller findash.spec --noconfirm        ->  dist/findash.app
+(Run PyInstaller on the target OS — you can't cross-build a Mac app from Windows.)
+"""
+
+import os
+import sys
+
+from PyInstaller.utils.hooks import collect_all
+
+IS_MAC = sys.platform == "darwin"
+
+# Make the app package importable while this spec is parsed.
+_APP_DIR = os.path.abspath(os.getcwd())
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
+
+# Per-OS app icon (.icns for the macOS .app, .ico for the Windows .exe).
+_ICON = "findash.icns" if IS_MAC else "findash.ico"
+if not os.path.exists(_ICON):
+    _ICON = None
+
+datas = [("layouts", "layouts"), (".env.example", ".")]
+for _asset in ("findash.ico", "findash.icns"):
+    if os.path.exists(_asset):
+        datas.append((_asset, "."))
+binaries = []
+hiddenimports = []
+
+# WinSparkle auto-updater DLL (Windows only). Drop the 64-bit WinSparkle.dll
+# next to this spec — see RELEASING.md. Bundled at the app root so
+# updater.py can load it from BUNDLE_DIR at runtime.
+if not IS_MAC and os.path.exists("WinSparkle.dll"):
+    binaries.append(("WinSparkle.dll", "."))
+
+# Panels are imported dynamically at runtime (importlib), so PyInstaller's
+# static analysis never sees them — list them explicitly from the package's
+# BUILTIN table. (collect_submodules can't help: it runs in an isolated
+# subprocess that cannot import the non-installed `findash` package.)
+from findash.panels import BUILTIN as _PANELS
+
+hiddenimports += ["findash.panels", "findash.panels._news_common"]
+hiddenimports += [f"findash.panels.{m}" for m in _PANELS]
+hiddenimports += [
+    "findash.providers",
+    "findash.providers.econ",
+    "findash.providers.fundamentals",
+    "findash.providers.market",
+    "findash.providers.news",
+]
+
+# yfinance / news deps that static analysis under-collects.
+hiddenimports += [
+    "multitasking", "frozendict", "peewee", "platformdirs",
+    "websockets", "html5lib", "bs4",
+]
+
+# Packages with data files or native binaries to bundle fully.
+for _pkg in ("yfinance", "gnews", "feedparser", "curl_cffi", "PySide6QtAds"):
+    try:
+        _d, _b, _h = collect_all(_pkg)
+        datas += _d
+        binaries += _b
+        hiddenimports += _h
+    except Exception:
+        pass
+
+a = Analysis(
+    ["run_findash.py"],
+    pathex=[_APP_DIR],
+    binaries=binaries,
+    datas=datas,
+    hiddenimports=hiddenimports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=["tkinter", "matplotlib", "PyQt5", "PyQt6", "PySide2"],
+    noarchive=False,
+    optimize=0,
+)
+pyz = PYZ(a.pure)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.datas,
+    [],
+    name="findash",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    runtime_tmpdir=None,
+    console=False,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=_ICON,
+)
+
+if IS_MAC:
+    app = BUNDLE(
+        exe,
+        name="findash.app",
+        icon=_ICON,
+        bundle_identifier="findash.terminal.desktop",
+        info_plist={
+            "CFBundleName": "findash",
+            "CFBundleDisplayName": "findash",
+            "NSHighResolutionCapable": True,
+            "LSApplicationCategoryType": "public.app-category.finance",
+        },
+    )

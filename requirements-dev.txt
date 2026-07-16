@@ -1,0 +1,5 @@
+# Extra tooling for building the standalone app (not needed to run from source).
+-r requirements.txt
+pyinstaller>=6.0
+pillow>=10.0  # only used to (re)generate findash.icns for the macOS build
+cryptography>=42.0  # Ed25519 signing for WinSparkle updates (tools/)

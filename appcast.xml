@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  findash update feed (Sparkle/WinSparkle format).
+
+  WinSparkle fetches this file, compares the newest <item>'s
+  sparkle:version against the running app's version, and if newer, downloads
+  the enclosure url, verifies sparkle:edSignature against the app's embedded
+  EdDSA public key, then runs the installer.
+
+  Per release (see RELEASING.md): add a new <item> at the TOP with the new
+  version, the GitHub release download url, and the length + signature printed
+  by tools/sign_update.py. Keep older <item>s for history (optional).
+
+  This file must be reachable at the APPCAST_URL set in findash/updater.py.
+-->
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>findash</title>
+    <description>findash updates</description>
+    <language>en</language>
+
+    <item>
+      <title>findash 1.0.0</title>
+      <description><![CDATA[
+        <ul>
+          <li>Initial release.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Thu, 16 Jul 2026 12:40:00 +0000</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/findash/releases/download/v1.0.0/findash-setup.exe"
+        sparkle:version="1.0.0"
+        sparkle:os="windows"
+        length="102060065"
+        sparkle:edSignature="vMpqVQvdIH8MsSaNV16N5WNSA/rowMJGlZhx2NsIfByOpZT66wUfOhq7mn/Na7Dvt7ZswSfqk6bt8zQmQET0Cg=="
+        type="application/octet-stream" />
+    </item>
+
+  </channel>
+</rss>

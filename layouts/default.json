@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "panels": [
+    {
+      "instance": "chart#1",
+      "panel_id": "chart",
+      "link_group": "A",
+      "settings": {
+        "period": "6mo",
+        "sma50": true,
+        "sma100": false,
+        "sma200": true,
+        "rsi": true
+      }
+    },
+    {
+      "instance": "chart#2",
+      "panel_id": "chart",
+      "link_group": "B",
+      "settings": {
+        "period": "6mo",
+        "sma50": true,
+        "sma100": false,
+        "sma200": true,
+        "rsi": true
+      }
+    },
+    {
+      "instance": "topic_news#1",
+      "panel_id": "topic_news",
+      "link_group": "A",
+      "settings": {
+        "query": "Brazil"
+      }
+    },
+    {
+      "instance": "news#1",
+      "panel_id": "news",
+      "link_group": "A",
+      "settings": {}
+    },
+    {
+      "instance": "analyst#1",
+      "panel_id": "analyst",
+      "link_group": "A",
+      "settings": {}
+    },
+    {
+      "instance": "chart_grid#1",
+      "panel_id": "chart_grid",
+      "link_group": "A",
+      "settings": {
+        "symbols": [
+          "^NDX",
+          "^GSPC",
+          "^DJI",
+          "^BVSP",
+          "^FCHI",
+          "GC=F",
+          "CL=F",
+          "NG=F",
+          "BTC-USD"
+        ]
+      }
+    },
+    {
+      "instance": "watchlist#1",
+      "panel_id": "watchlist",
+      "link_group": "A",
+      "settings": {
+        "symbols": [
+          "^GSPC",
+          "DX-Y.NYB",
+          "^TNX",
+          "^FVX",
+          "^TYX",
+          "BBAS3.SA",
+          "TSLA",
+          "NFLX",
+          "AMZN",
+          "XOM",
+          "NRG",
+          "RGTI"
+        ]
+      }
+    },
+    {
+      "instance": "commodities#1",
+      "panel_id": "commodities",
+      "link_group": "A",
+      "settings": {
+        "energy": [
+          [
+            "WTI",
+            "CL=F"
+          ],
+          [
+            "Brent",
+            "BZ=F"
+          ],
+          [
+            "Gasoline",
+            "RB=F"
+          ],
+          [
+            "Heating Oil",
+            "HO=F"
+          ],
+          [
+            "NatGas",
+            "NG=F"
+          ]
+        ],
+        "metals": [
+          [
+            "Gold",
+            "GC=F"
+          ],
+          [
+            "Silver",
+            "SI=F"
+          ],
+          [
+            "Copper",
+            "HG=F"
+          ],
+          [
+            "Platinum",
+            "PL=F"
+          ],
+          [
+            "Aluminum",
+            "ALI=F"
+          ]
+        ]
+      }
+    },
+    {
+      "instance": "topic_news#2",
+      "panel_id": "topic_news",
+      "link_group": "A",
+      "settings": {
+        "query": "energy commodities"
+      }
+    },
+    {
+      "instance": "profile#1",
+      "panel_id": "profile",
+      "link_group": "A",
+      "settings": {}
+    }
+  ],
+  "ads_state": "0000052178dab554414f833014befb2b9a7a9e207af0c05816cc8e1ac3a6c7a5b64fd6585a52ba4d8d3fde963986ae6c61c9c201defbbe7e7ddfa3aff1e8a3106805bae24a0ef1f555881148aa1897f910cfa693c11d1e25f19319b3159114d8bda2ef16cb3e2b03057a6e166234ab4037b195499534844b9b71701237319a08454cbd4168f35929b83136fda839588aa905be9dc0529a21beede40c1ace8de58c35103425aff576285d6a0d0e32aae4742e615d5dba2a5e38cbc1a00752c03f0ca54255c05c514112074eae53d42f7782109144d856ee6bed00af5cc6bfa04a42e49e38d844f6fddba6e30d8bba1b4617447b0adaa6fbb8dbac89fc52d13167e7f035cf35671de6b6581f876b62e84270df1f6c4367707ae0c853551476820d07cf21fd0bf6f1da9a96e8c02445bd444baddeb880fd3a77c06903d0c2fd8ca0b990ec77c705975cfc005752a7eb",
+  "symbols": {
+    "A": "NRG",
+    "B": "EURUSD=X"
+  }
+}
