@@ -20,6 +20,26 @@
     <language>en</language>
 
     <item>
+      <title>findash 1.1.0</title>
+      <description><![CDATA[
+        <ul>
+          <li>Connect API keys in-app: new APIs menu shows each data source's connection status and opens a connect dialog — free-key links included, no .env editing needed. Keys apply immediately, no restart.</li>
+          <li>First launch of a new install or update now offers a one-time setup prompt when no keys are connected yet.</li>
+          <li>As always, everything keeps working with no keys — free keyless sources remain the default.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Fri, 17 Jul 2026 20:00:00 +0000</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/findash/releases/download/v1.1.0/findash-setup.exe"
+        sparkle:version="1.1.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="70735600"
+        sparkle:edSignature="opuGQce9FL8ADa1xaLoE6fWA5FrDjUUKfiuXbyECzwfbXJiDw0gyo5L4m6ORrl0CZAxyo4X2SrMVHERAV0M7DQ=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
       <title>findash 1.0.3</title>
       <description><![CDATA[
         <ul>

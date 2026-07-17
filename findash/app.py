@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import PySide6QtAds as QtAds
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 from PySide6.QtCore import QAbstractAnimation, QEasingCurve, QPropertyAnimation
 from PySide6.QtGui import QAction, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
@@ -278,6 +279,11 @@ class MainWindow(QMainWindow):
         self._m_panels = self._menubar.addMenu("&Panels")
         self._rebuild_panels_menu()
 
+        # optional data-source keys, with live connected/not-connected status
+        self._m_apis = self._menubar.addMenu("&APIs")
+        self._m_apis.aboutToShow.connect(self._rebuild_apis_menu)
+        self._rebuild_apis_menu()
+
         m_help = self._menubar.addMenu("&Help")
         a_update = QAction("Check for Updates…", self)
         a_update.triggered.connect(self._check_for_updates)
@@ -286,6 +292,65 @@ class MainWindow(QMainWindow):
         m_help.addAction(a_update)
         m_help.addSeparator()
         m_help.addAction(a_about)
+
+    def _rebuild_apis_menu(self) -> None:
+        from .settings_dialog import API_KEYS
+
+        m = self._m_apis
+        m.clear()
+        a_connect = QAction("Connect API Keys…", self)
+        a_connect.triggered.connect(self._show_api_keys)
+        m.addAction(a_connect)
+        m.addSeparator()
+        for env, name, _blurb, _url in API_KEYS:
+            state = "connected ✓" if os.environ.get(env) else "not connected"
+            status = QAction(f"{name} — {state}", self)
+            status.setEnabled(False)
+            m.addAction(status)
+
+    def _show_api_keys(self) -> None:
+        from .settings_dialog import ApiKeysDialog
+
+        if ApiKeysDialog(self).exec():
+            self.statusBar().showMessage(
+                "API keys saved — panels use them on their next refresh.", 5000
+            )
+
+    def maybe_prompt_api_keys(self) -> None:
+        """On the first launch of a fresh install or a new version, offer the
+        API-key connect dialog — but only when no key is connected yet, and
+        only once per version."""
+        from . import __version__
+        from .settings_dialog import API_KEYS
+
+        if any(os.environ.get(env) for env, *_ in API_KEYS):
+            return
+        settings = QSettings()
+        if settings.value("apiKeysPrompt/version", "") == __version__:
+            return
+        settings.setValue("apiKeysPrompt/version", __version__)
+        box = QMessageBox(self)
+        box.setWindowTitle("Connect free data sources")
+        box.setTextFormat(Qt.TextFormat.RichText)
+        box.setText(
+            "<b>findash works out of the box</b> — quotes, charts, and news "
+            "run on free keyless sources.<br><br>"
+            "Connecting <b>free API keys</b> unlocks better sources:"
+            "<ul>"
+            "<li><b>Finnhub / Twelve Data</b> — real-time quotes</li>"
+            "<li><b>FRED / EIA</b> — economic &amp; energy data</li>"
+            "<li><b>NewsAPI.org</b> — richer news coverage</li>"
+            "</ul>"
+            "Each takes about a minute to set up. You can connect (or "
+            "disconnect) anytime from the <b>APIs</b> menu."
+        )
+        connect = box.addButton(
+            "Connect now…", QMessageBox.ButtonRole.AcceptRole
+        )
+        box.addButton("Maybe later", QMessageBox.ButtonRole.RejectRole)
+        box.exec()
+        if box.clickedButton() is connect:
+            self._show_api_keys()
 
     def _check_for_updates(self) -> None:
         from . import updater
