@@ -126,11 +126,15 @@ Add a **new `<item>` at the top** (keep older ones for history):
   Inno installer silently instead of showing the full setup wizard. `/VERYSILENT`
   hides the UI; `/FORCECLOSEAPPLICATIONS` closes a running findash so its files
   can be replaced. Omit it and every update pops the full wizard.
-- **Relaunch** is handled by the installer, not the appcast: `installer.iss`
-  has a `[Run] … Check: WizardSilent` entry that starts findash after a silent
-  install (WinSparkle does not relaunch the app itself, and `/RESTARTAPPLICATIONS`
-  is unreliable because the app exits before the installer's restart-manager
-  phase). Don't add `/RESTARTAPPLICATIONS` — it can cause a double launch.
+- **Relaunch** is handled by the installer, not the appcast (WinSparkle does not
+  relaunch the app itself, and `/RESTARTAPPLICATIONS` is unreliable). Silent
+  auto-updates relaunch from `installer.iss`'s `[Code]` `CurStepChanged` handler,
+  which does `Sleep(6000)` then `Exec({app}\findash.exe)`. **The delay is
+  required:** launched the instant the update finishes, the freshly-written numpy
+  C-extension DLLs aren't in place yet and the app crashes with "Importing the
+  numpy C-extensions failed" — a slightly later launch works. Interactive installs
+  relaunch via the `[Run] … postinstall skipifsilent` entry (no delay needed;
+  the Finished page already gives time). Don't add `/RESTARTAPPLICATIONS`.
 
 ### 5. Publish the GitHub release
 
