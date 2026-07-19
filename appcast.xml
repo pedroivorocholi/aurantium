@@ -20,6 +20,24 @@
     <language>en</language>
 
     <item>
+      <title>findash 1.2.3</title>
+      <description><![CDATA[
+        <ul>
+          <li>Chart: hovering an entry in the indicator "+" menu (SMA, EMA, BB, VWAP, VOL, RSI, MACD) now shows a tooltip with its full name and a one-line description.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sun, 19 Jul 2026 15:50:59 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/findash/releases/download/v1.2.3/findash-setup.exe"
+        sparkle:version="1.2.3"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72842571"
+        sparkle:edSignature="QL/b4p1y45DzaVLPghIQ1PI2GFmL153kUJLc34P0YBReZmfElK393+DKXQyaB/1vbu1sj1o5hsAM/6w4LUnACw=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
       <title>findash 1.2.2</title>
       <description><![CDATA[
         <ul>
