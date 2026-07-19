@@ -164,22 +164,48 @@ class _IndicatorSpec:
         pane: str,
         default_window: Optional[int],
         lookback: Callable[[dict], int],
+        description: str,
     ) -> None:
         self.kind = kind
         self.label = label
         self.pane = pane
         self.default_window = default_window  # None = no window parameter
         self.lookback = lookback  # bars of history the math needs to warm up
+        self.description = description  # shown as a tooltip in the add menu
 
 
 INDICATOR_SPECS: dict[str, _IndicatorSpec] = {
-    "sma": _IndicatorSpec("sma", "SMA", "price", 50, lambda p: p.get("window", 50)),
-    "ema": _IndicatorSpec("ema", "EMA", "price", 21, lambda p: p.get("window", 21) * 3),
-    "bb": _IndicatorSpec("bb", "BB", "price", 20, lambda p: p.get("window", 20)),
-    "vwap": _IndicatorSpec("vwap", "VWAP", "price", None, lambda p: 0),
-    "volume": _IndicatorSpec("volume", "VOL", "osc", None, lambda p: 0),
-    "rsi": _IndicatorSpec("rsi", "RSI", "osc", 14, lambda p: p.get("window", 14) + 1),
-    "macd": _IndicatorSpec("macd", "MACD", "osc", None, lambda p: 26 + 9),
+    "sma": _IndicatorSpec(
+        "sma", "SMA", "price", 50, lambda p: p.get("window", 50),
+        "Simple Moving Average — average closing price over the last N bars.",
+    ),
+    "ema": _IndicatorSpec(
+        "ema", "EMA", "price", 21, lambda p: p.get("window", 21) * 3,
+        "Exponential Moving Average — like SMA, but weights recent bars more heavily.",
+    ),
+    "bb": _IndicatorSpec(
+        "bb", "BB", "price", 20, lambda p: p.get("window", 20),
+        "Bollinger Bands — a moving average with upper/lower bands at N standard"
+        " deviations, showing volatility.",
+    ),
+    "vwap": _IndicatorSpec(
+        "vwap", "VWAP", "price", None, lambda p: 0,
+        "Volume Weighted Average Price — average price weighted by traded volume.",
+    ),
+    "volume": _IndicatorSpec(
+        "volume", "VOL", "osc", None, lambda p: 0,
+        "Volume — number of shares traded per bar.",
+    ),
+    "rsi": _IndicatorSpec(
+        "rsi", "RSI", "osc", 14, lambda p: p.get("window", 14) + 1,
+        "Relative Strength Index — momentum oscillator (0–100) showing"
+        " overbought/oversold conditions.",
+    ),
+    "macd": _IndicatorSpec(
+        "macd", "MACD", "osc", None, lambda p: 26 + 9,
+        "Moving Average Convergence Divergence — trend-following momentum"
+        " indicator from the difference of two EMAs.",
+    ),
 }
 
 
@@ -646,9 +672,11 @@ class ChartPanel(Panel):
 
     def _show_add_menu(self) -> None:
         menu = QMenu(self)
+        menu.setToolTipsVisible(True)
         for kind, spec in INDICATOR_SPECS.items():
             text = f"Add {spec.label}…" if spec.default_window else f"Add {spec.label}"
             act = QAction(text, menu)
+            act.setToolTip(spec.description)
             act.triggered.connect(lambda _=False, k=kind: self._add_indicator_ui(k))
             menu.addAction(act)
         menu.exec(self._add_btn.mapToGlobal(self._add_btn.rect().bottomLeft()))
