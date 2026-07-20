@@ -20,6 +20,36 @@
     <language>en</language>
 
     <item>
+      <title>findash 1.3.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>What&rsquo;s new in 1.3.2</h3>
+        <ul>
+          <li>Light theme polish: charts now follow the theme (no more black chart background in light mode), table headers stand out, and low-contrast elements were darkened for readability.</li>
+          <li>New keyboard shortcuts: Ctrl+W closes the focused panel, Ctrl+Shift+T reopens the last one you closed, and Ctrl+1–4 set the focused panel’s link group (A/B/C/D).</li>
+          <li>Fixed a memory build-up when repeatedly adding and removing chart indicators.</li>
+          <li>Layout files saved by a newer version are now declined gracefully instead of loading incorrectly.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 20 Jul 2026 17:13:56 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/findash/releases/download/v1.3.2/findash-setup.exe"
+        sparkle:version="1.3.2"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72854382"
+        sparkle:edSignature="/5jf1sGbWtue2TF0J1k0C6POYML1IFHpeSsF1UK/gNtjZVJHDAr4vQMa1UScFPHt0TNnqtd+OJMFYJlFwgu1Bw=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
       <title>findash 1.3.1</title>
       <description><![CDATA[
         <style>

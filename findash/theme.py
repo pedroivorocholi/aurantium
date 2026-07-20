@@ -63,11 +63,11 @@ _LIGHT = {
     "BG_ELEV": "#eceef1",      # raised controls (buttons)
     "CHROME": "#e8eaed",       # light chrome — title bars / top / bottom
     "CHROME_HOVER": "#dcdfe3", # hover / active tab
-    "BG_HEADER": "#e2e6ea",    # section rows inside panels
+    "BG_HEADER": "#dbe1ea",    # section rows inside panels
     "CHROME_BORDER": "#c9ced4",# outline between chrome and surface
     "CHROME_TEXT": "#1b2028",  # dark text on light chrome
-    "CHROME_TEXT_DIM": "#5b636d",
-    "HEADER_BLUE": "#e6ebf1",  # table column-header band (light)
+    "CHROME_TEXT_DIM": "#4c545e",  # darker so small chrome text stays readable
+    "HEADER_BLUE": "#d4dde9",  # table column-header band (light) — a clear blue-gray band
     "SELECT_BLUE": "#cfe0f5",  # selected row (light blue)
     "BORDER": "#dfe3e8",       # hairline dividers
     "BORDER_STRONG": "#c3c9d0",
@@ -94,6 +94,13 @@ def _read_theme_name() -> str:
 def current_theme() -> str:
     """Currently-selected theme name ("dark" | "light")."""
     return _read_theme_name()
+
+
+def palette_colors(name: str | None = None) -> dict:
+    """A copy of a theme's raw color map (defaults to the active theme). Lets
+    other modules (e.g. the chart's per-panel colors) tell a theme-derived
+    default from a genuine user customization across both themes."""
+    return dict(_PALETTES.get(name or _read_theme_name(), _ACTIVE))
 
 
 def set_theme(name: str) -> None:

@@ -26,12 +26,16 @@ from .datahub import DataHub
 from .layout_store import LayoutStore
 from .panel import Panel, PanelRegistry
 from .paths import BUNDLE_DIR
-from .symbol_context import DEFAULT_GROUP, SymbolContext
+from .symbol_context import DEFAULT_GROUP, GROUPS, SymbolContext
 
 LAYOUTS_DIR = BUNDLE_DIR / "layouts"
 
 # Shareable single-layout file (JSON inside). Import also accepts plain .json.
 LAYOUT_EXT = ".findashlayout"
+
+# Bump when the serialized layout schema changes incompatibly. A layout tagged
+# with a higher version was written by a newer findash and is not loaded.
+CURRENT_LAYOUT_VERSION = 1
 
 
 class MainWindow(QMainWindow):
@@ -45,6 +49,8 @@ class MainWindow(QMainWindow):
         self._maximize_actions: dict[str, QAction] = {}  # instance_id -> title-bar action
         self._maximized_instance: str | None = None
         self._pre_maximize_state = None  # QByteArray snapshot to restore on exit
+        self._last_closed: dict | None = None  # for reopen-last-closed (Ctrl+Shift+T)
+        self._loading_layout = False  # guard: mass-close during layout swap isn't a user close
         self._maximizing = False  # guard: hiding siblings is not a real close
         self._last_refresh_all = 0.0  # monotonic timestamp, debounces F5
         self.layout_store = LayoutStore()
@@ -97,6 +103,7 @@ class MainWindow(QMainWindow):
         self._install_fullscreen()
         self._install_refresh_all()
         self._install_search_shortcut()
+        self._install_more_shortcuts()
         self.statusBar().showMessage(
             "Click any ticker — every linked panel follows. Data: Yahoo Finance/Google News (free, delayed)."
         )
@@ -139,6 +146,59 @@ class MainWindow(QMainWindow):
     def _focus_symbol_search(self) -> None:
         self._cmd.setFocus(Qt.FocusReason.ShortcutFocusReason)
         self._cmd.selectAll()
+
+    def _install_more_shortcuts(self) -> None:
+        """Ctrl+W closes the focused panel; Ctrl+Shift+T reopens the last one you
+        closed; Ctrl+1..4 sets the focused panel's link group (A/B/C/D)."""
+        close_act = QAction(self)
+        # explicit Ctrl+W — StandardKey.Close is Ctrl+F4 on Windows, not what
+        # users expect for "close this panel".
+        close_act.setShortcut(QKeySequence("Ctrl+W"))
+        close_act.triggered.connect(self._close_focused_dock)
+        self.addAction(close_act)
+
+        reopen_act = QAction(self)
+        reopen_act.setShortcut(QKeySequence("Ctrl+Shift+T"))
+        reopen_act.triggered.connect(self._reopen_last_closed)
+        self.addAction(reopen_act)
+
+        for i in range(min(4, len(GROUPS))):
+            act = QAction(self)
+            act.setShortcut(QKeySequence(f"Ctrl+{i + 1}"))
+            act.triggered.connect(
+                lambda _=False, idx=i: self._set_focused_link_group(idx)
+            )
+            self.addAction(act)
+
+    def _close_focused_dock(self) -> None:
+        dock = self.dock_manager.focusedDockWidget()
+        if dock is None and len(self._docks) == 1:
+            dock = next(iter(self._docks.values()))
+        if dock is not None:
+            dock.closeDockWidget()
+
+    def _set_focused_link_group(self, index: int) -> None:
+        dock = self.dock_manager.focusedDockWidget()
+        if dock is None or not (0 <= index < len(GROUPS)):
+            return
+        panel = dock.widget()
+        if isinstance(panel, Panel):
+            panel.set_link_group(GROUPS[index])
+            self.statusBar().showMessage(
+                f"Panel linked to group {GROUPS[index]}", 2500
+            )
+
+    def _reopen_last_closed(self) -> None:
+        info = self._last_closed
+        if not info or not info.get("panel_id"):
+            self.statusBar().showMessage("No recently closed panel to reopen.", 3000)
+            return
+        self._last_closed = None
+        self.add_panel(
+            info["panel_id"],
+            link_group=info.get("link_group"),
+            settings=info.get("settings"),
+        )
 
     def _refresh_all(self) -> None:
         # debounce: ignore repeat presses within 1.5s of the last accepted one
@@ -278,6 +338,20 @@ class MainWindow(QMainWindow):
         the rest of the layout back."""
         if self._maximizing:
             return  # sibling hidden for maximize, not actually closed
+        # remember what was here so Ctrl+Shift+T can bring it back (capture
+        # before the dock/panel is dropped and deleted)
+        dock = self._docks.get(instance_id)
+        if dock is not None and not self._loading_layout:
+            panel = dock.widget()
+            if isinstance(panel, Panel):
+                try:
+                    self._last_closed = {
+                        "panel_id": panel.panel_id,
+                        "link_group": panel.link_group,
+                        "settings": panel.settings(),
+                    }
+                except Exception:
+                    self._last_closed = {"panel_id": getattr(panel, "panel_id", "")}
         self._docks.pop(instance_id, None)
         self._maximize_actions.pop(instance_id, None)
         if self._maximized_instance == instance_id:
@@ -726,12 +800,27 @@ class MainWindow(QMainWindow):
         """Rebuild panels and dock arrangement from a serialized layout dict."""
         if not isinstance(doc, dict):
             return False
+        try:
+            layout_version = int(doc.get("version", 1))
+        except (TypeError, ValueError):
+            layout_version = 1  # malformed version — treat as current, try to load
+        if layout_version > CURRENT_LAYOUT_VERSION:
+            self.statusBar().showMessage(
+                "This layout was saved by a newer version of findash — "
+                "update to load it.",
+                6000,
+            )
+            return False
         # drop any maximize state — we're rebuilding the whole arrangement
         self._maximized_instance = None
         self._pre_maximize_state = None
         self._esc_shortcut.setEnabled(False)
-        for dock in list(self._docks.values()):
-            dock.closeDockWidget()
+        self._loading_layout = True  # mass-close below isn't a user close
+        try:
+            for dock in list(self._docks.values()):
+                dock.closeDockWidget()
+        finally:
+            self._loading_layout = False
         self._docks.clear()
         self._maximize_actions.clear()
         SymbolContext.instance().from_json(doc.get("symbols", {}))

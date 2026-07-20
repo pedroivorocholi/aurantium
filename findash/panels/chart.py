@@ -29,7 +29,19 @@ from PySide6.QtWidgets import (
 )
 
 from ..panel import Panel, register_panel
-from ..theme import ACCENT, BG, BG_ELEV, DOWN, FG, FG_DIM, MONO_FONT, UP
+from ..theme import (
+    ACCENT,
+    BG,
+    BG_ELEV,
+    DOWN,
+    FG,
+    FG_DIM,
+    MONO_FONT,
+    THEMES,
+    UP,
+    current_theme,
+    palette_colors,
+)
 
 # -- range / interval model -------------------------------------------------
 #
@@ -82,6 +94,46 @@ DEFAULT_COLORS = {
     "grid": FG_DIM,
     "bg": BG,
 }
+
+
+def _chart_defaults_for(theme_name: str) -> dict:
+    """The default chart colors for a given theme (bg/grid follow it, up/down/
+    line are that theme's accents)."""
+    p = palette_colors(theme_name)
+    return {
+        "up": p["UP"],
+        "down": p["DOWN"],
+        "line": p["ACCENT"],
+        "grid": p["FG_DIM"],
+        "bg": p["BG"],
+    }
+
+
+# default chart colors per theme, and — per color key — the set of every theme's
+# default value for it. A saved color that matches any theme default is treated
+# as theme-derived (so it follows a theme switch); anything else is a genuine
+# user customization and is preserved.
+_CHART_DEFAULTS_BY_THEME = {t: _chart_defaults_for(t) for t in THEMES}
+_THEME_DEFAULT_VALUES = {
+    key: {defaults[key].lower() for defaults in _CHART_DEFAULTS_BY_THEME.values()}
+    for key in DEFAULT_COLORS
+}
+
+
+def _mark_too_low_contrast(color: "QColor") -> bool:
+    """True if a mark/indicator color would be illegible on the active canvas:
+    too light on the light theme's white, too dark on the dark theme's black."""
+    if current_theme() == "light":
+        return color.lightness() > 210
+    return color.lightness() < 60
+
+
+def _mark_reject_msg() -> str:
+    return (
+        "⚠ too light for the white canvas"
+        if current_theme() == "light"
+        else "⚠ too dark for the black canvas"
+    )
 
 CHART_TYPES = [
     ("candles", "Candlesticks"),
@@ -664,8 +716,8 @@ class ChartPanel(Panel):
             picked = QColorDialog.getColor(QColor(seed), self, f"{label} color")
             if not picked.isValid():
                 return None
-            if picked.lightness() < 60:
-                self.set_status("⚠ too dark for the black canvas — pick a lighter color")
+            if _mark_too_low_contrast(picked):
+                self.set_status(f"{_mark_reject_msg()} — pick another color")
                 seed = picked.name()
                 continue
             return picked.name()
@@ -763,8 +815,8 @@ class ChartPanel(Panel):
         picked = QColorDialog.getColor(QColor(inst.color), self, "Indicator color")
         if not picked.isValid():
             return
-        if picked.lightness() < 60:
-            self.set_status("⚠ too dark for the black canvas — keeping old color")
+        if _mark_too_low_contrast(picked):
+            self.set_status(f"{_mark_reject_msg()} — keeping old color")
             return
         inst.color = picked.name()
         self._style_chip(inst)
@@ -814,10 +866,15 @@ class ChartPanel(Panel):
     def _teardown_indicator_items(self, inst: _IndicatorInstance) -> None:
         for item in inst.items:
             self.plot_widget.removeItem(item)
+            # release the pg item explicitly — removeItem only detaches it from
+            # the plot; without this, repeatedly adding/removing indicators
+            # accumulates orphaned GraphicsObjects until the next GC pass.
+            if hasattr(item, "deleteLater"):
+                item.deleteLater()
         inst.items = []
         if inst.pane is not None:
             self.content_layout.removeWidget(inst.pane)
-            inst.pane.deleteLater()
+            inst.pane.deleteLater()  # destroys the pane's scene and its pane_items
             inst.pane = None
         inst.pane_items = []
 
@@ -1057,14 +1114,24 @@ class ChartPanel(Panel):
         )
         if not picked.isValid():
             return
-        # keep the terminal dark: backgrounds must stay near-black, marks must
-        # stay visible on it — refuse picks that break the theme
-        if key == "bg" and picked.lightness() > 40:
-            self.set_status("⚠ background must stay dark — keeping old color")
-            return
-        if key != "bg" and picked.lightness() < 60:
-            self.set_status("⚠ too dark for the black canvas — keeping old color")
-            return
+        # keep marks legible on the canvas — the constraint flips with the theme:
+        # a dark theme needs a near-black bg and light marks; a light theme needs
+        # a near-white bg and dark marks.
+        light = current_theme() == "light"
+        if key == "bg":
+            if light and picked.lightness() < 200:
+                self.set_status("⚠ background must stay light — keeping old color")
+                return
+            if not light and picked.lightness() > 40:
+                self.set_status("⚠ background must stay dark — keeping old color")
+                return
+        else:
+            if light and picked.lightness() > 210:
+                self.set_status("⚠ too light for the white canvas — keeping old color")
+                return
+            if not light and picked.lightness() < 60:
+                self.set_status("⚠ too dark for the black canvas — keeping old color")
+                return
         self._colors[key] = picked.name()
         self._apply_colors()
 
@@ -1326,9 +1393,18 @@ class ChartPanel(Panel):
 
         colors = settings.get("colors")
         if isinstance(colors, dict):
+            active_defaults = _CHART_DEFAULTS_BY_THEME[current_theme()]
             for key in self._colors:
                 val = colors.get(key)
-                if isinstance(val, str) and QColor(val).isValid():
+                if not (isinstance(val, str) and QColor(val).isValid()):
+                    continue
+                if val.lower() in _THEME_DEFAULT_VALUES[key]:
+                    # theme-derived default (from whichever theme it was saved
+                    # in) → adopt the ACTIVE theme's default so a chart saved in
+                    # dark doesn't stay black after switching to light, and vice
+                    # versa. Genuine custom picks fall through and are kept.
+                    self._colors[key] = active_defaults[key]
+                else:
                     self._colors[key] = val
 
         saved = settings.get("indicators")
