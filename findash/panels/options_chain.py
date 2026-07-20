@@ -163,6 +163,13 @@ class OptionsChainPanel(Panel):
     def _on_options(self, data: Any) -> None:
         if not isinstance(data, dict):
             return
+        # Drop stale callbacks from a previous symbol. Switching tickers quickly
+        # can leave a just-queued payload for the old symbol in flight; if it
+        # names a different symbol than the one we're showing now, ignore it so
+        # the expiry combo and tables never fill with the wrong ticker's data.
+        payload_sym = data.get("symbol")
+        if payload_sym and payload_sym != self.current_symbol:
+            return
 
         spot = data.get("spot")
         self._spot = spot

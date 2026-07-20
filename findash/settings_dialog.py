@@ -77,7 +77,10 @@ def write_env_keys(path: Path, values: dict[str, str]) -> None:
             out.append(line)
     for key, val in remaining.items():
         out.append(f"{key}={val}")
-    path.write_text("\n".join(out) + "\n", encoding="utf-8")
+    # atomic write: a crash mid-write must never truncate the user's saved keys.
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    tmp.write_text("\n".join(out) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
 
 
 class ApiKeysDialog(QDialog):

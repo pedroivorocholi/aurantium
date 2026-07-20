@@ -9,12 +9,20 @@ an underlying API call, so batching wouldn't help).
 from __future__ import annotations
 
 import re
+import threading
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import yfinance as yf
 
 from ..datahub import DataHub, Provider
+
+# Hard cap on any single fetch. yfinance property access can hang on a slow or
+# unresponsive endpoint; without a ceiling a hung call pins its QThreadPool
+# worker forever. On timeout we free the worker and publish an error (the
+# stuck call keeps running in its own helper thread, which Python can't kill,
+# but it no longer blocks the pool).
+_FETCH_TIMEOUT_S = 20.0
 
 
 def _as_float(x: Any) -> Optional[float]:
@@ -199,21 +207,44 @@ class FundamentalsProvider(Provider):
             parts = topic.split(":")
             kind = parts[0]
             if kind == "financials" and len(parts) == 2:
-                hub.run_async(lambda t=topic, s=parts[1]: self._fetch_financials(t, s))
+                hub.run_async(lambda t=topic, s=parts[1]: self._guarded(t, lambda: self._fetch_financials(t, s)))
             elif kind == "earnings" and len(parts) == 2:
-                hub.run_async(lambda t=topic, s=parts[1]: self._fetch_earnings(t, s))
+                hub.run_async(lambda t=topic, s=parts[1]: self._guarded(t, lambda: self._fetch_earnings(t, s)))
             elif kind == "dividends" and len(parts) == 2:
-                hub.run_async(lambda t=topic, s=parts[1]: self._fetch_dividends(t, s))
+                hub.run_async(lambda t=topic, s=parts[1]: self._guarded(t, lambda: self._fetch_dividends(t, s)))
             elif kind == "holders" and len(parts) == 2:
-                hub.run_async(lambda t=topic, s=parts[1]: self._fetch_holders(t, s))
+                hub.run_async(lambda t=topic, s=parts[1]: self._guarded(t, lambda: self._fetch_holders(t, s)))
             elif kind == "options" and len(parts) in (2, 3):
                 symbol = parts[1]
                 expiry = parts[2] if len(parts) == 3 else None
-                hub.run_async(lambda t=topic, s=symbol, e=expiry: self._fetch_options(t, s, e))
+                hub.run_async(lambda t=topic, s=symbol, e=expiry: self._guarded(t, lambda: self._fetch_options(t, s, e)))
             elif kind == "movers" and len(parts) == 2:
-                hub.run_async(lambda t=topic, k=parts[1]: self._fetch_movers(t, k))
+                hub.run_async(lambda t=topic, k=parts[1]: self._guarded(t, lambda: self._fetch_movers(t, k)))
             else:
                 hub.publish_error(topic, f"unrecognized topic: {topic}")
+
+    @staticmethod
+    def _guarded(topic: str, fetch: Callable[[], None]) -> None:
+        """Run a fetch body with a hard timeout so a hung yfinance call frees its
+        QThreadPool worker instead of pinning it.
+
+        The fetch runs on a *daemon* thread we can abandon: if it exceeds the
+        timeout we publish an error and return, and the stuck thread won't block
+        interpreter shutdown (a ThreadPoolExecutor worker, by contrast, is joined
+        at exit and would hang the app on close — the very hang this guards
+        against). Fetch bodies publish their own success/error, so a late
+        completion is a benign last-writer-wins on the topic."""
+        done = threading.Event()
+
+        def _run() -> None:
+            try:
+                fetch()
+            finally:
+                done.set()
+
+        threading.Thread(target=_run, name=f"fetch:{topic}", daemon=True).start()
+        if not done.wait(_FETCH_TIMEOUT_S):
+            DataHub.instance().publish_error(topic, "data source timed out")
 
     # -- financials ----------------------------------------------------
 

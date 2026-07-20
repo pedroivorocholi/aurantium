@@ -8,6 +8,7 @@ the installed app rather than sitting next to the code.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from PySide6.QtCore import QStandardPaths
@@ -35,11 +36,17 @@ class LayoutStore:
         self._data.setdefault("last", None)
 
     def _flush(self) -> None:
+        # Atomic write: a crash (or a concurrent reader — e.g. the fresh process
+        # spawned by a theme-switch restart) must never see a truncated file.
+        # Write a temp sibling, then os.replace() it into place (atomic on the
+        # same filesystem).
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            self._path.write_text(
-                json.dumps(self._data, indent=2), encoding="utf-8"
-            )
+            # pid-unique temp so two processes flushing at once (old + the fresh
+            # process from a theme-switch restart) never collide on the temp.
+            tmp = self._path.with_name(f"{self._path.name}.{os.getpid()}.tmp")
+            tmp.write_text(json.dumps(self._data, indent=2), encoding="utf-8")
+            os.replace(tmp, self._path)
         except OSError:
             pass
 

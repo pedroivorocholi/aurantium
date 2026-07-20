@@ -10,7 +10,7 @@ from pathlib import Path
 import PySide6QtAds as QtAds
 from PySide6.QtCore import Qt, QSettings
 from PySide6.QtCore import QAbstractAnimation, QEasingCurve, QPropertyAnimation
-from PySide6.QtGui import QAction, QKeySequence, QShortcut
+from PySide6.QtGui import QAction, QActionGroup, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QFileDialog,
     QInputDialog,
@@ -317,6 +317,8 @@ class MainWindow(QMainWindow):
         self._m_panels = self._menubar.addMenu("&Panels")
         self._rebuild_panels_menu()
 
+        self._build_view_menu()
+
         # optional data-source keys, with live connected/not-connected status
         self._m_apis = self._menubar.addMenu("&APIs")
         self._m_apis.aboutToShow.connect(self._rebuild_apis_menu)
@@ -532,6 +534,68 @@ class MainWindow(QMainWindow):
                     lambda _=False, pid=meta.id: self.add_panel(pid)
                 )
                 sub.addAction(act)
+
+    def _build_view_menu(self) -> None:
+        """View ▸ Theme ▸ Dark/Light. Switching persists the choice and restarts
+        the app so the whole UI — charts included — renders in one theme."""
+        from .theme import THEMES, current_theme
+
+        m_view = self._menubar.addMenu("&View")
+        theme_menu = m_view.addMenu("Theme")
+        self._theme_group = QActionGroup(self)
+        self._theme_group.setExclusive(True)
+        cur = current_theme()
+        for name in THEMES:
+            act = QAction(name.capitalize(), self)
+            act.setCheckable(True)
+            act.setChecked(name == cur)
+            act.triggered.connect(
+                lambda _=False, n=name: self._on_theme_selected(n)
+            )
+            self._theme_group.addAction(act)
+            theme_menu.addAction(act)
+
+    def _on_theme_selected(self, name: str) -> None:
+        from .theme import current_theme, set_theme
+
+        if name == current_theme():
+            return  # already active (e.g. re-clicking the checked item)
+        resp = QMessageBox.question(
+            self,
+            "Switch theme",
+            f"Switch to the {name} theme?\n\nfindash needs to restart to apply "
+            "it — your workspace will be restored automatically.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if resp != QMessageBox.StandardButton.Yes:
+            self._sync_theme_actions()  # undo the menu selection
+            return
+        set_theme(name)
+        self._restart_app()
+
+    def _sync_theme_actions(self) -> None:
+        from .theme import current_theme
+
+        cur = current_theme()
+        for act in self._theme_group.actions():
+            act.setChecked(act.text().lower() == cur)
+
+    def _restart_app(self) -> None:
+        """Persist the workspace, then relaunch this app so the new theme takes
+        effect. The fresh process restores the auto-saved layout on startup."""
+        import sys
+
+        from PySide6.QtCore import QProcess
+
+        try:
+            self.layout_store.set_last(self.serialize_layout())
+        except Exception:
+            pass
+        if getattr(sys, "frozen", False):
+            QProcess.startDetached(sys.executable, [])
+        else:
+            QProcess.startDetached(sys.executable, ["-m", "findash"])
+        self.close()
 
     def _on_command(self) -> None:
         text = self._cmd.text().strip().upper()
