@@ -11,6 +11,55 @@ from .paths import BUNDLE_DIR, EXT_DIR
 
 APP_ID = "findash.terminal.desktop.1"
 
+# Name of the local IPC endpoint used to enforce a single running instance.
+# The first instance owns this server; later launches connect to it, ask it to
+# surface its window, then exit instead of opening a duplicate.
+_IPC_NAME = "findash.terminal.singleinstance"
+
+
+def _running_instance_activated() -> bool:
+    """Return True if another findash is already running. When it is, hand it a
+    one-line 'activate' message over the local socket so it surfaces its window
+    (from the tray or from behind other windows), and let this launch exit."""
+    from PySide6.QtNetwork import QLocalSocket
+
+    sock = QLocalSocket()
+    sock.connectToServer(_IPC_NAME)
+    if not sock.waitForConnected(300):
+        return False
+    sock.write(b"activate\n")
+    sock.waitForBytesWritten(300)
+    sock.disconnectFromServer()
+    if sock.state() != QLocalSocket.LocalSocketState.UnconnectedState:
+        sock.waitForDisconnected(300)
+    return True
+
+
+def _listen_for_second_instance():
+    """Own the single-instance lock by listening on the local server that later
+    launches probe. Returns the server (the caller keeps it alive) or None if we
+    couldn't listen."""
+    from PySide6.QtNetwork import QLocalServer
+
+    QLocalServer.removeServer(_IPC_NAME)  # clear a stale endpoint from a hard crash
+    server = QLocalServer()
+    if not server.listen(_IPC_NAME):
+        return None
+    return server
+
+
+def _surface_on_second_instance(server, win) -> None:
+    """Drain any pending connections from other launches and, if any arrived,
+    bring the running window to the front."""
+    surfaced = False
+    while server.hasPendingConnections():
+        conn = server.nextPendingConnection()
+        if conn is not None:
+            conn.disconnectFromServer()
+            surfaced = True
+    if surfaced:
+        win.bring_to_front()
+
 
 def _set_windows_app_id() -> None:
     """Give Windows an explicit AppUserModelID so the taskbar treats findash
@@ -98,6 +147,13 @@ def main() -> int:
     app.setApplicationName("findash")
     app.setOrganizationName("findash")
 
+    # Single instance: if findash is already running, tell it to surface its
+    # window and exit before building anything. Otherwise claim the lock — done
+    # early so a rapid double-launch can't slip a second window through the gap.
+    if _running_instance_activated():
+        return 0
+    ipc_server = _listen_for_second_instance()
+
     from PySide6.QtGui import QIcon
 
     icon_path = BUNDLE_DIR / "findash.ico"
@@ -129,6 +185,14 @@ def main() -> int:
     win = MainWindow()
     if app_icon is not None:
         win.setWindowIcon(app_icon)
+
+    # Now that the window exists, route second-launch pings to it. Drain once up
+    # front in case a near-simultaneous launch connected during startup.
+    if ipc_server is not None:
+        ipc_server.newConnection.connect(
+            lambda: _surface_on_second_instance(ipc_server, win)
+        )
+        _surface_on_second_instance(ipc_server, win)
     # launch filling the screen; the 1500x900 set in MainWindow stays as the
     # un-maximized size when the user restores the window
     win.showMaximized()

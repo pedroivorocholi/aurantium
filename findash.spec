@@ -28,7 +28,10 @@ for _asset in ("findash.ico", "findash.icns"):
     if os.path.exists(_asset):
         datas.append((_asset, "."))
 binaries = []
-hiddenimports = []
+# QtNetwork drives the single-instance QLocalServer/QLocalSocket guard in
+# __main__.py. It's the only PySide6 module reached solely via runtime import,
+# so PyInstaller's PySide6 hook won't detect it — list it explicitly.
+hiddenimports = ["PySide6.QtNetwork"]
 
 # WinSparkle auto-updater DLL (Windows only). Drop the 64-bit WinSparkle.dll
 # next to this spec — see RELEASING.md. Bundled at the app root so

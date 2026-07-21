@@ -20,6 +20,33 @@
     <language>en</language>
 
     <item>
+      <title>findash 1.4.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>What&rsquo;s new in 1.4.2</h3>
+        <ul>
+          <li><b>Single instance:</b> findash now runs as one window. Launching it again &mdash; from the taskbar, Start menu, or desktop &mdash; brings the existing window to the front instead of opening a duplicate, and re-surfaces it when it&rsquo;s tucked away in the system tray.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 21 Jul 2026 17:35:16 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/findash/releases/download/v1.4.2/findash-setup.exe"
+        sparkle:version="1.4.2"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72940339"
+        sparkle:edSignature="2gf3OVVq7f75WYcy0zgmvzgvXwjcfavHWxbwtNvKWgk7iL940zb+c5mYgssBVOjfJObg7XHOeUTVJXRmIIaVBg=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
       <title>findash 1.4.1</title>
       <description><![CDATA[
         <style>

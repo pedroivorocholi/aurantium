@@ -261,7 +261,14 @@ class MainWindow(QMainWindow):
             self._show_from_tray()
 
     def _show_from_tray(self) -> None:
-        self.showNormal()
+        self.bring_to_front()
+
+    def bring_to_front(self) -> None:
+        """Restore, raise, and focus the window. Shared by the tray 'Show' action
+        and the single-instance handler that fires when a second launch asks the
+        already-running instance to surface (from the tray or from behind other
+        windows) instead of opening a duplicate."""
+        self.showNormal()  # also un-hides a window closed to the tray
         self.raise_()
         self.activateWindow()
 
