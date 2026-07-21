@@ -4,11 +4,21 @@
 #define AppId "aurantium.terminal.desktop.1"
 
 [Setup]
+; Pinned to the OLD product name on purpose: the findash-era installs never set an
+; explicit AppId, so Inno fell back to using AppName ("findash") as the internal
+; identity key. Keeping that same value here is what makes this installer recognized
+; as an upgrade of an existing findash install (same Programs-and-Features entry,
+; same install dir) instead of a fresh side-by-side "aurantium" install. Do not change
+; this even though everything else has been renamed.
+AppId=findash
 AppName=aurantium
 AppVersion=1.4.3
 AppPublisher=aurantium
 DefaultDirName={autopf}\aurantium
 DefaultGroupName=aurantium
+; Force the Start Menu group to actually rename to "aurantium" on upgrade too —
+; otherwise Inno would silently keep reusing the previous install's "findash" group.
+UsePreviousGroup=no
 DisableProgramGroupPage=yes
 OutputDir=dist
 OutputBaseFilename=aurantium-setup
@@ -25,6 +35,23 @@ WizardStyle=modern
 Source: "dist\aurantium\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "aurantium.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: ".env.example"; DestDir: "{app}"; Flags: ignoreversion
+
+[InstallDelete]
+; Same AppId means Setup upgrades in place rather than uninstalling the old findash
+; install first, so the renamed exe/icon/shortcuts would otherwise linger forever
+; alongside the new ones. Clean up the specific old-named artifacts (harmless no-op
+; on a fresh install, or if a path doesn't exist). Covers both per-user and
+; per-machine installs since PrivilegesRequired=lowest still allows either.
+Type: files; Name: "{app}\findash.exe"
+Type: files; Name: "{app}\findash.ico"
+Type: files; Name: "{userdesktop}\findash.lnk"
+Type: files; Name: "{commondesktop}\findash.lnk"
+Type: files; Name: "{userprograms}\findash\findash.lnk"
+Type: files; Name: "{userprograms}\findash\Uninstall findash.lnk"
+Type: dirifempty; Name: "{userprograms}\findash"
+Type: files; Name: "{commonprograms}\findash\findash.lnk"
+Type: files; Name: "{commonprograms}\findash\Uninstall findash.lnk"
+Type: dirifempty; Name: "{commonprograms}\findash"
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"
