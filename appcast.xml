@@ -20,6 +20,33 @@
     <language>en</language>
 
     <item>
+      <title>Aurantium 1.5.3</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.5.3 &mdash; Bug fix</h3>
+        <ul>
+          <li><b>Ctrl+Q now quits:</b> the Quit shortcut relied on a Windows key binding that doesn't actually exist, so it silently did nothing. It's now bound explicitly and works.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 22 Jul 2026 19:45:36 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.5.3/aurantium-setup.exe"
+        sparkle:version="1.5.3"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76111893"
+        sparkle:edSignature="KjOrHwVGuxwLVyN6Ey3W/g1XUmyHo+aNVApVQj2V2iR/RAEYjVXrWf1d13MrfWyaDfUDN7aq0M5H1wxwUmGpDQ=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
       <title>Aurantium 1.5.2</title>
       <description><![CDATA[
         <style>
