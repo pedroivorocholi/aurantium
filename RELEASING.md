@@ -1,12 +1,56 @@
-# Releasing Aurantium (with WinSparkle auto-updates)
+# Releasing Aurantium (with WinSparkle / updater_mac auto-updates)
 
-Aurantium ships updates through [WinSparkle](https://winsparkle.org/). On launch
-the app checks an **appcast** feed once a day; when a newer, correctly-signed
-installer is available it offers to download and run it. Users click once — no
+Aurantium ships updates through [WinSparkle](https://winsparkle.org/) on Windows
+and `aurantium/updater_mac.py` on macOS — both read the same **appcast** feed
+(`appcast.xml`) once a day; when a newer, correctly-signed build is available for
+their platform they offer to download and install it. Users click once — no
 manual re-install.
 
-This doc has two parts: **one-time setup** (do once), and the **per-release
-checklist** (every version).
+This doc has three parts: **one-time setup** (do once), the **automated
+release flow** (the normal way to cut a release — one tag push builds, signs,
+and publishes both platforms), and the **manual per-release checklist**
+(fallback — building one platform by hand, e.g. to test a change locally
+before tagging).
+
+---
+
+## Automated releases (`.github/workflows/release.yml`)
+
+One-time: add a repo secret named **`EDDSA_PRIVATE_KEY`** (Settings ▸ Secrets
+and variables ▸ Actions ▸ New repository secret) containing the exact contents
+of `tools/eddsa_private.key` (one base64 line, no surrounding quotes — see
+step 4 below for how that file is generated). Also check Settings ▸ Actions ▸
+General ▸ Workflow permissions is set to **"Read and write permissions"** —
+the `publish` job pushes the updated `appcast.xml` straight to `main`, which
+needs write access.
+
+Per release, once that's done:
+
+1. On `main`: bump `aurantium/__init__.py`'s `__version__` **and**
+   `installer.iss`'s `AppVersion` to the same new version, commit, push.
+2. Tag it — **use an annotated tag with a real message**, since the tag
+   message becomes both the GitHub release notes and the appcast item's
+   description:
+   ```bash
+   git tag -a v1.5.4 -m "- What changed…
+   - Another line…"
+   git push origin v1.5.4
+   ```
+3. Watch the **Actions** tab. `build-windows` and `build-macos` run in
+   parallel (each builds, signs with the shared key, uploads its artifact);
+   `publish` waits for both, verifies the tag matches `__version__`, creates
+   the GitHub release with both files attached, inserts both platforms'
+   `<item>`s into `appcast.xml` (`tools/ci_update_appcast.py`), and pushes
+   that to `main`.
+4. Verify per step 7 below, on a machine running the previous version, for
+   **both** platforms.
+
+If `publish` fails on the version check, you forgot step 1 — fix `main`,
+delete the tag (`git push --delete origin v1.5.4 && git tag -d v1.5.4`), and
+re-tag. This workflow is new and has not yet run for a real release — expect
+to debug the first run (see especially the Inno Setup `iscc` PATH step on
+Windows, and Gatekeeper/`xattr` on macOS if the published `.app` ever fails
+to relaunch after an update).
 
 ---
 
@@ -76,7 +120,11 @@ Download the latest WinSparkle release zip from
 
 ---
 
-## Per-release checklist
+## Manual per-release checklist (fallback)
+
+Only needed if you're releasing outside CI — e.g. testing a signing/appcast
+change locally, or a platform's CI runner is broken and you need to ship
+anyway. The automated flow above supersedes this for normal releases.
 
 Say you're going from 1.0.0 → **1.1.0**.
 

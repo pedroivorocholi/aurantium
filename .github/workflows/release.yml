@@ -1,0 +1,177 @@
+name: Release
+
+# Push a tag like v1.5.4 (matching aurantium/__init__.py's __version__) and
+# this builds the Windows installer AND the macOS app in parallel, signs both
+# with the same EdDSA key (EDDSA_PRIVATE_KEY secret), publishes both to one
+# GitHub release, and commits both appcast.xml entries to main. Manual,
+# single-platform releases are still documented in RELEASING.md — this just
+# means you don't have to hand a Mac build to a friend every time.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    outputs:
+      length: ${{ steps.sign.outputs.length }}
+      signature: ${{ steps.sign.outputs.signature }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Write signing key
+        shell: bash
+        run: printf '%s' "${{ secrets.EDDSA_PRIVATE_KEY }}" > tools/eddsa_private.key
+
+      - name: Build exe
+        run: pyinstaller aurantium.spec --noconfirm --clean
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Compile installer
+        shell: bash
+        run: iscc installer.iss
+
+      - name: Sign installer
+        id: sign
+        shell: bash
+        run: |
+          out=$(python tools/sign_update.py dist/aurantium-setup.exe)
+          echo "$out"
+          length=$(echo "$out" | sed -n 's/^length:[[:space:]]*//p')
+          sig=$(echo "$out" | sed -n 's/.*sparkle:edSignature="\(.*\)"/\1/p')
+          echo "length=$length" >> "$GITHUB_OUTPUT"
+          echo "signature=$sig" >> "$GITHUB_OUTPUT"
+
+      - name: Remove signing key
+        if: always()
+        shell: bash
+        run: rm -f tools/eddsa_private.key
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/aurantium-setup.exe
+
+  build-macos:
+    runs-on: macos-latest
+    outputs:
+      length: ${{ steps.sign.outputs.length }}
+      signature: ${{ steps.sign.outputs.signature }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Write signing key
+        run: printf '%s' "${{ secrets.EDDSA_PRIVATE_KEY }}" > tools/eddsa_private.key
+
+      - name: Build app bundle
+        run: pyinstaller aurantium.spec --noconfirm --clean
+
+      - name: Zip app bundle
+        run: cd dist && zip -r aurantium-mac.zip aurantium.app && cd ..
+
+      - name: Sign zip
+        id: sign
+        run: |
+          out=$(python tools/sign_update.py dist/aurantium-mac.zip)
+          echo "$out"
+          length=$(echo "$out" | sed -n 's/^length:[[:space:]]*//p')
+          sig=$(echo "$out" | sed -n 's/.*sparkle:edSignature="\(.*\)"/\1/p')
+          echo "length=$length" >> "$GITHUB_OUTPUT"
+          echo "signature=$sig" >> "$GITHUB_OUTPUT"
+
+      - name: Remove signing key
+        if: always()
+        run: rm -f tools/eddsa_private.key
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-app
+          path: dist/aurantium-mac.zip
+
+  publish:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # main, not the tag — appcast.xml gets edited and pushed to main
+      # regardless of exactly which commit the tag points at.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos-app
+          path: dist
+
+      - name: Derive + verify version
+        id: ver
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          code_version=$(grep -oP '(?<=__version__ = ")[^"]+' aurantium/__init__.py)
+          if [ "$code_version" != "$version" ]; then
+            echo "Tag $GITHUB_REF_NAME doesn't match aurantium/__init__.py's __version__ ($code_version) on main." >&2
+            echo "Bump __version__ (and installer.iss's AppVersion) on main, then re-tag." >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Release notes
+        run: |
+          git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > /tmp/notes.txt
+          [ -s /tmp/notes.txt ] || echo "See the GitHub release for details." > /tmp/notes.txt
+          cat /tmp/notes.txt
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            dist/aurantium-setup.exe dist/aurantium-mac.zip \
+            --title "Aurantium ${{ steps.ver.outputs.version }}" \
+            --notes-file /tmp/notes.txt
+
+      - name: Update appcast.xml
+        run: |
+          python tools/ci_update_appcast.py \
+            --appcast appcast.xml \
+            --version "${{ steps.ver.outputs.version }}" \
+            --notes-file /tmp/notes.txt \
+            --windows-url "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/aurantium-setup.exe" \
+            --windows-length "${{ needs.build-windows.outputs.length }}" \
+            --windows-sig "${{ needs.build-windows.outputs.signature }}" \
+            --macos-url "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/aurantium-mac.zip" \
+            --macos-length "${{ needs.build-macos.outputs.length }}" \
+            --macos-sig "${{ needs.build-macos.outputs.signature }}"
+
+      - name: Commit appcast
+        run: |
+          git config user.name "aurantium-release-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add appcast.xml
+          git commit -m "Release ${{ steps.ver.outputs.version }}: update appcast" || echo "Nothing to commit"
+          git push origin HEAD:main
