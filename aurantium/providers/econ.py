@@ -48,9 +48,34 @@ _WBC_SYMBOLS = {
 }
 
 # CFTC market key -> market_and_exchange_names filter (Socrata `like` pattern).
+# Every pattern verified live against the endpoint (exact strings preferred —
+# a loose pattern can match sibling markets, e.g. "COFFEE C%" also matches
+# COFFEE CALENDAR SPREAD OPTIONS).
 _CFTC_MARKETS = {
+    # metals
     "gold": "GOLD - COMMODITY EXCHANGE INC.",
+    "silver": "SILVER - COMMODITY EXCHANGE INC.",
+    # exact name varies slightly across report years ("COPPER-GRADE #1 …")
+    "copper": "COPPER%COMMODITY EXCHANGE INC.",
+    "platinum": "PLATINUM - NEW YORK MERCANTILE EXCHANGE",
+    "palladium": "PALLADIUM - NEW YORK MERCANTILE EXCHANGE",
+    # energy
     "crude_oil": "CRUDE OIL, LIGHT SWEET%",
+    "brent": "BRENT LAST DAY%",
+    # the physical NYMEX Henry Hub contract (NG) — "NATURAL GAS - NEW YORK…"
+    # stopped reporting under that name in 2022
+    "natgas": "NAT GAS NYME - NEW YORK MERCANTILE EXCHANGE",
+    "gasoline": "GASOLINE RBOB - NEW YORK MERCANTILE EXCHANGE",
+    "heating_oil": "NY HARBOR ULSD - NEW YORK MERCANTILE EXCHANGE",
+    # agriculture
+    "wheat": "WHEAT-SRW - CHICAGO BOARD OF TRADE",
+    "corn": "CORN - CHICAGO BOARD OF TRADE",
+    "soybeans": "SOYBEANS - CHICAGO BOARD OF TRADE",
+    "coffee": "COFFEE C - ICE FUTURES U.S.",
+    "sugar": "SUGAR NO. 11 - ICE FUTURES U.S.",
+    "cocoa": "COCOA - ICE FUTURES U.S.",
+    "cotton": "COTTON NO. 2 - ICE FUTURES U.S.",
+    # financial
     "sp500": "E-MINI S&P 500%",
     "bitcoin": "BITCOIN%",
     "euro_fx": "EURO FX%",
@@ -237,7 +262,7 @@ class EconProvider(Provider):
             resp = requests.get(
                 "https://publicreporting.cftc.gov/resource/jun7-fc8e.json",
                 params={
-                    "$limit": 8,
+                    "$limit": 120,  # ~2.3 years of weekly reports for history
                     "$order": "report_date_as_yyyy_mm_dd DESC",
                     "$where": f"market_and_exchange_names like '{pattern}'",
                 },
@@ -248,18 +273,39 @@ class EconProvider(Provider):
             if not rows:
                 hub.publish_error(topic, f"no CFTC data for {market}")
                 return
-            row = rows[0]
 
-            def _i(key: str) -> int:
+            def _i(row: dict, key: str) -> int:
                 f = _as_float(row.get(key))
                 return int(f) if f is not None else 0
 
-            commercial_net = _i("comm_positions_long_all") - _i("comm_positions_short_all")
-            noncommercial_net = _i("noncomm_positions_long_all") - _i(
-                "noncomm_positions_short_all"
+            def _net(row: dict) -> int:
+                return _i(row, "noncomm_positions_long_all") - _i(
+                    row, "noncomm_positions_short_all"
+                )
+
+            # a `like` pattern can match sibling markets; keep one row per
+            # report date (rows are newest-first, first match wins)
+            seen_dates: set[str] = set()
+            weekly: list[dict] = []
+            for r in rows:
+                d = r.get("report_date_as_yyyy_mm_dd", "")
+                if d in seen_dates:
+                    continue
+                seen_dates.add(d)
+                weekly.append(r)
+
+            row = weekly[0]
+            commercial_net = _i(row, "comm_positions_long_all") - _i(
+                row, "comm_positions_short_all"
             )
-            open_interest = _i("open_interest_all")
+            noncommercial_net = _net(row)
+            open_interest = _i(row, "open_interest_all")
             bias = "bullish" if noncommercial_net > 0 else "bearish"
+            # oldest -> newest, ready to plot
+            history = [
+                [r.get("report_date_as_yyyy_mm_dd", ""), _net(r), _i(r, "open_interest_all")]
+                for r in reversed(weekly)
+            ]
 
             hub.publish(
                 topic,
@@ -268,8 +314,10 @@ class EconProvider(Provider):
                     "report_date": row.get("report_date_as_yyyy_mm_dd", ""),
                     "commercial_net": commercial_net,
                     "noncommercial_net": noncommercial_net,
+                    "noncommercial_net_prev": _net(weekly[1]) if len(weekly) > 1 else None,
                     "open_interest": open_interest,
                     "bias": bias,
+                    "history": history,
                 },
             )
         except Exception as exc:

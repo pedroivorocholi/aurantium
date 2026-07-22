@@ -34,7 +34,7 @@ providers keep the topics fresh (TTL-based polling, shared cache, rate limits):
 | `fred:DGS10` | `{id, title, units, points:[[date, value], …]}` (needs FRED_API_KEY) | 1 h |
 | `wb:US:FP.CPI.TOTL.ZG` | World Bank indicator series (keyless) | 1 h |
 | `wbc:GOLD` | Commodity quote+trend (GOLD, WTI, BRENT, COPPER, SILVER, NATGAS) | 1 h |
-| `cftc:gold` | COT positioning `{commercial_net, noncommercial_net, open_interest, bias}` (keyless) | 1 h |
+| `cftc:gold` | COT positioning `{commercial_net, noncommercial_net, noncommercial_net_prev, open_interest, bias, history:[[date, net, oi], …]}` (keyless; markets: gold, silver, copper, brent, natgas, crude_oil, sp500, bitcoin, euro_fx) | 1 h |
 | `eia:spot:wti` | Energy spot price series (needs EIA_API_KEY) | 1 h |
 | `newsq:any free text` | Keyword news feed (e.g. `newsq:Brazil`) — same payload as `news:` | 5 min |
 | `profile:AAPL` | Company profile `{name, description, sector, industry, market_cap, pe_trailing/forward, eps, dividend_yield, beta, week52_high/low, employees, website, officers}` | 24 h |
@@ -83,7 +83,9 @@ as you like (e.g. two Topic News feeds with different queries):
 | Performance | Relative % return chart: linked symbol vs SPY/QQQ/… | Comparison list + period buttons |
 | Portfolio | Your positions with live P&L and totals | Add/remove positions; persists |
 | Market Movers | Top gainers / losers / most active | Category buttons |
-| Macro / Rates | US yield curve, 10Y–3M inversion spread, CFTC positioning | — |
+| Macro / Rates | US yield curve + spread, macro monitor (DXY, optional FRED series), CFTC positioning for the configured markets | Edit… dialog for tenors, instruments, and markets |
+| Futures Curve | Term structure of a commodity's futures with a plain-English contango/backwardation readout | Commodity buttons (gold, silver, copper, Brent, natgas, WTI) |
+| Positioning History (CFTC) | ~2 years of weekly net speculative positioning for one commodity | Commodity buttons |
 
 Two ready-made layouts ship in `layouts/`: `default.json` (loaded at startup)
 and `bloomberg.json` — a 10-panel Bloomberg-Launchpad-style arrangement

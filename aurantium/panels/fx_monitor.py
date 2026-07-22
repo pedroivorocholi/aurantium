@@ -11,18 +11,19 @@ from typing import Any
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
-    QDialog,
-    QDialogButtonBox,
     QHBoxLayout,
     QHeaderView,
-    QLabel,
-    QPlainTextEdit,
     QPushButton,
     QTableWidgetItem,
-    QVBoxLayout,
 )
 
-from ..components import MarketTable, make_filter_edit
+from ..components import (
+    EditorColumn,
+    EditorSection,
+    MarketTable,
+    make_filter_edit,
+    open_list_editor,
+)
 from ..undo import UndoStack
 from ..panel import Panel, register_panel
 from ..theme import ACCENT, BG_HEADER, FG_DIM, apply_tick
@@ -73,59 +74,6 @@ def _fmt_num(value: Any, decimals: int = 2) -> str:
         return f"{float(value):,.{decimals}f}"
     except (TypeError, ValueError):
         return "-"
-
-
-class _EditDialog(QDialog):
-    """Two-box editor: one QPlainTextEdit per section, lines of
-    "Label,SYMBOL". OK rebuilds the table from the parsed text."""
-
-    def __init__(self, majors: list, other: list, parent=None) -> None:
-        super().__init__(parent)
-        self.setWindowTitle("Edit FX Monitor")
-        self.resize(420, 420)
-
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Majors (one 'Label,SYMBOL' per line):", self))
-        self.majors_edit = QPlainTextEdit(self)
-        self.majors_edit.setPlainText(
-            "\n".join(f"{label},{sym}" for label, sym in majors)
-        )
-        layout.addWidget(self.majors_edit, 1)
-
-        layout.addWidget(QLabel("Other (one 'Label,SYMBOL' per line):", self))
-        self.other_edit = QPlainTextEdit(self)
-        self.other_edit.setPlainText(
-            "\n".join(f"{label},{sym}" for label, sym in other)
-        )
-        layout.addWidget(self.other_edit, 1)
-
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
-            self,
-        )
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-
-    @staticmethod
-    def _parse(text: str) -> list:
-        rows = []
-        for line in text.splitlines():
-            line = line.strip()
-            if not line or "," not in line:
-                continue
-            label, sym = line.split(",", 1)
-            label = label.strip()
-            sym = sym.strip().upper()
-            if label and sym:
-                rows.append([label, sym])
-        return rows
-
-    def result_majors(self) -> list:
-        return self._parse(self.majors_edit.toPlainText())
-
-    def result_other(self) -> list:
-        return self._parse(self.other_edit.toPlainText())
 
 
 @register_panel(id="fx", title="FX Monitor", category="Markets")
@@ -255,24 +203,33 @@ class FXMonitorPanel(Panel):
     # -- edit dialog ---------------------------------------------------------
 
     def _open_edit_dialog(self) -> None:
-        dlg = _EditDialog(self._majors, self._other, self)
-        if dlg.exec() == QDialog.DialogCode.Accepted:
-            majors = dlg.result_majors()
-            other = dlg.result_other()
-            if majors or other:
-                snap_m = [list(r) for r in self._majors]
-                snap_o = [list(r) for r in self._other]
+        columns = [EditorColumn("Label"), EditorColumn("Symbol", kind="symbol")]
+        hint = "Yahoo Finance symbols — pairs like EURUSD=X, indices like DX-Y.NYB, crypto like BTC-USD."
+        result = open_list_editor(
+            self,
+            "Edit FX Monitor",
+            [
+                EditorSection("majors", "Majors", columns, self._majors, hint=hint),
+                EditorSection("other", "Other", columns, self._other, hint=hint),
+            ],
+        )
+        if result is None:
+            return
+        majors, other = result["majors"], result["other"]
+        if majors or other:
+            snap_m = [list(r) for r in self._majors]
+            snap_o = [list(r) for r in self._other]
 
-                def _undo() -> None:
-                    self._majors = [list(r) for r in snap_m]
-                    self._other = [list(r) for r in snap_o]
-                    self._rebuild_table()
-                    self.set_status("undo · edit FX")
-
-                UndoStack.instance().push("edit FX", _undo)
-                self._majors = majors or self._majors
-                self._other = other or self._other
+            def _undo() -> None:
+                self._majors = [list(r) for r in snap_m]
+                self._other = [list(r) for r in snap_o]
                 self._rebuild_table()
+                self.set_status("undo · edit FX")
+
+            UndoStack.instance().push("edit FX", _undo)
+            self._majors = majors or self._majors
+            self._other = other or self._other
+            self._rebuild_table()
 
     # -- persistence -------------------------------------------------------------
 

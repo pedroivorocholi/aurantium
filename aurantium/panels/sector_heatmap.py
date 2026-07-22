@@ -14,13 +14,14 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
+from ..components import EditorColumn, EditorSection, open_list_editor
 from ..panel import Panel, register_panel
+from ..undo import UndoStack
 from ..theme import BG_ALT, DOWN, FG_DIM, UP
 
 DEFAULT_TILES = [
@@ -129,12 +130,10 @@ class SectorHeatmapPanel(Panel):
         self.content_layout.addWidget(self.grid_container, 1)
 
         edit_row = QHBoxLayout()
-        self.edit_line = QLineEdit(self)
-        self.edit_line.setPlaceholderText("Label=SYM, Label=SYM, …")
-        apply_btn = QPushButton("Apply", self)
-        apply_btn.clicked.connect(self._apply_edit_line)
-        edit_row.addWidget(self.edit_line, 1)
-        edit_row.addWidget(apply_btn)
+        edit_row.addStretch(1)
+        edit_btn = QPushButton("Edit…", self)
+        edit_btn.clicked.connect(self._open_edit_dialog)
+        edit_row.addWidget(edit_btn)
         self.content_layout.addLayout(edit_row)
 
         self._rebuild_grid()
@@ -159,10 +158,6 @@ class SectorHeatmapPanel(Panel):
             self.grid.addWidget(tile, row, col)
             self._tile_of_symbol[symbol] = tile
 
-        self.edit_line.setText(
-            ", ".join(f"{label}={sym}" for label, sym in self._tiles_cfg)
-        )
-
         for _label, sym in self._tiles_cfg:
             self.subscribe(f"quote:{sym}", lambda data, s=sym: self._on_quote(s, data))
 
@@ -174,25 +169,35 @@ class SectorHeatmapPanel(Panel):
             return
         tile.set_change_pct(data.get("change_pct"))
 
-    # -- edit line -------------------------------------------------------------
+    # -- edit dialog ---------------------------------------------------------
 
-    def _apply_edit_line(self) -> None:
-        text = self.edit_line.text().strip()
-        if not text:
+    def _open_edit_dialog(self) -> None:
+        result = open_list_editor(
+            self,
+            "Edit Sector Heatmap",
+            [
+                EditorSection(
+                    "tiles",
+                    "Tiles",
+                    [EditorColumn("Label"), EditorColumn("Symbol", kind="symbol")],
+                    self._tiles_cfg,
+                    hint="One tile per row — sector ETFs by default (XLK, XLF…), but "
+                    "any Yahoo Finance symbol works.",
+                )
+            ],
+        )
+        if result is None or not result["tiles"]:
             return
-        parsed = []
-        for entry in text.split(","):
-            entry = entry.strip()
-            if not entry or "=" not in entry:
-                continue
-            label, sym = entry.split("=", 1)
-            label = label.strip()
-            sym = sym.strip().upper()
-            if label and sym:
-                parsed.append([label, sym])
-        if parsed:
-            self._tiles_cfg = parsed
+        snap = [list(r) for r in self._tiles_cfg]
+
+        def _undo() -> None:
+            self._tiles_cfg = [list(r) for r in snap]
             self._rebuild_grid()
+            self.set_status("undo · edit heatmap")
+
+        UndoStack.instance().push("edit heatmap", _undo)
+        self._tiles_cfg = result["tiles"]
+        self._rebuild_grid()
 
     # -- persistence -------------------------------------------------------------
 

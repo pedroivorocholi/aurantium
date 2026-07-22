@@ -14,14 +14,15 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QPushButton,
     QScrollArea,
     QVBoxLayout,
     QWidget,
 )
 
+from ..components import EditorColumn, EditorSection, open_list_editor
 from ..panel import Panel, register_panel
+from ..undo import UndoStack
 from ..theme import ACCENT, BG, BORDER_STRONG, DOWN, FG_DIM, UP
 
 DEFAULT_SYMBOLS = [
@@ -155,14 +156,10 @@ class ChartGridPanel(Panel):
         self.content_layout.addWidget(self._scroll, 1)
 
         config_row = QHBoxLayout()
-        self.symbols_edit = QLineEdit(self)
-        self.symbols_edit.setText(", ".join(self._symbols))
-        self.symbols_edit.setPlaceholderText("Comma-separated symbols…")
-        apply_btn = QPushButton("Apply", self)
-        apply_btn.clicked.connect(self._apply_symbols)
-        self.symbols_edit.returnPressed.connect(self._apply_symbols)
-        config_row.addWidget(self.symbols_edit, 1)
-        config_row.addWidget(apply_btn)
+        config_row.addStretch(1)
+        edit_btn = QPushButton("Edit…", self)
+        edit_btn.clicked.connect(self._open_edit_dialog)
+        config_row.addWidget(edit_btn)
         self.content_layout.addLayout(config_row)
 
         self._rebuild_grid()
@@ -214,12 +211,32 @@ class ChartGridPanel(Panel):
     def _on_cell_click(self, symbol: str) -> None:
         self.set_symbol(symbol)
 
-    def _apply_symbols(self) -> None:
-        text = self.symbols_edit.text()
-        symbols = [s.strip().upper() for s in text.split(",") if s.strip()]
-        if not symbols:
+    def _open_edit_dialog(self) -> None:
+        result = open_list_editor(
+            self,
+            "Edit Chart Grid",
+            [
+                EditorSection(
+                    "symbols",
+                    "Symbols",
+                    [EditorColumn("Symbol", kind="symbol")],
+                    [[s] for s in self._symbols],
+                    hint="One chart per row — any Yahoo Finance symbol (^GSPC, GC=F, "
+                    "BTC-USD, AAPL…).",
+                )
+            ],
+        )
+        if result is None or not result["symbols"]:
             return
-        self._symbols = symbols
+        snap = list(self._symbols)
+
+        def _undo() -> None:
+            self._symbols = list(snap)
+            self._rebuild_grid()
+            self.set_status("undo · edit chart grid")
+
+        UndoStack.instance().push("edit chart grid", _undo)
+        self._symbols = [row[0] for row in result["symbols"]]
         self._rebuild_grid()
 
     # -- persistence -------------------------------------------------------------
@@ -233,5 +250,4 @@ class ChartGridPanel(Panel):
             cleaned = [str(s).strip().upper() for s in symbols if str(s).strip()]
             if cleaned:
                 self._symbols = cleaned
-                self.symbols_edit.setText(", ".join(self._symbols))
                 self._rebuild_grid()

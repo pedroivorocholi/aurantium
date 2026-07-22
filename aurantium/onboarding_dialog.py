@@ -177,6 +177,23 @@ icon to Show/Hide/Quit; turn on <b>Close to tray</b> — there or under
 <b>Settings</b> — if you'd like the window's ✕ to minimize to the tray instead of
 quitting (off by default, so ✕ quits as usual).</p>
 
+<h2>Macro, commodities &amp; positioning</h2>
+<p>The <b>Macro / Rates</b> panel is built for a weekly macro check: a US
+Treasury <b>yield curve</b>, a <b>Macro Monitor</b> (Dollar Index by default),
+and weekly <b>CFTC positioning</b> for gold, silver, copper, Brent, and natural
+gas. All three lists are configurable via <b>Edit…</b> — including FRED data
+series like the 10-year real yield (add a row as
+<code>Label,fred:DFII10</code>; needs a free FRED key under Settings &#9656; API
+Keys…). Click an instrument or positioning row to drive the linked panels.</p>
+<p>The <b>Futures Curve</b> panel plots the price of each upcoming delivery
+month for a commodity and says in plain words whether the curve slopes
+<i>upward</i> (contango: later deliveries cost more) or <i>downward</i>
+(backwardation: nearer deliveries cost more). The <b>Positioning History
+(CFTC)</b> panel charts about two years of the weekly net position of large
+speculative traders. In both, pick a commodity with the buttons — linked
+panels follow — or click a commodity anywhere else (Commodities, Macro/Rates)
+and these panels re-center on it.</p>
+
 <h2>Portfolio</h2>
 <p>In the <b>Positions</b> tab add a holding: symbol, <b>Qty</b>, <b>Price</b>,
 and a <b>Buy date</b>. Leave Price on <i>market</i> to use the current quote as

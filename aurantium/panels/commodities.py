@@ -10,18 +10,19 @@ from typing import Any
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
-    QDialog,
-    QDialogButtonBox,
     QHBoxLayout,
     QHeaderView,
-    QLabel,
-    QPlainTextEdit,
     QPushButton,
     QTableWidgetItem,
-    QVBoxLayout,
 )
 
-from ..components import MarketTable, make_filter_edit
+from ..components import (
+    EditorColumn,
+    EditorSection,
+    MarketTable,
+    make_filter_edit,
+    open_list_editor,
+)
 from ..panel import Panel, register_panel
 from ..undo import UndoStack
 from ..theme import ACCENT, BG_HEADER, FG_DIM, apply_tick
@@ -61,59 +62,6 @@ def _fmt_range(low: Any, high: Any) -> str:
     if low is None and high is None:
         return "-"
     return f"{_fmt_num(low)} – {_fmt_num(high)}"
-
-
-class _EditDialog(QDialog):
-    """Two-box editor: one QPlainTextEdit per section, lines of
-    "Label,SYMBOL". OK rebuilds the table from the parsed text."""
-
-    def __init__(self, energy: list, metals: list, parent=None) -> None:
-        super().__init__(parent)
-        self.setWindowTitle("Edit Commodities")
-        self.resize(420, 420)
-
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Energy (one 'Label,SYMBOL' per line):", self))
-        self.energy_edit = QPlainTextEdit(self)
-        self.energy_edit.setPlainText(
-            "\n".join(f"{label},{sym}" for label, sym in energy)
-        )
-        layout.addWidget(self.energy_edit, 1)
-
-        layout.addWidget(QLabel("Metals (one 'Label,SYMBOL' per line):", self))
-        self.metals_edit = QPlainTextEdit(self)
-        self.metals_edit.setPlainText(
-            "\n".join(f"{label},{sym}" for label, sym in metals)
-        )
-        layout.addWidget(self.metals_edit, 1)
-
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
-            self,
-        )
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-
-    @staticmethod
-    def _parse(text: str) -> list:
-        rows = []
-        for line in text.splitlines():
-            line = line.strip()
-            if not line or "," not in line:
-                continue
-            label, sym = line.split(",", 1)
-            label = label.strip()
-            sym = sym.strip().upper()
-            if label and sym:
-                rows.append([label, sym])
-        return rows
-
-    def result_energy(self) -> list:
-        return self._parse(self.energy_edit.toPlainText())
-
-    def result_metals(self) -> list:
-        return self._parse(self.metals_edit.toPlainText())
 
 
 @register_panel(id="commodities", title="Commodities", category="Markets")
@@ -247,24 +195,33 @@ class CommoditiesPanel(Panel):
     # -- edit dialog ---------------------------------------------------------
 
     def _open_edit_dialog(self) -> None:
-        dlg = _EditDialog(self._energy, self._metals, self)
-        if dlg.exec() == QDialog.DialogCode.Accepted:
-            energy = dlg.result_energy()
-            metals = dlg.result_metals()
-            if energy or metals:
-                snap_e = [list(r) for r in self._energy]
-                snap_m = [list(r) for r in self._metals]
+        columns = [EditorColumn("Label"), EditorColumn("Symbol", kind="symbol")]
+        hint = "Any Yahoo Finance futures symbol works — CL=F, BZ=F, GC=F, ALI=F…"
+        result = open_list_editor(
+            self,
+            "Edit Commodities",
+            [
+                EditorSection("energy", "Energy", columns, self._energy, hint=hint),
+                EditorSection("metals", "Metals", columns, self._metals, hint=hint),
+            ],
+        )
+        if result is None:
+            return
+        energy, metals = result["energy"], result["metals"]
+        if energy or metals:
+            snap_e = [list(r) for r in self._energy]
+            snap_m = [list(r) for r in self._metals]
 
-                def _undo() -> None:
-                    self._energy = [list(r) for r in snap_e]
-                    self._metals = [list(r) for r in snap_m]
-                    self._rebuild_table()
-                    self.set_status("undo · edit commodities")
-
-                UndoStack.instance().push("edit commodities", _undo)
-                self._energy = energy or self._energy
-                self._metals = metals or self._metals
+            def _undo() -> None:
+                self._energy = [list(r) for r in snap_e]
+                self._metals = [list(r) for r in snap_m]
                 self._rebuild_table()
+                self.set_status("undo · edit commodities")
+
+            UndoStack.instance().push("edit commodities", _undo)
+            self._energy = energy or self._energy
+            self._metals = metals or self._metals
+            self._rebuild_table()
 
     # -- persistence -------------------------------------------------------------
 

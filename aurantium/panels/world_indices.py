@@ -11,18 +11,19 @@ from typing import Any
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
-    QDialog,
-    QDialogButtonBox,
     QHBoxLayout,
     QHeaderView,
-    QLabel,
-    QPlainTextEdit,
     QPushButton,
     QTableWidgetItem,
-    QVBoxLayout,
 )
 
-from ..components import MarketTable, make_filter_edit
+from ..components import (
+    EditorColumn,
+    EditorSection,
+    MarketTable,
+    make_filter_edit,
+    open_list_editor,
+)
 from ..panel import Panel, register_panel
 from ..undo import UndoStack
 from ..theme import ACCENT, BG_HEADER, FG_DIM, apply_tick
@@ -63,69 +64,6 @@ def _fmt_num(value: Any, decimals: int = 2) -> str:
         return f"{float(value):,.{decimals}f}"
     except (TypeError, ValueError):
         return "-"
-
-
-class _EditDialog(QDialog):
-    """Three-box editor: one QPlainTextEdit per region, lines of
-    "Label,SYMBOL". OK rebuilds the table from the parsed text."""
-
-    def __init__(self, americas: list, europe: list, asia: list, parent=None) -> None:
-        super().__init__(parent)
-        self.setWindowTitle("Edit World Indices")
-        self.resize(420, 520)
-
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Americas (one 'Label,SYMBOL' per line):", self))
-        self.americas_edit = QPlainTextEdit(self)
-        self.americas_edit.setPlainText(
-            "\n".join(f"{label},{sym}" for label, sym in americas)
-        )
-        layout.addWidget(self.americas_edit, 1)
-
-        layout.addWidget(QLabel("Europe (one 'Label,SYMBOL' per line):", self))
-        self.europe_edit = QPlainTextEdit(self)
-        self.europe_edit.setPlainText(
-            "\n".join(f"{label},{sym}" for label, sym in europe)
-        )
-        layout.addWidget(self.europe_edit, 1)
-
-        layout.addWidget(QLabel("Asia/Pacific (one 'Label,SYMBOL' per line):", self))
-        self.asia_edit = QPlainTextEdit(self)
-        self.asia_edit.setPlainText(
-            "\n".join(f"{label},{sym}" for label, sym in asia)
-        )
-        layout.addWidget(self.asia_edit, 1)
-
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
-            self,
-        )
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-
-    @staticmethod
-    def _parse(text: str) -> list:
-        rows = []
-        for line in text.splitlines():
-            line = line.strip()
-            if not line or "," not in line:
-                continue
-            label, sym = line.split(",", 1)
-            label = label.strip()
-            sym = sym.strip().upper()
-            if label and sym:
-                rows.append([label, sym])
-        return rows
-
-    def result_americas(self) -> list:
-        return self._parse(self.americas_edit.toPlainText())
-
-    def result_europe(self) -> list:
-        return self._parse(self.europe_edit.toPlainText())
-
-    def result_asia(self) -> list:
-        return self._parse(self.asia_edit.toPlainText())
 
 
 @register_panel(id="world_indices", title="World Indices", category="Markets")
@@ -260,11 +198,21 @@ class WorldIndicesPanel(Panel):
     # -- edit dialog ---------------------------------------------------------
 
     def _open_edit_dialog(self) -> None:
-        dlg = _EditDialog(self._americas, self._europe, self._asia, self)
-        if dlg.exec() == QDialog.DialogCode.Accepted:
-            americas = dlg.result_americas()
-            europe = dlg.result_europe()
-            asia = dlg.result_asia()
+        columns = [EditorColumn("Label"), EditorColumn("Symbol", kind="symbol")]
+        hint = "Yahoo Finance index symbols — ^GSPC, ^FTSE, ^N225, 000001.SS…"
+        result = open_list_editor(
+            self,
+            "Edit World Indices",
+            [
+                EditorSection("americas", "Americas", columns, self._americas, hint=hint),
+                EditorSection("europe", "Europe", columns, self._europe, hint=hint),
+                EditorSection("asia", "Asia/Pacific", columns, self._asia, hint=hint),
+            ],
+        )
+        if result is not None:
+            americas = result["americas"]
+            europe = result["europe"]
+            asia = result["asia"]
             if americas or europe or asia:
                 snap_am = [list(r) for r in self._americas]
                 snap_eu = [list(r) for r in self._europe]
