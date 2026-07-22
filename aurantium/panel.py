@@ -78,13 +78,19 @@ class PanelRegistry:
 
 
 def register_panel(id: str, title: str, category: str = "General"):
-    """Class decorator registering a Panel subclass under ``id``."""
+    """Class decorator registering a Panel subclass under ``id``.
+
+    ``category="Examples"`` is reserved for tutorial files: the class is
+    annotated but NOT registered, so a stray copy of a template can never
+    leak into the Panels menu. To publish a copied template, change its
+    category (and id/title) along with the filename."""
 
     def deco(cls: Type["Panel"]) -> Type["Panel"]:
         cls.panel_id = id
         cls.panel_title = title
         cls.panel_category = category
-        PanelRegistry.add(PanelMeta(id=id, title=title, category=category, cls=cls))
+        if category != "Examples":
+            PanelRegistry.add(PanelMeta(id=id, title=title, category=category, cls=cls))
         return cls
 
     return deco

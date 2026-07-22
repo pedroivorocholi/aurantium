@@ -2,8 +2,11 @@
 
 The leading underscore in this filename keeps it OUT of the Panels menu
 (panel discovery skips ``_*.py`` files) — it's a tutorial, not a panel you'd
-use. To try it, copy it to a name without the underscore (e.g.
-``my_panel.py``), restart aurantium, and it appears under Panels ▸ Add Panel.
+use. The ``category="Examples"`` below is a second guard: that category is
+never registered, so even an underscore-less copy stays out of the menu. To
+try it, copy it to a name without the underscore (e.g. ``my_panel.py``),
+change ``id=``/``title=`` AND set a real ``category=`` (e.g. "Analytics"),
+restart aurantium, and it appears under Panels ▸ Add Panel.
 
 Read this file top to bottom, then copy it to write your own panel. A panel
 is one Python file in ``user_panels/`` (this directory) with exactly one

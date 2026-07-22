@@ -177,22 +177,37 @@ icon to Show/Hide/Quit; turn on <b>Close to tray</b> — there or under
 <b>Settings</b> — if you'd like the window's ✕ to minimize to the tray instead of
 quitting (off by default, so ✕ quits as usual).</p>
 
+<h2>Customizing panels</h2>
+<p>Configurable panels (Commodities, FX, World Indices, Sector Heatmap, Chart
+Grid, Macro/Rates) share one <b>Edit…</b> dialog: rows drag to reorder by the
+<b>⠿</b> grip, ✕ removes one, and <b>+ Add…</b> opens a search — type a plain
+name ("10 year", "cattle", "euro") and pick the instrument, no ticker
+memorization needed (free-text symbols still work and are verified live).
+Preset chips add common setups in one click. Quicker still:
+<b>right-click a row, tile, or mini chart</b> to remove it, add another, or
+jump into the full dialog — and <b>Ctrl+Z</b> undoes any edit.</p>
+
 <h2>Macro, commodities &amp; positioning</h2>
 <p>The <b>Macro / Rates</b> panel is built for a weekly macro check: a US
-Treasury <b>yield curve</b>, a <b>Macro Monitor</b> (Dollar Index by default),
-and weekly <b>CFTC positioning</b> for gold, silver, copper, Brent, and natural
-gas. All three lists are configurable via <b>Edit…</b> — including FRED data
-series like the 10-year real yield (add a row as
-<code>Label,fred:DFII10</code>; needs a free FRED key under Settings &#9656; API
-Keys…). Click an instrument or positioning row to drive the linked panels.</p>
+Treasury <b>yield curve</b> (hover it for per-tenor yields), a <b>Macro
+Monitor</b> (Dollar Index by default), and weekly <b>CFTC positioning</b> for
+gold, silver, copper, Brent, and natural gas. All three lists are configurable
+via <b>Edit…</b> or right-click — including FRED data series like the 10-year
+real yield, searchable by name (needs a free FRED key under Settings &#9656;
+API Keys…). Click an instrument or positioning row to drive the linked
+panels.</p>
 <p>The <b>Futures Curve</b> panel plots the price of each upcoming delivery
 month for a commodity and says in plain words whether the curve slopes
 <i>upward</i> (contango: later deliveries cost more) or <i>downward</i>
-(backwardation: nearer deliveries cost more). The <b>Positioning History
-(CFTC)</b> panel charts about two years of the weekly net position of large
-speculative traders. In both, pick a commodity with the buttons — linked
-panels follow — or click a commodity anywhere else (Commodities, Macro/Rates)
-and these panels re-center on it.</p>
+(backwardation: nearer deliveries cost more); hover a point for its price and
+month. The <b>Positioning History (CFTC)</b> panel charts the weekly net
+position of large speculative traders on a real date axis — hover for any
+week's reading, and use the <b>6M / 1Y / All</b> buttons to zoom the range.
+Both cover the full commodity universe (metals, energy, agriculture,
+livestock): pick one in the searchable dropdown — linked panels follow — or
+click a commodity anywhere else (Commodities, Macro/Rates) and these panels
+re-center on it. Charts stay clamped to their data, so you can't zoom off
+into empty space.</p>
 
 <h2>Portfolio</h2>
 <p>In the <b>Positions</b> tab add a holding: symbol, <b>Qty</b>, <b>Price</b>,

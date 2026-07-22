@@ -71,7 +71,6 @@ as you like (e.g. two Topic News feeds with different queries):
 | Company Profile | Bloomberg-DES-style: description, sector, key stats, officers | — (follows link group) |
 | Chart Grid | Grid of mini index/commodity charts; click a cell to drive linked panels | Comma-separated symbol list |
 | Commodities | GLCO-style energy + metals monitor | "Edit…" dialog for both sections |
-| Example: Macro Snapshot | CFTC positioning + commodity trends (tutorial file) | copy it to make your own |
 | Financials | Bloomberg-FA-style statements table | Income/Balance/Cash Flow × Annual/Quarterly toggles |
 | Earnings | Next earnings date + EPS est vs actual history | — (follows link group) |
 | Dividends | Yield, rate, ex-date, payout + dividend/split history | — (follows link group) |
@@ -84,8 +83,8 @@ as you like (e.g. two Topic News feeds with different queries):
 | Portfolio | Your positions with live P&L and totals | Add/remove positions; persists |
 | Market Movers | Top gainers / losers / most active | Category buttons |
 | Macro / Rates | US yield curve + spread, macro monitor (DXY, optional FRED series), CFTC positioning for the configured markets | Edit… dialog for tenors, instruments, and markets |
-| Futures Curve | Term structure of a commodity's futures with a plain-English contango/backwardation readout | Commodity buttons (gold, silver, copper, Brent, natgas, WTI) |
-| Positioning History (CFTC) | ~2 years of weekly net speculative positioning for one commodity | Commodity buttons |
+| Futures Curve | Term structure of a commodity's futures with a plain-English contango/backwardation readout, hover readouts and price labels | Searchable dropdown over the full commodity universe (metals, energy, agriculture, livestock) |
+| Positioning History (CFTC) | Weekly net speculative positioning for one commodity on a real date axis, with hover readout and latest marker | Searchable commodity dropdown + 6M/1Y/All range buttons |
 
 Two ready-made layouts ship in `layouts/`: `default.json` (loaded at startup)
 and `bloomberg.json` — a 10-panel Bloomberg-Launchpad-style arrangement
@@ -96,7 +95,10 @@ Rearrange anything by dragging, then File ▸ Save Layout to keep it.
 ## Write your own panel (one file, ~40 lines)
 
 Drop a file into `user_panels/`, restart the app, and it appears under
-Panels ▸ Add Panel. Start by copying `user_panels/example_macro.py`.
+Panels ▸ Add Panel. Start by copying `user_panels/_example_macro.py` to a
+name without the leading underscore, then change its `id=`, `title=`, and
+`category=` in `@register_panel` — the `"Examples"` category is reserved
+for tutorial files and never appears in the menu.
 
 ```python
 from aurantium.panel import Panel, register_panel
