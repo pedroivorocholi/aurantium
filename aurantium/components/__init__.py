@@ -13,6 +13,7 @@ from .market_table import (
     make_filter_edit,
     parse_numeric,
 )
+from .plot_utils import attach_hover, clamp_view, view_limits
 from .symbol_catalog import (
     FRED_ENTRIES,
     FX_ENTRIES,
@@ -36,10 +37,13 @@ __all__ = [
     "NumericTableWidgetItem",
     "SECTOR_ETF_ENTRIES",
     "TENOR_ENTRIES",
+    "attach_hover",
+    "clamp_view",
     "commodity_entries",
     "make_filter_edit",
     "open_add_picker",
     "open_list_editor",
     "parse_numeric",
     "search_catalog",
+    "view_limits",
 ]
