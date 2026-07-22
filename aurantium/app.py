@@ -725,7 +725,7 @@ class MainWindow(QMainWindow):
         m.addSeparator()
 
         a_quit = QAction("&Quit", self)
-        a_quit.setShortcut(QKeySequence.StandardKey.Quit)
+        a_quit.setShortcut(QKeySequence("Ctrl+Q"))
         # real quit even when 'Close to tray' is on (that only intercepts the X)
         a_quit.triggered.connect(self._quit_app)
         m.addAction(a_quit)
