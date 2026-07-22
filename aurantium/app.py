@@ -80,12 +80,22 @@ class MainWindow(QMainWindow):
         bl.setSpacing(10)
         lbl = QLabel("SYMBOL", bar)
         lbl.setObjectName("commandLabel")
-        self._cmd = CommandBar(bar, completions=self._command_completions)
+        self._cmd = CommandBar(bar)
         self._cmd.setObjectName("commandInput")
         self._cmd.setPlaceholderText(
-            "Ticker (AAPL) or a /command — /add /layout /save /refresh · ↑↓ history · Tab completes"
+            "Symbol or name (AAPL, nvidia, gold…) or a /command — ↑↓ history · Tab cycles suggestions"
         )
         self._cmd.returnPressed.connect(self._on_command)
+        from .components.symbol_search import SuggestField, shared_engine
+
+        engine = shared_engine()
+        engine.set_extra_symbols(self._watchlist_symbols)
+        self._suggest = SuggestField(
+            self._cmd,
+            engine,
+            on_pick=self._on_suggestion_picked,
+            slash_completions=self._command_completions,
+        )
         bl.addWidget(lbl)
         bl.addWidget(self._cmd, 1)
         self.setMenuWidget(self._wrap_menu_and_bar(bar))
@@ -993,22 +1003,33 @@ class MainWindow(QMainWindow):
                 DEFAULT_GROUP, raw.upper(), source=self
             )
         self._cmd.clear()
-        self._cmd.refresh_completions()
+
+    def _on_suggestion_picked(self, suggestion) -> None:
+        """A suggestion row was accepted in the top bar: navigate immediately
+        (Bloomberg-style, one action) and clear the bar for the next entry."""
+        code = suggestion.code
+        self._cmd.push_history(code)
+        SymbolContext.instance().set_symbol(DEFAULT_GROUP, code, source=self)
+        self._cmd.clear()
 
     def _command_completions(self) -> list[str]:
-        """Candidates for the command bar: /add <panel>, /layout <name>, the
-        bare /save & /refresh verbs, and every watchlist symbol currently on
-        screen."""
+        """Slash-command candidates for the command bar: /add <panel>,
+        /layout <name>, and the bare /save & /refresh verbs. (Symbols come
+        from the suggestion engine, not this list.)"""
         items = [f"/add {m.id}" for m in PanelRegistry.all()]
         items += [f"/layout {name}" for name in self.layout_store.names()]
         items += ["/save", "/refresh"]
+        return items
+
+    def _watchlist_symbols(self) -> list[str]:
+        """Every watchlist symbol currently on screen — the suggestion
+        engine's instant local source for tickers the user already tracks."""
         symbols: set[str] = set()
         for dock in self._docks.values():
             widget = dock.widget()
             if getattr(widget, "panel_id", "") == "watchlist":
                 symbols.update(getattr(widget, "_symbols", []) or [])
-        items += sorted(symbols)
-        return items
+        return sorted(symbols)
 
     def _run_slash_command(self, raw: str) -> None:
         parts = raw[1:].split(maxsplit=1)

@@ -268,6 +268,17 @@ QComboBox QAbstractItemView {{
     padding: 2px;
 }}
 
+/* -- symbol suggestion popup (components.symbol_search) ------------------ */
+QListView#suggestPopup {{
+    background: {p['CHROME']}; border: 1px solid {p['CHROME_BORDER']};
+    color: {p['CHROME_TEXT']}; outline: 0; padding: 2px;
+    font-family: "{MONO_FONT}"; font-size: 11px;
+}}
+QListView#suggestPopup::item {{ padding: 4px 8px; }}
+QListView#suggestPopup::item:selected {{
+    background: {p['ACCENT']}; color: {p['ON_ACCENT']};
+}}
+
 /* -- buttons: flat tabs, amber when active ------------------------------- */
 QPushButton {{
     background: {p['BG_ELEV']}; color: {p['CHROME_TEXT_DIM']};

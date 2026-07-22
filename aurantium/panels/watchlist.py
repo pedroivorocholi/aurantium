@@ -21,7 +21,12 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
-from ..components import MarketTable, NumericTableWidgetItem, make_filter_edit
+from ..components import (
+    MarketTable,
+    NumericTableWidgetItem,
+    attach_suggestions,
+    make_filter_edit,
+)
 from ..panel import Panel, register_panel
 from ..undo import UndoStack
 from ..theme import ACCENT, apply_tick
@@ -85,8 +90,9 @@ class WatchlistPanel(Panel):
 
         add_row = QHBoxLayout()
         self.symbol_edit = QLineEdit(self)
-        self.symbol_edit.setPlaceholderText("Add symbol…")
+        self.symbol_edit.setPlaceholderText("Add symbol or name…")
         self.symbol_edit.returnPressed.connect(self._add_symbol)
+        attach_suggestions(self.symbol_edit)
         add_btn = QPushButton("Add", self)
         add_btn.clicked.connect(self._add_symbol)
         remove_btn = QPushButton("Remove", self)

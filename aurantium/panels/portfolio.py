@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..components import attach_suggestions
 from ..panel import Panel, register_panel
 from ..theme import ACCENT, BG_HEADER, FG, FG_DIM, apply_tick
 from ..undo import UndoStack
@@ -258,6 +259,7 @@ class PortfolioPanel(Panel):
         self.symbol_edit.setPlaceholderText("Symbol")
         self.symbol_edit.setMaximumWidth(84)
         self.symbol_edit.returnPressed.connect(self._add_position)
+        attach_suggestions(self.symbol_edit)
         self.qty_spin = QDoubleSpinBox(w)
         self.qty_spin.setRange(0.0001, 1e9)
         self.qty_spin.setDecimals(4)

@@ -20,6 +20,35 @@
     <language>en</language>
 
     <item>
+      <title>Aurantium 1.5.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.5.1 &mdash; Search by name, everywhere</h3>
+        <ul>
+          <li><b>Type a name, get the instrument:</b> the SYMBOL bar now suggests as you type &mdash; &ldquo;nvidia&rdquo;, &ldquo;gold&rdquo;, &ldquo;10 year treasury&rdquo;, &ldquo;cattle&rdquo; all resolve to the right ticker. Commodities, indices, FX, treasury yields and sector ETFs answer instantly and offline; any listed company worldwide is found by live lookup.</li>
+          <li><b>Everywhere symbols are typed:</b> the same suggestions appear when adding to the Watchlist, creating a Price Alert, adding a Portfolio position, or building a Performance comparison list.</li>
+          <li><b>Keyboard-first:</b> Tab / Shift+Tab cycle the suggestions, Enter or click jumps straight to one, Esc dismisses. History recall (&#8593;/&#8595;) and /commands work as before.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 22 Jul 2026 21:00:00 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.5.1/aurantium-setup.exe"
+        sparkle:version="1.5.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76118700"
+        sparkle:edSignature="ZJjpdgbHxDohdwqNKF+P4OH7R2DZtSHiQY6fl7ZHIgJnG+1UaprCk8WucMjLmTUu/Ml2N6PVTtBlC6KNlz0RDg=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
       <title>Aurantium 1.5.0 — The Commodities Update</title>
       <description><![CDATA[
         <style>

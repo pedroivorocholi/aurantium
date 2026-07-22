@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..alerts import AlertEngine
+from ..components import attach_suggestions
 from ..panel import Panel, register_panel
 
 HEADERS = ["Symbol", "Field", "Cond", "Threshold", "On"]
@@ -39,6 +40,7 @@ class AlertsPanel(Panel):
         self.symbol_edit = QLineEdit(self)
         self.symbol_edit.setPlaceholderText("Symbol…")
         self.symbol_edit.setMaximumWidth(90)
+        attach_suggestions(self.symbol_edit)
         self.field_combo = QComboBox(self)
         for label, _key in _FIELD_ITEMS:
             self.field_combo.addItem(label)

@@ -61,7 +61,7 @@ _SHORTCUTS_HTML = _page_css() + f"""
   {_row(_kbd("Ctrl", "F"), "Jump to the SYMBOL box and select its text")}
   {_row(_kbd("Enter"), "In the SYMBOL box: send the ticker (or run a /command)")}
   {_row(_kbd("↑") + " / " + _kbd("↓"), "In the SYMBOL box: recall previous entries")}
-  {_row(_kbd("Tab"), "In the SYMBOL box: autocomplete a symbol or /command")}
+  {_row(_kbd("Tab") + " / " + _kbd("Shift", "Tab"), "In a symbol box: cycle through the suggestions popup")}
   {_row(_kbd("F5"), "Refresh all live feeds (quotes, news, charts, financials)")}
   {_row(_kbd("F11"), "Maximize the focused panel — press again to restore")}
   {_row(_kbd("Esc"), "Restore a maximized panel")}
@@ -123,8 +123,14 @@ from the <b>Panels</b> menu.</p>
 drive the linked panels, or type a <b>/command</b>: <code>/add &lt;panel&gt;</code>
 opens a panel, <code>/layout &lt;name&gt;</code> loads a saved layout,
 <code>/save &lt;name&gt;</code> saves the current one, and <code>/refresh</code>
-reloads every feed. Press <b>Tab</b> to autocomplete a symbol or command, and
-<b>↑ / ↓</b> to recall what you typed before (remembered across sessions).</p>
+reloads every feed. As you type, a popup suggests matching instruments — search
+by <b>name</b>, not just ticker: "nvidia", "gold", "10 year treasury", "cattle"
+all work, mixing the curated catalog (commodities, indices, FX, rates, sector
+ETFs) with a live Yahoo Finance lookup for any listed company. Press
+<b>Tab</b> / <b>Shift+Tab</b> to cycle the suggestions, <b>Enter</b> or click to
+jump straight to one, <b>Esc</b> to dismiss. The same suggestions appear in the
+Watchlist, Alerts, Portfolio and Performance symbol boxes. Press <b>↑ / ↓</b>
+to recall what you typed before (remembered across sessions).</p>
 
 <h2>Arranging your workspace</h2>
 <p>Drag a panel by its tab to move and snap it beside, above, or below another

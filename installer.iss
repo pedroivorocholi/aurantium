@@ -12,7 +12,7 @@
 ; this even though everything else has been renamed.
 AppId=findash
 AppName=Aurantium
-AppVersion=1.5.0
+AppVersion=1.5.1
 AppPublisher=Aurantium
 DefaultDirName={autopf}\Aurantium
 DefaultGroupName=Aurantium

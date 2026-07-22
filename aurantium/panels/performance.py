@@ -14,6 +14,7 @@ import pyqtgraph as pg
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton
 
+from ..components import attach_suggestions
 from ..panel import Panel, register_panel
 from ..theme import ACCENT, BG, FG_DIM
 
@@ -71,6 +72,7 @@ class PerformancePanel(Panel):
         self.compare_edit = QLineEdit(self)
         self.compare_edit.setText(", ".join(self._compare))
         self.compare_edit.returnPressed.connect(self._apply_compare)
+        attach_suggestions(self.compare_edit, token_separator=",")
         apply_btn = QPushButton("Apply", self)
         apply_btn.clicked.connect(self._apply_compare)
         compare_row.addWidget(self.compare_edit, 1)

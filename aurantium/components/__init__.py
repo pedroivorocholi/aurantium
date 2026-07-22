@@ -24,6 +24,13 @@ from .symbol_catalog import (
     commodity_entries,
     search_catalog,
 )
+from .symbol_search import (
+    SuggestField,
+    SuggestionEngine,
+    SymbolSuggestion,
+    attach_suggestions,
+    shared_engine,
+)
 
 __all__ = [
     "CatalogEntry",
@@ -36,8 +43,12 @@ __all__ = [
     "MarketTable",
     "NumericTableWidgetItem",
     "SECTOR_ETF_ENTRIES",
+    "SuggestField",
+    "SuggestionEngine",
+    "SymbolSuggestion",
     "TENOR_ENTRIES",
     "attach_hover",
+    "attach_suggestions",
     "clamp_view",
     "commodity_entries",
     "make_filter_edit",
@@ -45,5 +56,6 @@ __all__ = [
     "open_list_editor",
     "parse_numeric",
     "search_catalog",
+    "shared_engine",
     "view_limits",
 ]
