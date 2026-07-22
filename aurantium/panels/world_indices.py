@@ -18,10 +18,12 @@ from PySide6.QtWidgets import (
 )
 
 from ..components import (
+    INDEX_ENTRIES,
     EditorColumn,
     EditorSection,
     MarketTable,
     make_filter_edit,
+    open_add_picker,
     open_list_editor,
 )
 from ..panel import Panel, register_panel
@@ -84,6 +86,7 @@ class WorldIndicesPanel(Panel):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
         self.table.itemSelectionChanged.connect(self._on_row_selected)
         self.table.enable_column_menu()
+        self.table.set_row_actions(self._row_actions)
 
         self._filter = make_filter_edit(self.table, "Filter indices…")
         self.content_layout.addWidget(self._filter)
@@ -197,16 +200,66 @@ class WorldIndicesPanel(Panel):
 
     # -- edit dialog ---------------------------------------------------------
 
+    def _apply_edit(self, americas=None, europe=None, asia=None) -> None:
+        """Apply a config change (None = keep) behind one undo snapshot —
+        shared by the Edit dialog and the right-click quick actions."""
+        snap_am = [list(r) for r in self._americas]
+        snap_eu = [list(r) for r in self._europe]
+        snap_as = [list(r) for r in self._asia]
+
+        def _undo() -> None:
+            self._americas = [list(r) for r in snap_am]
+            self._europe = [list(r) for r in snap_eu]
+            self._asia = [list(r) for r in snap_as]
+            self._rebuild_table()
+            self.set_status("undo · edit indices")
+
+        UndoStack.instance().push("edit indices", _undo)
+        if americas is not None:
+            self._americas = americas
+        if europe is not None:
+            self._europe = europe
+        if asia is not None:
+            self._asia = asia
+        self._rebuild_table()
+
     def _open_edit_dialog(self) -> None:
         columns = [EditorColumn("Label"), EditorColumn("Symbol", kind="symbol")]
-        hint = "Yahoo Finance index symbols — ^GSPC, ^FTSE, ^N225, 000001.SS…"
+
+        def section(key: str, title: str, rows: list, blurb: str) -> EditorSection:
+            return EditorSection(
+                key,
+                title,
+                columns,
+                rows,
+                description=blurb,
+                catalog=INDEX_ENTRIES,
+            )
+
         result = open_list_editor(
             self,
             "Edit World Indices",
             [
-                EditorSection("americas", "Americas", columns, self._americas, hint=hint),
-                EditorSection("europe", "Europe", columns, self._europe, hint=hint),
-                EditorSection("asia", "Asia/Pacific", columns, self._asia, hint=hint),
+                section(
+                    "americas",
+                    "Americas",
+                    self._americas,
+                    "Live index quotes in the Americas group — any Yahoo "
+                    "Finance index symbol works (^GSPC, ^BVSP…).",
+                ),
+                section(
+                    "europe",
+                    "Europe",
+                    self._europe,
+                    "Live index quotes in the Europe group (^FTSE, ^GDAXI…).",
+                ),
+                section(
+                    "asia",
+                    "Asia/Pacific",
+                    self._asia,
+                    "Live index quotes in the Asia/Pacific group (^N225, "
+                    "^HSI, 000001.SS…).",
+                ),
             ],
         )
         if result is not None:
@@ -214,22 +267,42 @@ class WorldIndicesPanel(Panel):
             europe = result["europe"]
             asia = result["asia"]
             if americas or europe or asia:
-                snap_am = [list(r) for r in self._americas]
-                snap_eu = [list(r) for r in self._europe]
-                snap_as = [list(r) for r in self._asia]
+                self._apply_edit(americas or None, europe or None, asia or None)
 
-                def _undo() -> None:
-                    self._americas = [list(r) for r in snap_am]
-                    self._europe = [list(r) for r in snap_eu]
-                    self._asia = [list(r) for r in snap_as]
-                    self._rebuild_table()
-                    self.set_status("undo · edit indices")
+    def _row_actions(self, row: int) -> list:
+        groups = [
+            ("Americas", self._americas, "americas"),
+            ("Europe", self._europe, "europe"),
+            ("Asia/Pacific", self._asia, "asia"),
+        ]
+        actions = []
+        kind, symbol = self._row_kind.get(row, (None, None))
+        if kind == ROW_KIND_DATA and symbol:
+            for _title, rows, key in groups:
+                label = next((l for l, s in rows if s == symbol), None)
+                if label is None:
+                    continue
 
-                UndoStack.instance().push("edit indices", _undo)
-                self._americas = americas or self._americas
-                self._europe = europe or self._europe
-                self._asia = asia or self._asia
-                self._rebuild_table()
+                def _remove(k=key, sym=symbol, group_rows=rows) -> None:
+                    remaining = [list(r) for r in group_rows if r[1] != sym]
+                    self._apply_edit(**{k: remaining})
+
+                actions.append((f'Remove "{label}"', _remove))
+                break
+
+        def _add(key: str, title: str, rows: list) -> None:
+            entry = open_add_picker(self, INDEX_ENTRIES, title=f"Add to {title}")
+            if entry is not None:
+                self._apply_edit(
+                    **{key: [list(r) for r in rows] + [[entry.label, entry.code]]}
+                )
+
+        for title, rows, key in groups:
+            actions.append(
+                (f"Add to {title}…", lambda t=title, r=rows, k=key: _add(k, t, r))
+            )
+        actions.append(("Edit panel…", self._open_edit_dialog))
+        return actions
 
     # -- persistence -------------------------------------------------------------
 

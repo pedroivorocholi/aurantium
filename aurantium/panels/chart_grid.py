@@ -20,7 +20,15 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..components import EditorColumn, EditorSection, open_list_editor
+from ..components import (
+    FX_ENTRIES,
+    INDEX_ENTRIES,
+    EditorColumn,
+    EditorSection,
+    commodity_entries,
+    open_add_picker,
+    open_list_editor,
+)
 from ..panel import Panel, register_panel
 from ..undo import UndoStack
 from ..theme import ACCENT, BG, BORDER_STRONG, DOWN, FG_DIM, UP
@@ -62,10 +70,13 @@ class _ChartCell(QWidget):
     """One grid cell: title label + mini line chart. Clicking anywhere on
     the cell publishes its symbol via ``on_click``."""
 
-    def __init__(self, symbol: str, on_click, parent: QWidget | None = None) -> None:
+    def __init__(
+        self, symbol: str, on_click, on_menu=None, parent: QWidget | None = None
+    ) -> None:
         super().__init__(parent)
         self.symbol = symbol
         self._on_click = on_click
+        self._on_menu = on_menu
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setMinimumHeight(120)
         self.setObjectName("chartCell")
@@ -100,6 +111,8 @@ class _ChartCell(QWidget):
     def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802 (Qt override)
         if event.button() == Qt.MouseButton.LeftButton:
             self._on_click(self.symbol)
+        elif event.button() == Qt.MouseButton.RightButton and self._on_menu:
+            self._on_menu(self.symbol, event.globalPosition().toPoint())
         super().mousePressEvent(event)
 
     def set_history(self, t: list, c: list) -> None:
@@ -178,7 +191,9 @@ class ChartGridPanel(Panel):
         self._cells.clear()
 
         for i, sym in enumerate(self._symbols):
-            cell = _ChartCell(sym, self._on_cell_click, self._grid_host)
+            cell = _ChartCell(
+                sym, self._on_cell_click, self._show_cell_menu, self._grid_host
+            )
             row, col = divmod(i, COLUMNS)
             self._grid.addWidget(cell, row, col)
             self._cells[sym] = cell
@@ -211,6 +226,20 @@ class ChartGridPanel(Panel):
     def _on_cell_click(self, symbol: str) -> None:
         self.set_symbol(symbol)
 
+    def _apply_edit(self, symbols: list[str]) -> None:
+        """Apply a symbol-set change behind one undo snapshot — shared by
+        the Edit dialog and the cell right-click menu."""
+        snap = list(self._symbols)
+
+        def _undo() -> None:
+            self._symbols = list(snap)
+            self._rebuild_grid()
+            self.set_status("undo · edit chart grid")
+
+        UndoStack.instance().push("edit chart grid", _undo)
+        self._symbols = symbols
+        self._rebuild_grid()
+
     def _open_edit_dialog(self) -> None:
         result = open_list_editor(
             self,
@@ -221,23 +250,36 @@ class ChartGridPanel(Panel):
                     "Symbols",
                     [EditorColumn("Symbol", kind="symbol")],
                     [[s] for s in self._symbols],
-                    hint="One chart per row — any Yahoo Finance symbol (^GSPC, GC=F, "
-                    "BTC-USD, AAPL…).",
+                    description="One mini chart per row — any Yahoo Finance "
+                    "symbol (^GSPC, GC=F, BTC-USD, AAPL…).",
+                    catalog=INDEX_ENTRIES + commodity_entries() + FX_ENTRIES,
                 )
             ],
         )
         if result is None or not result["symbols"]:
             return
-        snap = list(self._symbols)
+        self._apply_edit([row[0] for row in result["symbols"]])
 
-        def _undo() -> None:
-            self._symbols = list(snap)
-            self._rebuild_grid()
-            self.set_status("undo · edit chart grid")
+    def _show_cell_menu(self, symbol: str, global_pos) -> None:
+        from PySide6.QtWidgets import QMenu
 
-        UndoStack.instance().push("edit chart grid", _undo)
-        self._symbols = [row[0] for row in result["symbols"]]
-        self._rebuild_grid()
+        menu = QMenu(self)
+        remove_act = menu.addAction(f'Remove "{symbol}"')
+        add_act = menu.addAction("Add chart…")
+        edit_act = menu.addAction("Edit panel…")
+        chosen = menu.exec(global_pos)
+        if chosen is remove_act:
+            self._apply_edit([s for s in self._symbols if s != symbol])
+        elif chosen is add_act:
+            entry = open_add_picker(
+                self,
+                INDEX_ENTRIES + commodity_entries() + FX_ENTRIES,
+                title="Add Chart",
+            )
+            if entry is not None and entry.code not in self._symbols:
+                self._apply_edit(list(self._symbols) + [entry.code])
+        elif chosen is edit_act:
+            self._open_edit_dialog()
 
     # -- persistence -------------------------------------------------------------
 

@@ -19,7 +19,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..components import EditorColumn, EditorSection, open_list_editor
+from ..components import (
+    SECTOR_ETF_ENTRIES,
+    EditorColumn,
+    EditorSection,
+    open_add_picker,
+    open_list_editor,
+)
 from ..panel import Panel, register_panel
 from ..undo import UndoStack
 from ..theme import BG_ALT, DOWN, FG_DIM, UP
@@ -77,6 +83,7 @@ class _Tile(QFrame):
     """A single clickable sector tile."""
 
     clicked = Signal(str)
+    menu_requested = Signal(str, object)  # symbol, global pos
 
     def __init__(self, label: str, symbol: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -115,6 +122,8 @@ class _Tile(QFrame):
     def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802 (Qt override)
         if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit(self._symbol)
+        elif event.button() == Qt.MouseButton.RightButton:
+            self.menu_requested.emit(self._symbol, event.globalPosition().toPoint())
         super().mousePressEvent(event)
 
 
@@ -155,6 +164,7 @@ class SectorHeatmapPanel(Panel):
             row, col = divmod(idx, GRID_COLS)
             tile = _Tile(label, symbol, self.grid_container)
             tile.clicked.connect(self.set_symbol)
+            tile.menu_requested.connect(self._show_tile_menu)
             self.grid.addWidget(tile, row, col)
             self._tile_of_symbol[symbol] = tile
 
@@ -169,7 +179,21 @@ class SectorHeatmapPanel(Panel):
             return
         tile.set_change_pct(data.get("change_pct"))
 
-    # -- edit dialog ---------------------------------------------------------
+    # -- edit dialog & quick actions -----------------------------------------
+
+    def _apply_edit(self, tiles: list) -> None:
+        """Apply a tile-set change behind one undo snapshot — shared by the
+        Edit dialog and the tile right-click menu."""
+        snap = [list(r) for r in self._tiles_cfg]
+
+        def _undo() -> None:
+            self._tiles_cfg = [list(r) for r in snap]
+            self._rebuild_grid()
+            self.set_status("undo · edit heatmap")
+
+        UndoStack.instance().push("edit heatmap", _undo)
+        self._tiles_cfg = tiles
+        self._rebuild_grid()
 
     def _open_edit_dialog(self) -> None:
         result = open_list_editor(
@@ -181,23 +205,38 @@ class SectorHeatmapPanel(Panel):
                     "Tiles",
                     [EditorColumn("Label"), EditorColumn("Symbol", kind="symbol")],
                     self._tiles_cfg,
-                    hint="One tile per row — sector ETFs by default (XLK, XLF…), but "
-                    "any Yahoo Finance symbol works.",
+                    description="One colored tile per row — S&P sector ETFs by "
+                    "default, but any Yahoo Finance symbol works.",
+                    catalog=SECTOR_ETF_ENTRIES,
+                    presets=[
+                        ("All 11 sectors", [[e.label, e.code] for e in SECTOR_ETF_ENTRIES]),
+                    ],
                 )
             ],
         )
         if result is None or not result["tiles"]:
             return
-        snap = [list(r) for r in self._tiles_cfg]
+        self._apply_edit(result["tiles"])
 
-        def _undo() -> None:
-            self._tiles_cfg = [list(r) for r in snap]
-            self._rebuild_grid()
-            self.set_status("undo · edit heatmap")
+    def _show_tile_menu(self, symbol: str, global_pos) -> None:
+        from PySide6.QtWidgets import QMenu
 
-        UndoStack.instance().push("edit heatmap", _undo)
-        self._tiles_cfg = result["tiles"]
-        self._rebuild_grid()
+        label = next((l for l, s in self._tiles_cfg if s == symbol), symbol)
+        menu = QMenu(self)
+        remove_act = menu.addAction(f'Remove "{label}"')
+        add_act = menu.addAction("Add tile…")
+        edit_act = menu.addAction("Edit panel…")
+        chosen = menu.exec(global_pos)
+        if chosen is remove_act:
+            self._apply_edit([list(r) for r in self._tiles_cfg if r[1] != symbol])
+        elif chosen is add_act:
+            entry = open_add_picker(self, SECTOR_ETF_ENTRIES, title="Add Tile")
+            if entry is not None:
+                self._apply_edit(
+                    [list(r) for r in self._tiles_cfg] + [[entry.label, entry.code]]
+                )
+        elif chosen is edit_act:
+            self._open_edit_dialog()
 
     # -- persistence -------------------------------------------------------------
 

@@ -18,10 +18,12 @@ from PySide6.QtWidgets import (
 )
 
 from ..components import (
+    FX_ENTRIES,
     EditorColumn,
     EditorSection,
     MarketTable,
     make_filter_edit,
+    open_add_picker,
     open_list_editor,
 )
 from ..undo import UndoStack
@@ -93,6 +95,7 @@ class FXMonitorPanel(Panel):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
         self.table.itemSelectionChanged.connect(self._on_row_selected)
         self.table.enable_column_menu()
+        self.table.set_row_actions(self._row_actions)
 
         self._filter = make_filter_edit(self.table, "Filter pairs…")
         self.content_layout.addWidget(self._filter)
@@ -202,34 +205,98 @@ class FXMonitorPanel(Panel):
 
     # -- edit dialog ---------------------------------------------------------
 
+    def _apply_edit(self, majors=None, other=None) -> None:
+        """Apply a config change (None = keep) behind one undo snapshot —
+        shared by the Edit dialog and the right-click quick actions."""
+        snap_m = [list(r) for r in self._majors]
+        snap_o = [list(r) for r in self._other]
+
+        def _undo() -> None:
+            self._majors = [list(r) for r in snap_m]
+            self._other = [list(r) for r in snap_o]
+            self._rebuild_table()
+            self.set_status("undo · edit FX")
+
+        UndoStack.instance().push("edit FX", _undo)
+        if majors is not None:
+            self._majors = majors
+        if other is not None:
+            self._other = other
+        self._rebuild_table()
+
     def _open_edit_dialog(self) -> None:
         columns = [EditorColumn("Label"), EditorColumn("Symbol", kind="symbol")]
-        hint = "Yahoo Finance symbols — pairs like EURUSD=X, indices like DX-Y.NYB, crypto like BTC-USD."
         result = open_list_editor(
             self,
             "Edit FX Monitor",
             [
-                EditorSection("majors", "Majors", columns, self._majors, hint=hint),
-                EditorSection("other", "Other", columns, self._other, hint=hint),
+                EditorSection(
+                    "majors",
+                    "Majors",
+                    columns,
+                    self._majors,
+                    description="Live rates in the Majors group — Yahoo pairs "
+                    "like EURUSD=X, indices like DX-Y.NYB, crypto like BTC-USD.",
+                    catalog=FX_ENTRIES,
+                    presets=[
+                        ("G3 pairs", [["EUR/USD", "EURUSD=X"], ["USD/JPY", "USDJPY=X"], ["GBP/USD", "GBPUSD=X"]]),
+                    ],
+                ),
+                EditorSection(
+                    "other",
+                    "Other",
+                    columns,
+                    self._other,
+                    description="Live rates in the Other group — EM pairs, the "
+                    "dollar index, crypto.",
+                    catalog=FX_ENTRIES,
+                    presets=[
+                        ("LatAm", [["USD/BRL", "USDBRL=X"], ["USD/MXN", "USDMXN=X"]]),
+                    ],
+                ),
             ],
         )
         if result is None:
             return
         majors, other = result["majors"], result["other"]
         if majors or other:
-            snap_m = [list(r) for r in self._majors]
-            snap_o = [list(r) for r in self._other]
+            self._apply_edit(majors or None, other or None)
 
-            def _undo() -> None:
-                self._majors = [list(r) for r in snap_m]
-                self._other = [list(r) for r in snap_o]
-                self._rebuild_table()
-                self.set_status("undo · edit FX")
+    def _row_actions(self, row: int) -> list:
+        actions = []
+        kind, symbol = self._row_kind.get(row, (None, None))
+        if kind == ROW_KIND_DATA and symbol:
+            in_majors = any(s == symbol for _l, s in self._majors)
+            group = self._majors if in_majors else self._other
+            label = next((l for l, s in group if s == symbol), symbol)
 
-            UndoStack.instance().push("edit FX", _undo)
-            self._majors = majors or self._majors
-            self._other = other or self._other
-            self._rebuild_table()
+            def _remove() -> None:
+                rows = [list(r) for r in group if r[1] != symbol]
+                if in_majors:
+                    self._apply_edit(majors=rows)
+                else:
+                    self._apply_edit(other=rows)
+
+            actions.append((f'Remove "{label}"', _remove))
+
+        def _add(to_majors: bool) -> None:
+            entry = open_add_picker(
+                self,
+                FX_ENTRIES,
+                title="Add to Majors" if to_majors else "Add to Other",
+            )
+            if entry is None:
+                return
+            new_row = [entry.label, entry.code]
+            if to_majors:
+                self._apply_edit(majors=[list(r) for r in self._majors] + [new_row])
+            else:
+                self._apply_edit(other=[list(r) for r in self._other] + [new_row])
+
+        actions.append(("Add to Majors…", lambda: _add(True)))
+        actions.append(("Add to Other…", lambda: _add(False)))
+        actions.append(("Edit panel…", self._open_edit_dialog))
+        return actions
 
     # -- persistence -------------------------------------------------------------
 

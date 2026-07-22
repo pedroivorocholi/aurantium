@@ -20,7 +20,9 @@ from ..components import (
     EditorColumn,
     EditorSection,
     MarketTable,
+    commodity_entries,
     make_filter_edit,
+    open_add_picker,
     open_list_editor,
 )
 from ..panel import Panel, register_panel
@@ -81,6 +83,7 @@ class CommoditiesPanel(Panel):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
         self.table.itemSelectionChanged.connect(self._on_row_selected)
         self.table.enable_column_menu()
+        self.table.set_row_actions(self._row_actions)
 
         self._filter = make_filter_edit(self.table, "Filter commodities…")
         self.content_layout.addWidget(self._filter)
@@ -194,34 +197,99 @@ class CommoditiesPanel(Panel):
 
     # -- edit dialog ---------------------------------------------------------
 
+    def _apply_edit(self, energy=None, metals=None) -> None:
+        """Apply a config change (None = keep) behind one undo snapshot —
+        shared by the Edit dialog and the right-click quick actions."""
+        snap_e = [list(r) for r in self._energy]
+        snap_m = [list(r) for r in self._metals]
+
+        def _undo() -> None:
+            self._energy = [list(r) for r in snap_e]
+            self._metals = [list(r) for r in snap_m]
+            self._rebuild_table()
+            self.set_status("undo · edit commodities")
+
+        UndoStack.instance().push("edit commodities", _undo)
+        if energy is not None:
+            self._energy = energy
+        if metals is not None:
+            self._metals = metals
+        self._rebuild_table()
+
     def _open_edit_dialog(self) -> None:
         columns = [EditorColumn("Label"), EditorColumn("Symbol", kind="symbol")]
-        hint = "Any Yahoo Finance futures symbol works — CL=F, BZ=F, GC=F, ALI=F…"
+        catalog = commodity_entries()
         result = open_list_editor(
             self,
             "Edit Commodities",
             [
-                EditorSection("energy", "Energy", columns, self._energy, hint=hint),
-                EditorSection("metals", "Metals", columns, self._metals, hint=hint),
+                EditorSection(
+                    "energy",
+                    "Energy",
+                    columns,
+                    self._energy,
+                    description="Live futures quotes in the Energy group — any "
+                    "Yahoo Finance symbol works (CL=F, BZ=F…).",
+                    catalog=catalog,
+                    presets=[
+                        ("Oil complex", [["WTI", "CL=F"], ["Brent", "BZ=F"]]),
+                    ],
+                ),
+                EditorSection(
+                    "metals",
+                    "Metals",
+                    columns,
+                    self._metals,
+                    description="Live futures quotes in the Metals group — any "
+                    "Yahoo Finance symbol works (GC=F, SI=F…).",
+                    catalog=catalog,
+                    presets=[
+                        ("Precious", [["Gold", "GC=F"], ["Silver", "SI=F"]]),
+                    ],
+                ),
             ],
         )
         if result is None:
             return
         energy, metals = result["energy"], result["metals"]
         if energy or metals:
-            snap_e = [list(r) for r in self._energy]
-            snap_m = [list(r) for r in self._metals]
+            self._apply_edit(energy or None, metals or None)
 
-            def _undo() -> None:
-                self._energy = [list(r) for r in snap_e]
-                self._metals = [list(r) for r in snap_m]
-                self._rebuild_table()
-                self.set_status("undo · edit commodities")
+    def _row_actions(self, row: int) -> list:
+        actions = []
+        kind, symbol = self._row_kind.get(row, (None, None))
+        if kind == ROW_KIND_DATA and symbol:
+            in_energy = any(s == symbol for _l, s in self._energy)
+            group = self._energy if in_energy else self._metals
+            label = next((l for l, s in group if s == symbol), symbol)
 
-            UndoStack.instance().push("edit commodities", _undo)
-            self._energy = energy or self._energy
-            self._metals = metals or self._metals
-            self._rebuild_table()
+            def _remove() -> None:
+                rows = [list(r) for r in group if r[1] != symbol]
+                if in_energy:
+                    self._apply_edit(energy=rows)
+                else:
+                    self._apply_edit(metals=rows)
+
+            actions.append((f'Remove "{label}"', _remove))
+
+        def _add(to_energy: bool) -> None:
+            entry = open_add_picker(
+                self,
+                commodity_entries(),
+                title="Add to Energy" if to_energy else "Add to Metals",
+            )
+            if entry is None:
+                return
+            new_row = [entry.label, entry.code]
+            if to_energy:
+                self._apply_edit(energy=[list(r) for r in self._energy] + [new_row])
+            else:
+                self._apply_edit(metals=[list(r) for r in self._metals] + [new_row])
+
+        actions.append(("Add to Energy…", lambda: _add(True)))
+        actions.append(("Add to Metals…", lambda: _add(False)))
+        actions.append(("Edit panel…", self._open_edit_dialog))
+        return actions
 
     # -- persistence -------------------------------------------------------------
 
