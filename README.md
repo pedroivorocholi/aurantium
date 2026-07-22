@@ -1,4 +1,4 @@
-![Aurantium](aurantium_logo.png)
+![Aurantium](aurantium_logo_ondark.png)
 
 # Aurantium
 
