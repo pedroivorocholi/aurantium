@@ -328,9 +328,11 @@ class MainWindow(QMainWindow):
 
     def _on_alert_triggered(self, message: str) -> None:
         if self._tray is not None:
+            # pass the tray's own QIcon (not MessageIcon.Information) so the
+            # Windows toast shows the Aurantium icon instead of the generic ⓘ
             self._tray.showMessage(
                 "Aurantium — price alert", message,
-                QSystemTrayIcon.MessageIcon.Information, 8000,
+                self._tray.icon(), 8000,
             )
         self.statusBar().showMessage(f"⚠ Alert: {message}", 8000)
 
@@ -1309,10 +1311,11 @@ class MainWindow(QMainWindow):
             event.ignore()
             self.hide()
             if self._tray is not None:
+                # QIcon overload → app icon in the toast, not the generic ⓘ
                 self._tray.showMessage(
                     "Aurantium",
                     "Still running in the tray — right-click the icon to quit.",
-                    QSystemTrayIcon.MessageIcon.Information, 4000,
+                    self._tray.icon(), 4000,
                 )
             return
         try:
