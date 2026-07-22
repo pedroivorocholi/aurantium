@@ -13,7 +13,8 @@ from __future__ import annotations
 from typing import Any, Optional
 
 import pyqtgraph as pg
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QComboBox, QCompleter, QHBoxLayout, QLabel
 
 from ..commodities_meta import (
     CATEGORIES,
@@ -22,16 +23,21 @@ from ..commodities_meta import (
     by_symbol,
     contract_symbols,
 )
+from ..components import attach_hover, clamp_view
 from ..panel import Panel, register_panel
 from ..theme import ACCENT, BG, FG, FG_DIM
+
+#: minimum horizontal pixels per contract before per-point price labels show
+_LABEL_MIN_PX = 70
 
 CONTRACT_COUNT = 8
 
 
 def make_commodity_combo(parent, commodities) -> QComboBox:
-    """A commodity dropdown grouped by category (disabled header items).
-    Data role holds the commodity root. Shared by the curve and positioning
-    panels so both selectors look identical."""
+    """A commodity dropdown grouped by category (disabled header items),
+    with type-to-search (the list now spans ~26 markets). Data role holds
+    the commodity root. Shared by the curve and positioning panels so both
+    selectors look identical."""
     combo = QComboBox(parent)
     for cat in CATEGORIES:
         in_cat = [m for m in commodities if m.category == cat]
@@ -41,6 +47,13 @@ def make_commodity_combo(parent, commodities) -> QComboBox:
         combo.model().item(combo.count() - 1).setEnabled(False)
         for meta in in_cat:
             combo.addItem(meta.label, meta.root)
+    combo.setEditable(True)
+    combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+    completer = combo.completer()
+    if completer is not None:
+        completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
     return combo
 
 
@@ -76,6 +89,11 @@ class FuturesCurvePanel(Panel):
             symbolSize=7,
         )
         self.curve_widget.addItem(self.curve)
+        self._point_labels: list[pg.TextItem] = []
+        self._front_lbl = pg.TextItem("front", color=FG_DIM, anchor=(0.5, -0.4))
+        self._front_lbl.setVisible(False)
+        self.curve_widget.addItem(self._front_lbl, ignoreBounds=True)
+        attach_hover(self.curve_widget, self._hover_text)
         self.content_layout.addWidget(self.curve_widget, 1)
 
         # -- slope readout: descriptive, plain English ------------------------
@@ -137,9 +155,52 @@ class FuturesCurvePanel(Panel):
             xs.append(float(i))
             ys.append(float(p))
         self.curve.setData(xs, ys)
+        # a small fixed-point chart: keep it auto-fitted, no zoom/pan
+        clamp_view(self.curve_widget, xs, ys, pad=0.15, lock=True)
+        self._last_points = (xs, ys)
+        self._update_point_labels(xs, ys)
         loaded = len(xs)
         self.set_status(f"contracts {loaded}/{len(self._contracts)}")
         self._update_slope(xs, ys)
+
+    def _update_point_labels(self, xs: list[float], ys: list[float]) -> None:
+        """Front-month tag always; per-point price labels only when the
+        panel is wide enough that they won't overlap."""
+        for lbl in self._point_labels:
+            self.curve_widget.removeItem(lbl)
+        self._point_labels.clear()
+        if not xs:
+            self._front_lbl.setVisible(False)
+            return
+        self._front_lbl.setPos(xs[0], ys[0])
+        self._front_lbl.setVisible(True)
+        n = max(len(self._contracts), 1)
+        if self.curve_widget.width() / n < _LABEL_MIN_PX:
+            return
+        for x, y in zip(xs, ys):
+            lbl = pg.TextItem(f"{y:,.2f}", color=FG_DIM, anchor=(0.5, 1.15))
+            lbl.setPos(x, y)
+            self.curve_widget.addItem(lbl, ignoreBounds=True)
+            self._point_labels.append(lbl)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        super().resizeEvent(event)
+        xs, ys = getattr(self, "_last_points", ([], []))
+        if xs:
+            self._update_point_labels(xs, ys)
+
+    def _hover_text(self, x: float, _y: float) -> Optional[str]:
+        """Readout for the contract nearest the cursor — 'Dec 26 · 4,182.50'."""
+        if not self._contracts:
+            return None
+        i = round(x)
+        if not (0 <= i < len(self._contracts)) or abs(x - i) > 0.5:
+            return None
+        sym, label = self._contracts[i]
+        price = self._prices.get(sym)
+        if price is None:
+            return None
+        return f"{label} · {float(price):,.2f}"
 
     def _update_slope(self, xs: list[float], ys: list[float]) -> None:
         """Describe the curve's shape in plain words: front month vs. a

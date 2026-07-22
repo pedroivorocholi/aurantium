@@ -11,16 +11,21 @@ commodity switches the chart.
 
 from __future__ import annotations
 
-from typing import Any
+from datetime import datetime
+from typing import Any, Optional
 
 import pyqtgraph as pg
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QHBoxLayout, QLabel
+from PySide6.QtWidgets import QButtonGroup, QHBoxLayout, QLabel, QPushButton
 
 from ..commodities_meta import COMMODITIES, CommodityMeta, by_symbol
+from ..components import attach_hover, clamp_view
 from ..panel import Panel, register_panel
 from ..theme import ACCENT, BG, FG_DIM, tick_color
 from .futures_curve import make_commodity_combo
+
+#: range-button choices: (label, days back; None = everything)
+_RANGES = [("6M", 183), ("1Y", 365), ("All", None)]
 
 #: only commodities with a wired COT market appear in this panel
 _COVERED = tuple(m for m in COMMODITIES if m.cftc_market)
@@ -34,16 +39,34 @@ class CotHistoryPanel(Panel):
         self._meta: CommodityMeta = _COVERED[0]
         self._syncing = False  # True while the combo is being set from code
 
-        # -- market selector: grouped dropdown ---------------------------------
+        #: loaded weekly series: parallel (epoch seconds, net contracts, date)
+        self._times: list[float] = []
+        self._nets: list[float] = []
+        self._dates: list[str] = []
+
+        # -- market selector + range buttons -----------------------------------
         sel_row = QHBoxLayout()
         self.selector = make_commodity_combo(self, _COVERED)
         self.selector.currentIndexChanged.connect(self._on_select)
         sel_row.addWidget(self.selector)
         sel_row.addStretch(1)
+        self._range_group = QButtonGroup(self)
+        self._range_days: Optional[int] = None  # None = All
+        for i, (label, days) in enumerate(_RANGES):
+            btn = QPushButton(label, self)
+            btn.setCheckable(True)
+            btn.setChecked(days is None)
+            btn.setFixedWidth(38)
+            btn.setToolTip(f"Show the last {label}" if days else "Show every report")
+            self._range_group.addButton(btn, i)
+            sel_row.addWidget(btn)
+        self._range_group.idClicked.connect(self._on_range)
         self.content_layout.addLayout(sel_row)
 
-        # -- history plot ------------------------------------------------------
-        self.plot_widget = pg.PlotWidget()
+        # -- history plot (real weekly date axis) ------------------------------
+        self.plot_widget = pg.PlotWidget(
+            axisItems={"bottom": pg.DateAxisItem(orientation="bottom")}
+        )
         self.plot_widget.setBackground(BG)
         self.plot_widget.showGrid(x=True, y=True, alpha=0.15)
         self.plot_widget.setLabel("left", "Net contracts")
@@ -56,6 +79,13 @@ class CotHistoryPanel(Panel):
         )
         self.series = pg.PlotDataItem(pen=pg.mkPen(ACCENT, width=2))
         self.plot_widget.addItem(self.series)
+        self.latest_marker = pg.ScatterPlotItem(
+            size=7, brush=pg.mkBrush(ACCENT), pen=pg.mkPen(ACCENT)
+        )
+        self.plot_widget.addItem(self.latest_marker)
+        self.latest_txt = pg.TextItem(color=ACCENT, anchor=(1, 1))
+        self.plot_widget.addItem(self.latest_txt, ignoreBounds=True)
+        attach_hover(self.plot_widget, self._hover_text)
         self.content_layout.addWidget(self.plot_widget, 1)
 
         # -- latest reading + plain-English caption ----------------------------
@@ -100,6 +130,9 @@ class CotHistoryPanel(Panel):
 
         self.unsubscribe_all()
         self.series.setData([], [])
+        self.latest_marker.setData([], [])
+        self.latest_txt.setText("")
+        self._times, self._nets, self._dates = [], [], []
         self.latest_lbl.setText("")
         self.plot_widget.setTitle(meta.label, color=FG_DIM, size="9pt")
         self.set_status("loading…")
@@ -111,19 +144,28 @@ class CotHistoryPanel(Panel):
         if not isinstance(data, dict) or data.get("market") != self._meta.cftc_market:
             return
         history = data.get("history") or []
-        dates: list[str] = []
+        times: list[float] = []
         nets: list[float] = []
+        dates: list[str] = []
         for row in history:
             if not isinstance(row, (list, tuple)) or len(row) < 2 or row[1] is None:
                 continue
-            dates.append(str(row[0])[:10])
+            date_str = str(row[0])[:10]
+            try:
+                ts = datetime.strptime(date_str, "%Y-%m-%d").timestamp()
+            except ValueError:
+                continue
+            times.append(ts)
+            dates.append(date_str)
             nets.append(float(row[1]))
-        self.series.setData(list(range(len(nets))), nets)
-
-        # a date label roughly every quarter, so the axis stays readable
-        axis = self.plot_widget.getAxis("bottom")
-        step = max(1, len(dates) // 8)
-        axis.setTicks([[(i, dates[i][:7]) for i in range(0, len(dates), step)]])
+        self._times, self._nets, self._dates = times, nets, dates
+        self.series.setData(times, nets)
+        if times:
+            self.latest_marker.setData([times[-1]], [nets[-1]])
+            self.latest_txt.setText(f"{nets[-1]:+,.0f}")
+            self.latest_txt.setPos(times[-1], nets[-1])
+        clamp_view(self.plot_widget, times, nets + [0.0])
+        self._apply_range()
 
         net = data.get("noncommercial_net")
         if net is not None:
@@ -136,6 +178,36 @@ class CotHistoryPanel(Panel):
                 f"color: {tick_color(net)}; font-weight: bold;"
             )
         self.set_status(f"{len(nets)} weekly reports")
+
+    # -- view range & hover ----------------------------------------------------
+
+    def _on_range(self, button_id: int) -> None:
+        self._range_days = _RANGES[button_id][1]
+        self._apply_range()
+
+    def _apply_range(self) -> None:
+        if not self._times:
+            return
+        vb = self.plot_widget.getViewBox()
+        if self._range_days is None:
+            vb.autoRange()
+            return
+        cutoff = self._times[-1] - self._range_days * 86400.0
+        start = max(cutoff, self._times[0])
+        vb.setAutoVisible(y=True)
+        vb.enableAutoRange(axis=vb.YAxis)
+        self.plot_widget.setXRange(start, self._times[-1], padding=0.02)
+
+    def _hover_text(self, x: float, _y: float) -> Optional[str]:
+        """Snap to the nearest weekly report — 'week of 2026-03-17 · +187,450
+        contracts'."""
+        if not self._times:
+            return None
+        nearest = min(range(len(self._times)), key=lambda i: abs(self._times[i] - x))
+        # ignore hovers far outside the data (more than ~2 weeks off)
+        if abs(self._times[nearest] - x) > 14 * 86400.0:
+            return None
+        return f"week of {self._dates[nearest]} · {self._nets[nearest]:+,.0f} contracts"
 
     # -- linked-symbol behavior -------------------------------------------------
 
