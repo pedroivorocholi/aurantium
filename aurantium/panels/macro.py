@@ -25,9 +25,17 @@ from PySide6.QtWidgets import (
 
 from ..commodities_meta import COMMODITIES, by_cftc_market, by_symbol
 from ..components import (
+    FRED_ENTRIES,
+    FX_ENTRIES,
+    INDEX_ENTRIES,
+    TENOR_ENTRIES,
+    CatalogEntry,
     EditorColumn,
     EditorSection,
     MarketTable,
+    attach_hover,
+    clamp_view,
+    open_add_picker,
     open_list_editor,
 )
 from ..panel import Panel, register_panel
@@ -89,6 +97,24 @@ _SOURCE_CHOICES = [
     ("fred", "FRED series"),
 ]
 
+#: picker entries for the positioning quick-add (code = CFTC market key)
+_MARKET_ENTRIES = [
+    CatalogEntry(label, value, "quote", "CFTC") for value, label in _MARKET_CHOICES
+]
+
+#: known tenor symbols → (maturity years, curve tick label)
+_TENOR_DETAILS = {
+    "^IRX": (0.25, "3M"),
+    "^FVX": (5.0, "5Y"),
+    "^TNX": (10.0, "10Y"),
+    "^TYX": (30.0, "30Y"),
+}
+
+
+def _tenor_row_from_entry(entry: CatalogEntry) -> list:
+    years, label = _TENOR_DETAILS.get(entry.code, (0.0, entry.label))
+    return [years, label, entry.code]
+
 
 @register_panel(id="macro", title="Macro / Rates", category="Analytics")
 class MacroPanel(Panel):
@@ -121,6 +147,7 @@ class MacroPanel(Panel):
             symbolSize=8,
         )
         self.curve_widget.addItem(self.yield_curve)
+        attach_hover(self.curve_widget, self._curve_hover_text)
         self.content_layout.addWidget(self.curve_widget, 2)
 
         self.spread_lbl = QLabel("", self)
@@ -139,6 +166,7 @@ class MacroPanel(Panel):
         for col in (INST_COL_LAST, INST_COL_CHG, INST_COL_CHGPCT):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
         self.inst_table.itemSelectionChanged.connect(self._on_inst_selected)
+        self.inst_table.set_row_actions(self._inst_row_actions)
         self.content_layout.addWidget(self.inst_table, 1)
 
         # -- (c) CFTC positioning ---------------------------------------------------
@@ -157,6 +185,7 @@ class MacroPanel(Panel):
         for col in (CFTC_COL_NETSPEC, CFTC_COL_WOW, CFTC_COL_BIAS):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
         self.cftc_table.itemSelectionChanged.connect(self._on_cftc_selected)
+        self.cftc_table.set_row_actions(self._cftc_row_actions)
         self.content_layout.addWidget(self.cftc_table, 1)
 
         edit_row = QHBoxLayout()
@@ -252,7 +281,22 @@ class MacroPanel(Panel):
             xs.append(float(years))
             ys.append(float(y))
         self.yield_curve.setData(xs, ys)
+        clamp_view(self.curve_widget, xs, ys, lock=True)
         self._update_spread()
+
+    def _curve_hover_text(self, x: float, _y: float) -> Optional[str]:
+        """Readout for the tenor nearest the cursor — '10Y · 4.21%'."""
+        best = None
+        for years, label, sym in self._tenors:
+            value = self._yields.get(sym)
+            if value is None:
+                continue
+            distance = abs(float(years) - x)
+            if best is None or distance < best[0]:
+                best = (distance, label, float(value))
+        if best is None:
+            return None
+        return f"{best[1]} · {best[2]:.2f}%"
 
     def _update_spread(self) -> None:
         """Short-vs-10Y spread when the tenor set has both ends: the shortest
@@ -431,7 +475,35 @@ class MacroPanel(Panel):
                 f"yields {yields_loaded}/{len(self._tenors)} · CFTC {cftc_loaded}/{len(self._cftc)}"
             )
 
-    # -- edit dialog ---------------------------------------------------------
+    # -- edit dialog & quick actions -----------------------------------------
+
+    def _apply_edit(
+        self,
+        tenors: Optional[list] = None,
+        instruments: Optional[list] = None,
+        cftc: Optional[list] = None,
+    ) -> None:
+        """Apply a config change (None = keep) behind one undo snapshot —
+        shared by the Edit dialog and the right-click quick actions."""
+        snap_t = [list(r) for r in self._tenors]
+        snap_i = [list(r) for r in self._instruments]
+        snap_c = [list(r) for r in self._cftc]
+
+        def _undo() -> None:
+            self._tenors = [list(r) for r in snap_t]
+            self._instruments = [list(r) for r in snap_i]
+            self._cftc = [list(r) for r in snap_c]
+            self._rebuild()
+            self.set_status("undo · edit macro")
+
+        UndoStack.instance().push("edit macro", _undo)
+        if tenors is not None:
+            self._tenors = tenors
+        if instruments is not None:
+            self._instruments = instruments
+        if cftc is not None:
+            self._cftc = cftc
+        self._rebuild()
 
     def _open_edit_dialog(self) -> None:
         # instruments are stored as [label, "SYM"] or [label, "fred:SERIES"];
@@ -456,8 +528,22 @@ class MacroPanel(Panel):
                         EditorColumn("Symbol", kind="symbol"),
                     ],
                     self._tenors,
-                    hint="Yahoo yield indices — ^IRX (3M), ^FVX (5Y), ^TNX (10Y), ^TYX (30Y). "
-                    "The quoted price is the yield in percent.",
+                    description="The yield of each US Treasury maturity, drawn "
+                    "left to right as the curve. The quoted price of a yield "
+                    "index (^TNX…) is the yield in percent.",
+                    catalog=TENOR_ENTRIES,
+                    presets=[
+                        (
+                            "Full curve",
+                            [
+                                [0.25, "3M", "^IRX"],
+                                [5.0, "5Y", "^FVX"],
+                                [10.0, "10Y", "^TNX"],
+                                [30.0, "30Y", "^TYX"],
+                            ],
+                        )
+                    ],
+                    row_factory=_tenor_row_from_entry,
                 ),
                 EditorSection(
                     "instruments",
@@ -468,10 +554,16 @@ class MacroPanel(Panel):
                         EditorColumn("Code", kind="symbol"),
                     ],
                     inst_rows,
-                    hint="Quote symbol: any Yahoo symbol (DX-Y.NYB, EURUSD=X, GC=F). "
-                    "FRED series: a data code from fred.stlouisfed.org — e.g. DFII10 "
-                    "(10Y real yield) or T10YIE (10Y inflation expectation); needs a "
-                    "free FRED key under Settings ▸ API Keys…",
+                    description="Live instruments in the monitor table — any "
+                    "Yahoo quote, or a FRED data series (needs a free key "
+                    "under Settings ▸ API Keys…).",
+                    catalog=FX_ENTRIES + INDEX_ENTRIES + FRED_ENTRIES,
+                    presets=[
+                        ("10Y real yield", [["10Y Real Yield", "fred", "DFII10"]]),
+                        ("10Y breakeven", [["10Y Breakeven", "fred", "T10YIE"]]),
+                        ("EUR/USD", [["EUR/USD", "quote", "EURUSD=X"]]),
+                        ("VIX", [["VIX", "quote", "^VIX"]]),
+                    ],
                 ),
                 EditorSection(
                     "cftc",
@@ -481,8 +573,10 @@ class MacroPanel(Panel):
                         EditorColumn("Market", kind="choice", choices=_MARKET_CHOICES),
                     ],
                     self._cftc,
-                    hint="Weekly CFTC Commitments of Traders data — pick a market from "
-                    "the list; the label is what the panel shows.",
+                    description="Weekly CFTC report of how large speculators "
+                    "(hedge funds, money managers) are positioned in each "
+                    "futures market — pick markets to watch.",
+                    presets=[("Koji five", [list(r) for r in DEFAULT_CFTC])],
                 ),
             ],
         )
@@ -494,22 +588,59 @@ class MacroPanel(Panel):
             ]
             cftc = result["cftc"]
             if tenors or instruments or cftc:
-                snap_t = [list(r) for r in self._tenors]
-                snap_i = [list(r) for r in self._instruments]
-                snap_c = [list(r) for r in self._cftc]
+                self._apply_edit(
+                    tenors or None, instruments or None, cftc or None
+                )
 
-                def _undo() -> None:
-                    self._tenors = [list(r) for r in snap_t]
-                    self._instruments = [list(r) for r in snap_i]
-                    self._cftc = [list(r) for r in snap_c]
-                    self._rebuild()
-                    self.set_status("undo · edit macro")
+    def _inst_row_actions(self, row: int) -> list:
+        actions = []
+        if 0 <= row < len(self._instruments):
+            label = self._instruments[row][0]
 
-                UndoStack.instance().push("edit macro", _undo)
-                self._tenors = tenors or self._tenors
-                self._instruments = instruments or self._instruments
-                self._cftc = cftc or self._cftc
-                self._rebuild()
+            def _remove(r=row) -> None:
+                rows = [list(x) for x in self._instruments]
+                del rows[r]
+                self._apply_edit(instruments=rows)
+
+            actions.append((f'Remove "{label}"', _remove))
+
+        def _add() -> None:
+            entry = open_add_picker(
+                self, FX_ENTRIES + INDEX_ENTRIES + FRED_ENTRIES, title="Add Instrument"
+            )
+            if entry is None:
+                return
+            target = f"fred:{entry.code}" if entry.kind == "fred" else entry.code
+            rows = [list(x) for x in self._instruments] + [[entry.label, target]]
+            self._apply_edit(instruments=rows)
+
+        actions.append(("Add instrument…", _add))
+        actions.append(("Edit panel…", self._open_edit_dialog))
+        return actions
+
+    def _cftc_row_actions(self, row: int) -> list:
+        actions = []
+        if 0 <= row < len(self._cftc):
+            label = self._cftc[row][0]
+
+            def _remove(r=row) -> None:
+                rows = [list(x) for x in self._cftc]
+                del rows[r]
+                self._apply_edit(cftc=rows)
+
+            actions.append((f'Remove "{label}"', _remove))
+
+        def _add() -> None:
+            entry = open_add_picker(
+                self, _MARKET_ENTRIES, allow_free_text=False, title="Add Market"
+            )
+            if entry is not None:
+                rows = [list(x) for x in self._cftc] + [[entry.label, entry.code]]
+                self._apply_edit(cftc=rows)
+
+        actions.append(("Add market…", _add))
+        actions.append(("Edit panel…", self._open_edit_dialog))
+        return actions
 
     # -- persistence -------------------------------------------------------------
 

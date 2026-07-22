@@ -276,10 +276,31 @@ class MarketTable(QTableWidget):
         for c in range(self.columnCount()):
             self.setColumnHidden(c, c in wanted)
 
+    # -- panel-provided row actions -----------------------------------------
+
+    def set_row_actions(self, provider) -> None:
+        """Let the owning panel prepend quick actions to the right-click
+        menu. ``provider(row)`` (row is -1 outside any row) returns a list
+        of ``(text, callable)`` pairs shown above the built-in entries —
+        the hook behind "Remove …" / "Add…" / "Edit panel…" on
+        configurable panels."""
+        self._row_actions = provider
+
     # -- CSV export ---------------------------------------------------------
 
     def _show_context_menu(self, pos) -> None:
         menu = QMenu(self)
+
+        quick_actions: dict = {}
+        provider = getattr(self, "_row_actions", None)
+        if provider is not None:
+            index = self.indexAt(pos)
+            row = index.row() if index.isValid() else -1
+            for text, slot in provider(row) or []:
+                quick_actions[menu.addAction(text)] = slot
+            if quick_actions:
+                menu.addSeparator()
+
         export_act = menu.addAction("Export Table to CSV…")
 
         col_actions: dict = {}
@@ -296,7 +317,9 @@ class MarketTable(QTableWidget):
         chosen = menu.exec(self.viewport().mapToGlobal(pos))
         if chosen is None:
             return
-        if chosen is export_act:
+        if chosen in quick_actions:
+            quick_actions[chosen]()
+        elif chosen is export_act:
             self._export_csv()
         elif chosen in col_actions:
             self._toggle_column(col_actions[chosen], chosen.isChecked())
