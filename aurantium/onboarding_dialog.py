@@ -244,6 +244,15 @@ to show only the rows that match. Right-click any table to
 remembered with the layout). The Financials panel additionally offers styled
 Excel export and clipboard copy from its toolbar.</p>
 
+<h2>Workspaces</h2>
+<p>Aurantium ships curated starter workspaces — <b>Macro Desk</b>,
+<b>Commodities Desk</b> and <b>Equity Research</b> — each a ready-made
+arrangement of linked panels. Load one anytime from <b>Settings &#9656;
+Workspaces</b>. On a fresh install you are offered the list at startup; choose
+<b>Start empty</b> if you would rather build your own. Loading a workspace
+replaces the current arrangement, so save anything you want to keep first
+(<b>Ctrl+S</b>).</p>
+
 <h2>Layouts</h2>
 <p>Use <b>Settings &#9656; Layout</b> to save the current arrangement under a name
 (<b>Ctrl+S</b>), reload a saved one, or reset to the default. Layouts can be
