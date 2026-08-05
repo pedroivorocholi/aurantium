@@ -1327,13 +1327,18 @@ class MainWindow(QMainWindow):
 
     def default_startup(self) -> None:
         """Restore the auto-saved last session if there is one. A fresh install
-        has none, so it opens to an empty workspace — the user adds panels from
-        the Panels menu or loads a saved layout (e.g. via the Layout menu).
-        The bundled default layout is available on demand via
-        Layout ▸ Reset to Default Layout."""
+        has none, so it offers the shipped workspaces instead of opening to an
+        empty window. Dismissing the chooser keeps the empty workspace — the
+        user adds panels from the Panels menu or loads a saved layout."""
         last = self.layout_store.get_last()
         if isinstance(last, dict) and last.get("panels"):
             self.apply_layout(last)
+            return
+        from .workspace_chooser import pick_workspace
+
+        preset = pick_workspace(available_presets(), self)
+        if preset is not None:
+            self._load_workspace(preset)
 
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt override)
         """Hide to the tray if the user opted in (unless Quit was chosen);
