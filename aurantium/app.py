@@ -38,6 +38,7 @@ from .datahub import DataHub
 from .layout_store import LayoutStore
 from .panel import Panel, PanelRegistry
 from .paths import BUNDLE_DIR
+from .presets import Preset, available_presets
 from .symbol_context import DEFAULT_GROUP, GROUPS, SymbolContext
 from .undo import UndoStack
 
@@ -699,6 +700,10 @@ class MainWindow(QMainWindow):
 
         m.addSeparator()
 
+        # -- curated starter workspaces (shipped presets) -------------------
+        self._m_workspaces = m.addMenu("Workspaces")
+        self._rebuild_workspaces_menu()
+
         # -- named layouts (save / load / import / export / reset) ----------
         self._m_layout = m.addMenu("Layout")
         self._rebuild_layout_menu()
@@ -845,6 +850,32 @@ class MainWindow(QMainWindow):
             f"Version {__version__}<br><br>"
             "Data: Yahoo Finance / Google News (free, delayed).",
         )
+
+    def _rebuild_workspaces_menu(self) -> None:
+        """List the shipped presets. Rebuilt rather than built once so a future
+        entitlement gate (Plan B) has a single place to filter."""
+        m = self._m_workspaces
+        m.clear()
+        presets = available_presets()
+        if not presets:
+            placeholder = QAction("(no workspaces available)", self)
+            placeholder.setEnabled(False)
+            m.addAction(placeholder)
+            return
+        for preset in presets:
+            act = QAction(preset.name, self)
+            if preset.description:
+                act.setToolTip(preset.description)
+            act.triggered.connect(
+                lambda _=False, p=preset: self._load_workspace(p)
+            )
+            m.addAction(act)
+
+    def _load_workspace(self, preset: Preset) -> None:
+        """Replace the current arrangement with a shipped preset. Matches the
+        no-confirmation behaviour of loading a saved layout."""
+        if self.apply_layout(preset.doc):
+            self.statusBar().showMessage(f"Workspace loaded: {preset.name}", 4000)
 
     def _rebuild_layout_menu(self) -> None:
         m = self._m_layout
