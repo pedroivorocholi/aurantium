@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import PySide6QtAds as QtAds
@@ -1325,17 +1326,29 @@ class MainWindow(QMainWindow):
         self.add_panel("news", area=QtAds.DockWidgetArea.RightDockWidgetArea)
         self.add_panel("analyst", area=QtAds.DockWidgetArea.BottomDockWidgetArea)
 
-    def default_startup(self) -> None:
+    def default_startup(
+        self, before_prompt: Callable[[], None] | None = None
+    ) -> None:
         """Restore the auto-saved last session if there is one. A fresh install
         has none, so it offers the shipped workspaces instead of opening to an
         empty window. Dismissing the chooser keeps the empty workspace — the
-        user adds panels from the Panels menu or loads a saved layout."""
+        user adds panels from the Panels menu or loads a saved layout.
+
+        ``before_prompt``, if given, is called immediately before the chooser
+        is shown — and only on that branch. The caller uses it to close the
+        startup splash first, since the splash must otherwise stay up while
+        the modal chooser dialog waits for the user, which reads as the app
+        being stuck loading. On the restore branch the splash stays up for
+        the caller's own subsequent close, since that path builds panels
+        rather than asking a question."""
         last = self.layout_store.get_last()
         if isinstance(last, dict) and last.get("panels"):
             self.apply_layout(last)
             return
         from .workspace_chooser import pick_workspace
 
+        if before_prompt is not None:
+            before_prompt()
         preset = pick_workspace(available_presets(), self)
         if preset is not None:
             self._load_workspace(preset)

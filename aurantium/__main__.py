@@ -343,13 +343,21 @@ def main() -> int:
     _splash_message(splash, "LOADING · LAYOUT")
     startup_err = ""
     try:
-        win.default_startup()
+        # On the no-saved-session branch, default_startup shows a modal
+        # first-run chooser. The splash is always-on-top and would otherwise
+        # sit over that dialog (or at least make the app look stuck loading
+        # while it's actually waiting on the user), so close it right before
+        # the prompt appears. On the restore branch this callback never
+        # fires, and the splash stays up until the unconditional close below.
+        win.default_startup(before_prompt=lambda: _close_splash(splash, win))
     except Exception:
         import traceback as _tb
 
         startup_err = _tb.format_exc()
 
     # Panels are built and the layout restored — hand off from splash to window.
+    # Harmless no-op if the no-session branch already closed it above:
+    # _close_splash guards on `splash is not None`, not on prior-close state.
     _close_splash(splash, win)
 
     if os.environ.get("AURANTIUM_DEBUG") or startup_err or errors:
