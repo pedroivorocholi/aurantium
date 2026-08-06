@@ -11,10 +11,16 @@ it builds an actual ``MainWindow``, adds the desk's panels with
 arrangement, calls ``serialize_layout()`` to capture a genuine ``ads_state``,
 and writes the result as pretty-printed JSON.
 
+Each desk also seeds link group A with a symbol before its panels are built,
+so a fresh install — where the symbol context starts empty — opens on real
+data rather than a screen of blank symbol-driven panels.
+
 Run it whenever a desk's arrangement changes, or after a panel referenced by
 a desk is renamed/removed (then update the desk definitions below and
 re-run). It is deterministic and safe to re-run: it always rebuilds each
-desk from an empty workspace and overwrites its file.
+desk from an empty workspace (docks *and* symbol context) and overwrites its
+file. Two consecutive runs, and a run with the desks in any order, produce
+byte-identical files.
 
 Usage (from ``app/``):
 
@@ -40,22 +46,57 @@ PRESETS_DIR = APP_ROOT / "layouts" / "presets"
 # Each step: (panel_id, instance_id, area_attr, target_instance)
 # area_attr is a QtAds.DockWidgetArea attribute name; target_instance is
 # None for a global placement.
+#
+# Sizing rule — the two placements behave very differently, and getting this
+# wrong is invisible until you measure the restored layout:
+#
+#   * target_instance=None (global) splits the *entire container* 50/50, so
+#     the new panel takes half the window and everything already placed
+#     shares the other half.
+#   * target_instance="foo#1" joins the splitter that already holds foo#1,
+#     and the columns in that splitter end up evenly divided.
+#
+# So each desk makes exactly ONE global placement, and it is the desk's
+# analytical centrepiece, placed LAST — that is what makes it the widest
+# panel. Every supporting panel is placed against an existing instance and
+# lands narrower. Placing a supporting panel globally (as `news` once was)
+# hands it half the window and squeezes the centrepiece into a quarter.
+#
+# Measured by restoring each preset into a shown window and comparing dock-area
+# widths, at both 1600x900 and 2560x1440 (proportions identical at both, so they
+# are structural rather than pixel accidents):
+#   Macro Desk        chart 40% · macro 20% · cot_history 20% · news 20%
+#   Commodities Desk  chart 40% · commodities 20% · futures_curve 20%
+#                     · cot_history 20%
+#   Equity Research   chart 40% · watchlist 20% · fundamentals+analyst 20%
+#                     (tabbed) · news 20%
+#
+# Re-measure after changing this table. Note the window must be shown() before
+# reading widths — an unrealized window reports zeros and looks like a 50/50.
+#
+# "symbol" seeds link group A before the panels are built, so the desk opens
+# on real data instead of blank panels on a fresh install (SymbolContext is
+# empty there, and an empty "symbols" map restores to nothing). It also gets
+# baked into the panels' own saved settings — CL=F, for instance, switches
+# futures_curve to Crude and cot_history to the crude_oil CFTC market.
 DESKS = [
     {
         "file": "macro_desk.json",
         "name": "Macro Desk",
         "description": "Rates, inflation and positioning — the macro starting point.",
+        "symbol": "^TNX",  # US 10-year yield
         "panels": [
             ("macro", "macro#1", "CenterDockWidgetArea", None),
-            ("chart", "chart#1", "RightDockWidgetArea", "macro#1"),
+            ("news", "news#1", "RightDockWidgetArea", "macro#1"),
             ("cot_history", "cot_history#1", "BottomDockWidgetArea", "macro#1"),
-            ("news", "news#1", "RightDockWidgetArea", None),
+            ("chart", "chart#1", "RightDockWidgetArea", None),
         ],
     },
     {
         "file": "commodities_desk.json",
         "name": "Commodities Desk",
         "description": "Curves, prices and COT positioning for commodities.",
+        "symbol": "CL=F",  # WTI crude — a futures root the curve/COT panels cover
         "panels": [
             ("commodities", "commodities#1", "CenterDockWidgetArea", None),
             ("futures_curve", "futures_curve#1", "RightDockWidgetArea", "commodities#1"),
@@ -67,12 +108,13 @@ DESKS = [
         "file": "equity_research.json",
         "name": "Equity Research",
         "description": "Watchlist, chart and fundamentals for single-name work.",
+        "symbol": "AAPL",
         "panels": [
             ("watchlist", "watchlist#1", "CenterDockWidgetArea", None),
-            ("chart", "chart#1", "RightDockWidgetArea", "watchlist#1"),
-            ("fundamentals", "fundamentals#1", "BottomDockWidgetArea", "chart#1"),
+            ("news", "news#1", "RightDockWidgetArea", "watchlist#1"),
+            ("fundamentals", "fundamentals#1", "BottomDockWidgetArea", "watchlist#1"),
             ("analyst", "analyst#1", "CenterDockWidgetArea", "fundamentals#1"),
-            ("news", "news#1", "RightDockWidgetArea", None),
+            ("chart", "chart#1", "RightDockWidgetArea", None),
         ],
     },
 ]
@@ -84,7 +126,13 @@ def _reset_to_empty(win) -> None:
     Mirrors what ``MainWindow.apply_layout`` does before rebuilding: mass
     -close via ``closeDockWidget`` under the loading-layout guard, then clear
     the instance bookkeeping dicts.
+
+    Also empties the symbol context. ``SymbolContext`` is a process-wide
+    singleton and ``from_json`` merges rather than replaces, so without this
+    one desk's seed symbol would leak into the next desk's ``symbols`` map.
     """
+    from aurantium.symbol_context import SymbolContext
+
     win._loading_layout = True
     try:
         for dock in list(win._docks.values()):
@@ -93,9 +141,19 @@ def _reset_to_empty(win) -> None:
         win._loading_layout = False
     win._docks.clear()
     win._maximize_actions.clear()
+    SymbolContext.instance()._symbols.clear()
 
 
 def build_desk(win, QtAds, desk: dict) -> dict:
+    from aurantium.symbol_context import DEFAULT_GROUP, SymbolContext
+
+    # Seed before the panels exist: add_panel syncs each new panel to the
+    # group's current symbol as it is created, so the arrangement, the
+    # per-panel settings and the serialized "symbols" map all agree.
+    symbol = desk.get("symbol")
+    if symbol:
+        SymbolContext.instance().set_symbol(DEFAULT_GROUP, symbol)
+
     for panel_id, instance_id, area_name, target_instance in desk["panels"]:
         area = getattr(QtAds.DockWidgetArea, area_name)
         dock = win.add_panel(
@@ -144,6 +202,11 @@ def main() -> None:
                 f"{desk['name']}: {spec['instance']} has link_group "
                 f"{spec['link_group']!r}, expected 'A'"
             )
+        want = desk["symbol"].upper()
+        assert doc["symbols"] == {"A": want}, (
+            f"{desk['name']}: expected symbols {{'A': {want!r}}}, got "
+            f"{doc['symbols']!r} — a desk must seed exactly its own symbol"
+        )
         out_path = PRESETS_DIR / desk["file"]
         out_path.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
         print(f"wrote {out_path.relative_to(APP_ROOT)}  ({desk['name']!r})")

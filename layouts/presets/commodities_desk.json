@@ -60,7 +60,7 @@
       "panel_id": "futures_curve",
       "link_group": "A",
       "settings": {
-        "root": "GC"
+        "root": "CL"
       }
     },
     {
@@ -68,7 +68,7 @@
       "panel_id": "cot_history",
       "link_group": "A",
       "settings": {
-        "market": "gold"
+        "market": "crude_oil"
       }
     },
     {
@@ -117,13 +117,15 @@
           }
         ],
         "annotations": [],
-        "annotations_symbol": "",
+        "annotations_symbol": "CL=F",
         "drawing_color": "#2196f3"
       }
     }
   ],
   "ads_state": "0000030d78da8d525d4bc330147df7575ce2f36cbbf9b041da312a7b54649b3e8ed85eb7609b48725b9cf8e34dea2c32d3e94368ef3d27e703c2e76f75052d1a2bb54a597215334055e852aa5dca36ebe568cae619bfa745d90a556079a38b1787ad0e96b08687fe22838d45d3cf4e26d78a84546ee3e18cf7332c2b2da83388dd7ef55a4922b7be33121d853a810f2fd0284ad9789033ea39c93f75160605acc5531709f2c618f450a1ebda552689f6d24b3dca728704b7a2c65310f24a5b2c7df428e39117fc3bde19ebe7861a83765b34a6c5dfe6a770d07eb0156df7d292368750ab9f60b8957c479b8d2733f087475fb3fb1edb7e3326c90cfc19665c4fe3203a147c2f0c05221fd767c2c610368afac7e7fe071e7376f109c583016d",
-  "symbols": {},
+  "symbols": {
+    "A": "CL=F"
+  },
   "name": "Commodities Desk",
   "description": "Curves, prices and COT positioning for commodities."
 }

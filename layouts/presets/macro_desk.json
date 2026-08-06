@@ -59,6 +59,22 @@
       }
     },
     {
+      "instance": "news#1",
+      "panel_id": "news",
+      "link_group": "A",
+      "settings": {
+        "read": []
+      }
+    },
+    {
+      "instance": "cot_history#1",
+      "panel_id": "cot_history",
+      "link_group": "A",
+      "settings": {
+        "market": "gold"
+      }
+    },
+    {
       "instance": "chart#1",
       "panel_id": "chart",
       "link_group": "A",
@@ -104,29 +120,15 @@
           }
         ],
         "annotations": [],
-        "annotations_symbol": "",
+        "annotations_symbol": "^TNX",
         "drawing_color": "#2196f3"
-      }
-    },
-    {
-      "instance": "cot_history#1",
-      "panel_id": "cot_history",
-      "link_group": "A",
-      "settings": {
-        "market": "gold"
-      }
-    },
-    {
-      "instance": "news#1",
-      "panel_id": "news",
-      "link_group": "A",
-      "settings": {
-        "read": []
       }
     }
   ],
-  "ads_state": "000002ef78daad52d14ac330147df72b2ef179b6dd7cd8a0cd18953d2ad24d1f25a6972dd82692dc4d277ebc49572a63ed40f0e192dc736ece39819bce3feb0af6689d323a63c94dcc00b534a5d29b8cad57cbd194cd79fa488b722fb4c4f2cec837cf15074758c353f790c1daa1ed7a2f931b4d42698f049aa75d0fcbca086a0c628f17ef9522f2f08355e847a811f80e023b4d191b0fce8cba99e49f74c2ccc2a28095786d6243beb31603550b69cd75307a56e50609ee458dbf30e4957158862f453c8d82c8a09434f4b2558e8c3d9c0b9e92bdb285fa42c7c79319844aa363efcff677c3c65b61a9c7b2852f984d921984ea333b22b7d3f82f51347eb8f3242d7a21480cfd3651b75efe3eb0aefcea0734b3f49e",
-  "symbols": {},
+  "ads_state": "000002ef78daad52d14ac330147df72b2ef179b6dd7cd8a0ed18953d2ad24d1f2526972dd82692dc4d277ebc49572a63ed40f02124f79c9373ee859bce3feb0af6689d323a63c94dcc00b53052e94dc6d6abe568cae679fa480bb9e75aa0bc33e2cd73e5c111d6f0d47d64b07668bbdadb14461357da2381ced3ae866565383501b1c7cbf74a1179f8c12af4126a0cbe83c14e53c6c6839a51a749fec92768161639acf86bd336143b6b31503517d65c87a06725374870cf6bfc85a1a88c4319468af2340a268356c2d0cb563932f6706e784af6da96ea0b5d3e9ecc209c343ad6fe6ea71b0cd6f8e1ce135bf442d4249941387d5147e4761affa511b1e5967a666fe10badc4d01f1475ebe5df03eb9a5ffd003003f49e",
+  "symbols": {
+    "A": "^TNX"
+  },
   "name": "Macro Desk",
   "description": "Rates, inflation and positioning \u2014 the macro starting point."
 }

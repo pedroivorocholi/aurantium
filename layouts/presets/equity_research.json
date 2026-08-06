@@ -24,6 +24,31 @@
       }
     },
     {
+      "instance": "news#1",
+      "panel_id": "news",
+      "link_group": "A",
+      "settings": {
+        "read": []
+      }
+    },
+    {
+      "instance": "fundamentals#1",
+      "panel_id": "fundamentals",
+      "link_group": "A",
+      "settings": {
+        "statement": "income",
+        "period": "annual"
+      }
+    },
+    {
+      "instance": "analyst#1",
+      "panel_id": "analyst",
+      "link_group": "A",
+      "settings": {
+        "hidden_cols": []
+      }
+    },
+    {
       "instance": "chart#1",
       "panel_id": "chart",
       "link_group": "A",
@@ -69,38 +94,15 @@
           }
         ],
         "annotations": [],
-        "annotations_symbol": "",
+        "annotations_symbol": "AAPL",
         "drawing_color": "#2196f3"
-      }
-    },
-    {
-      "instance": "fundamentals#1",
-      "panel_id": "fundamentals",
-      "link_group": "A",
-      "settings": {
-        "statement": "income",
-        "period": "annual"
-      }
-    },
-    {
-      "instance": "analyst#1",
-      "panel_id": "analyst",
-      "link_group": "A",
-      "settings": {
-        "hidden_cols": []
-      }
-    },
-    {
-      "instance": "news#1",
-      "panel_id": "news",
-      "link_group": "A",
-      "settings": {
-        "read": []
       }
     }
   ],
-  "ads_state": "0000031978da8d524d4f023114bcfb2b5eea19f7030f90ec2e216b386a0ca0e7ba7d4263b7356d17c4f8e36d57582174d143d3be99e9bc794db3c9472d6083da70257392dcc40450568a71b9cac972311b8cc8a4c81eed946da8ac90dda9eacd71f39db158c3537791c0d2a0ee6a67532a6929970ef174917535cc84a2b66d103b7cfe2eb8b50e7ed01c9dc4b6065fdea091362769af66d069927ffa4c355258d0973612948dd6e8a92db5d55a7063afbdd133672bb4704f6b3ca5a014ca20f3b1a3228bbcd9dfd12eb4add654075a1ee060bb23abf4c88a4a2a76a1fcaf8d64eee0820973e679a2fcb508cfc93fd114e9700c7e65d14fedf6fdfc07c53019835ffd8adb511c647b5e49e2d69ccfb5472f448d21dc26ea3ea23bf77cece2ea1bb1b3026a",
-  "symbols": {},
+  "ads_state": "0000031978daad925f4fc23014c5dffd1437f519f7071f20d946c80c8f1a33d0e7ba5ea1b16b4ddb81183fbcedc0c9c24662e243b3de73cf7ee7b66932fba8046c511bae644aa29b9000ca52312ed729592d17a3099965c9a39db32d9525b23b55beb95eb137162b786a7f24b032a8dbda6172252de5d229be9d256d0d0ba1a86d0242a717ef825bebe407cdd1596c03f8f2805ada94c4839e51eb89fe89e33d738d1496f4a5191bf25a6bf4ad1db5e5467063af7dd833676bb4704f2becb62017ca20f3470bb224f0b00e323e415249c5be0ff85a4be6366e4061ce981de72fa237b8e09f68b2783c05bf92e050bbeff11e064f2b7167cee73aaa17a2c6d114fcea8b3a28b793f02f83941baa7b6ee847be304a08fd4141fb10dd7ee0616757df4d93026a",
+  "symbols": {
+    "A": "AAPL"
+  },
   "name": "Equity Research",
   "description": "Watchlist, chart and fundamentals for single-name work."
 }
