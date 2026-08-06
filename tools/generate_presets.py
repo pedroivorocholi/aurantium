@@ -62,17 +62,22 @@ PRESETS_DIR = APP_ROOT / "layouts" / "presets"
 # lands narrower. Placing a supporting panel globally (as `news` once was)
 # hands it half the window and squeezes the centrepiece into a quarter.
 #
-# Measured by restoring each preset into a shown window and comparing dock-area
-# widths, at both 1600x900 and 2560x1440 (proportions identical at both, so they
-# are structural rather than pixel accidents):
-#   Macro Desk        chart 40% · macro 20% · cot_history 20% · news 20%
-#   Commodities Desk  chart 40% · commodities 20% · futures_curve 20%
-#                     · cot_history 20%
-#   Equity Research   chart 40% · watchlist 20% · fundamentals+analyst 20%
-#                     (tabbed) · news 20%
+# Measured by restoring each preset into a shown window, at both 1600x900 and
+# 2560x1440 (identical at both, so structural rather than pixel accidents).
+# Each desk restores into THREE columns:
+#   Macro Desk        chart 50% · macro+cot_history 25% · news 25%
+#   Commodities Desk  chart 50% · futures_curve+cot_history 25% · commodities 25%
+#   Equity Research   chart 50% · watchlist+fundamentals+analyst 25% · news 25%
 #
-# Re-measure after changing this table. Note the window must be shown() before
-# reading widths — an unrealized window reports zeros and looks like a 50/50.
+# Re-measure after changing this table. Two traps, both hit for real while
+# writing this:
+#   * The window must be shown() first. An unrealized window reports zero width
+#     for every dock area, which reads as a plausible 50/50 and hides the very
+#     defect you are measuring for.
+#   * Group by COLUMN (a dock area's x-origin), not by dock area. Two stacked
+#     panels are two dock areas sharing one column; summing area widths counts
+#     that column twice and understates the centrepiece (it reports 40/20 here
+#     instead of the true 50/25).
 #
 # "symbol" seeds link group A before the panels are built, so the desk opens
 # on real data instead of blank panels on a fresh install (SymbolContext is
