@@ -853,10 +853,14 @@ class MainWindow(QMainWindow):
         )
 
     def _rebuild_workspaces_menu(self) -> None:
-        """List the shipped presets. Rebuilt rather than built once so a future
-        entitlement gate (Plan B) has a single place to filter."""
+        """List the shipped presets. Built once, at menu-construction time;
+        factored out so a future entitlement gate (Plan B) has a single call
+        site to filter."""
         m = self._m_workspaces
         m.clear()
+        # QMenu drops action tooltips unless it opts in, so without this the
+        # per-preset descriptions set below never reach the screen.
+        m.setToolTipsVisible(True)
         presets = available_presets()
         if not presets:
             placeholder = QAction("(no workspaces available)", self)

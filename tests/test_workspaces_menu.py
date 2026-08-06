@@ -61,6 +61,9 @@ def test_rebuild_lists_every_preset(monkeypatch):
     actions = host._m_workspaces.actions()
     assert [a.text() for a in actions] == ["Alpha Desk", "Beta Desk"]
     assert actions[0].toolTip() == "First."
+    # Setting the tooltip is not enough: QMenu suppresses action tooltips
+    # unless it opts in, so this is the property the user actually sees.
+    assert host._m_workspaces.toolTipsVisible()
 
 
 def test_clicking_an_entry_loads_that_preset(monkeypatch):
@@ -77,7 +80,9 @@ def test_clicking_an_entry_loads_that_preset(monkeypatch):
 
 
 def test_rebuild_is_idempotent(monkeypatch):
-    """Rebuilt on every open, so it must not accumulate duplicates."""
+    """Called once today, but it clears before it fills — so if it ever gains
+    a second call site (an entitlement gate re-filtering the list) it must not
+    accumulate duplicates."""
     from aurantium import app as app_mod
 
     monkeypatch.setattr(app_mod, "available_presets", _presets)
