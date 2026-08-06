@@ -80,6 +80,20 @@ def test_available_presets_skips_bad_files_and_sorts_by_name(tmp_path):
     assert [p.name for p in presets] == ["Alpha Desk", "Zulu Desk"]
 
 
+def test_available_presets_skips_a_file_that_is_not_utf8(tmp_path):
+    """A corrupt byte in a bundled preset — truncated update, disk error —
+    must cost one workspace, not the whole window: available_presets() runs
+    inside MainWindow.__init__, so raising here means the app never opens."""
+    (tmp_path / "good.json").write_text(
+        json.dumps(_doc(name="Alpha Desk")), encoding="utf-8"
+    )
+    (tmp_path / "corrupt.json").write_bytes(b'{"name": \xff\xfe"Macro Desk"}')
+
+    presets = available_presets(directory=tmp_path, known_panel_ids=KNOWN)
+
+    assert [p.name for p in presets] == ["Alpha Desk"]
+
+
 def test_available_presets_returns_empty_when_dir_missing(tmp_path):
     missing = tmp_path / "nope"
     assert available_presets(directory=missing, known_panel_ids=KNOWN) == []

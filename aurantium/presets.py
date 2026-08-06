@@ -4,12 +4,18 @@ A preset is an ordinary layout document — the same shape
 ``MainWindow.serialize_layout()`` produces — with two extra keys, ``name`` and
 ``description``, stored as JSON under ``layouts/presets/``.
 
-Presets are authored by arranging the workspace by hand in a running app and
-exporting it, so the bundled file carries a real ``ads_state`` and restores the
-intended arrangement instead of QtAds' default tiling.
+Presets are *generated*, never hand-written and never hand-captured from a
+running app: ``tools/generate_presets.py`` drives a real dock manager
+headlessly to build each desk, so the bundled file carries a genuine
+``ads_state`` and restores the intended arrangement instead of QtAds' default
+tiling. To change a desk — its panels, their arrangement or its seed symbol —
+edit the ``DESKS`` table in that script and re-run it; do not edit the JSON
+under ``layouts/presets/`` by hand.
 
 Validation is all-or-nothing per file: a preset naming a panel that no longer
-exists is dropped entirely rather than loaded half-built.
+exists is dropped entirely rather than loaded half-built. Nothing here may
+raise: ``available_presets()`` runs during ``MainWindow.__init__``, so an
+unreadable or corrupt file must be skipped, never propagated.
 """
 
 from __future__ import annotations
@@ -88,7 +94,10 @@ def available_presets(
     for path in files:
         try:
             raw = path.read_text(encoding="utf-8")
-        except OSError:
+        except (OSError, UnicodeDecodeError):
+            # A truncated download or a disk-corrupted byte must cost the user
+            # one workspace, not the whole window: this runs inside
+            # MainWindow.__init__, where an exception means no app at all.
             continue
         preset = parse_preset(raw, known_panel_ids)
         if preset is not None:
