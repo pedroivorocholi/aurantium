@@ -52,6 +52,10 @@ LAYOUT_EXT = ".aurantiumlayout"
 # with a higher version was written by a newer aurantium and is not loaded.
 CURRENT_LAYOUT_VERSION = 1
 
+# Set once the first-run workspace chooser has been presented, so it is never
+# offered twice — an empty auto-saved session is not proof of a first run.
+WORKSPACE_CHOOSER_SHOWN_KEY = "workspaceChooser/shown"
+
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
@@ -1338,6 +1342,13 @@ class MainWindow(QMainWindow):
         empty window. Dismissing the chooser keeps the empty workspace — the
         user adds panels from the Panels menu or loads a saved layout.
 
+        The offer happens genuinely once. An empty session is not proof of a
+        first run: ``closeEvent`` always auto-saves, and a workspace with
+        nothing open serializes to ``"panels": []``. Gating on that alone
+        would re-prompt at every launch — a modal nag with no way to dismiss
+        it permanently — so a QSettings flag records that the chooser was
+        presented and both conditions must hold.
+
         ``before_prompt``, if given, is called immediately before the chooser
         is shown — and only on that branch. The caller uses it to close the
         startup splash first, since the splash must otherwise stay up while
@@ -1349,6 +1360,10 @@ class MainWindow(QMainWindow):
         if isinstance(last, dict) and last.get("panels"):
             self.apply_layout(last)
             return
+        settings = QSettings()
+        if settings.value(WORKSPACE_CHOOSER_SHOWN_KEY, False, type=bool):
+            return
+        settings.setValue(WORKSPACE_CHOOSER_SHOWN_KEY, True)
         from .workspace_chooser import pick_workspace
 
         if before_prompt is not None:
