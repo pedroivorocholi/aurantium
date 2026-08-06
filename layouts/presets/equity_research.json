@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "panels": [
+    {
+      "instance": "watchlist#1",
+      "panel_id": "watchlist",
+      "link_group": "A",
+      "settings": {
+        "symbols": [
+          "AAPL",
+          "MSFT",
+          "NVDA",
+          "AMZN",
+          "GOOGL",
+          "TSLA",
+          "SPY",
+          "QQQ",
+          "ES=F",
+          "GC=F",
+          "CL=F",
+          "BTC-USD"
+        ],
+        "hidden_cols": []
+      }
+    },
+    {
+      "instance": "chart#1",
+      "panel_id": "chart",
+      "link_group": "A",
+      "settings": {
+        "range": {
+          "preset": "6mo"
+        },
+        "interval": "1d",
+        "chart_type": "candles",
+        "grid": true,
+        "log": false,
+        "colors": {
+          "up": "#33c46a",
+          "down": "#ff4d4d",
+          "line": "#ffab2e",
+          "grid": "#7c858e",
+          "bg": "#000000"
+        },
+        "indicators": [
+          {
+            "kind": "sma",
+            "params": {
+              "window": 50
+            },
+            "color": "#e91e63",
+            "on": true
+          },
+          {
+            "kind": "sma",
+            "params": {
+              "window": 200
+            },
+            "color": "#f8e71c",
+            "on": true
+          },
+          {
+            "kind": "rsi",
+            "params": {
+              "window": 14
+            },
+            "color": "#ffab2e",
+            "on": true
+          }
+        ],
+        "annotations": [],
+        "annotations_symbol": "",
+        "drawing_color": "#2196f3"
+      }
+    },
+    {
+      "instance": "fundamentals#1",
+      "panel_id": "fundamentals",
+      "link_group": "A",
+      "settings": {
+        "statement": "income",
+        "period": "annual"
+      }
+    },
+    {
+      "instance": "analyst#1",
+      "panel_id": "analyst",
+      "link_group": "A",
+      "settings": {
+        "hidden_cols": []
+      }
+    },
+    {
+      "instance": "news#1",
+      "panel_id": "news",
+      "link_group": "A",
+      "settings": {
+        "read": []
+      }
+    }
+  ],
+  "ads_state": "0000031978da8d524d4f023114bcfb2b5eea19f7030f90ec2e216b386a0ca0e7ba7d4263b7356d17c4f8e36d57582174d143d3be99e9bc794db3c9472d6083da70257392dcc40450568a71b9cac972311b8cc8a4c81eed946da8ac90dda9eacd71f39db158c3537791c0d2a0ee6a67532a6929970ef174917535cc84a2b66d103b7cfe2eb8b50e7ed01c9dc4b6065fdea091362769af66d069927ffa4c355258d0973612948dd6e8a92db5d55a7063afbdd133672bb4704f6b3ca5a014ca20f3b1a3228bbcd9dfd12eb4add654075a1ee060bb23abf4c88a4a2a76a1fcaf8d64eee0820973e679a2fcb508cfc93fd114e9700c7e65d14fedf6fdfc07c53019835ffd8adb511c647b5e49e2d69ccfb5472f448d21dc26ea3ea23bf77cece2ea1bb1b3026a",
+  "symbols": {},
+  "name": "Equity Research",
+  "description": "Watchlist, chart and fundamentals for single-name work."
+}

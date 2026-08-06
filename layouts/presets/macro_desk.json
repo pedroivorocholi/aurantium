@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "panels": [
+    {
+      "instance": "macro#1",
+      "panel_id": "macro",
+      "link_group": "A",
+      "settings": {
+        "tenors": [
+          [
+            0.25,
+            "3M",
+            "^IRX"
+          ],
+          [
+            5.0,
+            "5Y",
+            "^FVX"
+          ],
+          [
+            10.0,
+            "10Y",
+            "^TNX"
+          ],
+          [
+            30.0,
+            "30Y",
+            "^TYX"
+          ]
+        ],
+        "instruments": [
+          [
+            "Dollar Index",
+            "DX-Y.NYB"
+          ]
+        ],
+        "cftc": [
+          [
+            "Gold",
+            "gold"
+          ],
+          [
+            "Silver",
+            "silver"
+          ],
+          [
+            "Copper",
+            "copper"
+          ],
+          [
+            "Brent Crude",
+            "brent"
+          ],
+          [
+            "Henry Hub NatGas",
+            "natgas"
+          ]
+        ]
+      }
+    },
+    {
+      "instance": "chart#1",
+      "panel_id": "chart",
+      "link_group": "A",
+      "settings": {
+        "range": {
+          "preset": "6mo"
+        },
+        "interval": "1d",
+        "chart_type": "candles",
+        "grid": true,
+        "log": false,
+        "colors": {
+          "up": "#33c46a",
+          "down": "#ff4d4d",
+          "line": "#ffab2e",
+          "grid": "#7c858e",
+          "bg": "#000000"
+        },
+        "indicators": [
+          {
+            "kind": "sma",
+            "params": {
+              "window": 50
+            },
+            "color": "#e91e63",
+            "on": true
+          },
+          {
+            "kind": "sma",
+            "params": {
+              "window": 200
+            },
+            "color": "#f8e71c",
+            "on": true
+          },
+          {
+            "kind": "rsi",
+            "params": {
+              "window": 14
+            },
+            "color": "#ffab2e",
+            "on": true
+          }
+        ],
+        "annotations": [],
+        "annotations_symbol": "",
+        "drawing_color": "#2196f3"
+      }
+    },
+    {
+      "instance": "cot_history#1",
+      "panel_id": "cot_history",
+      "link_group": "A",
+      "settings": {
+        "market": "gold"
+      }
+    },
+    {
+      "instance": "news#1",
+      "panel_id": "news",
+      "link_group": "A",
+      "settings": {
+        "read": []
+      }
+    }
+  ],
+  "ads_state": "000002ef78daad52d14ac330147df72b2ef179b6dd7cd8a0cd18953d2ad24d1f25a6972dd82692dc4d277ebc49572a63ed40f0e192dc736ece39819bce3feb0af6689d323a63c94dcc00b534a5d29b8cad57cbd194cd79fa488b722fb4c4f2cec837cf15074758c353f790c1daa1ed7a2f931b4d42698f049aa75d0fcbca086a0c628f17ef9522f2f08355e847a811f80e023b4d191b0fce8cba99e49f74c2ccc2a28095786d6243beb31603550b69cd75307a56e50609ee458dbf30e4957158862f453c8d82c8a09434f4b2558e8c3d9c0b9e92bdb285fa42c7c79319844aa363efcff677c3c65b61a9c7b2852f984d921984ea333b22b7d3f82f51347eb8f3242d7a21480cfd3651b75efe3eb0aefcea0734b3f49e",
+  "symbols": {},
+  "name": "Macro Desk",
+  "description": "Rates, inflation and positioning \u2014 the macro starting point."
+}
