@@ -35,11 +35,14 @@ def window(qapp):
     An unrealized window reports zero widths for every dock area, which reads
     as a plausible-looking 50/50 split and hides exactly the defect these tests
     exist to catch.
+
+    Providers are deliberately NOT registered: this test measures geometry, not
+    data, and registering them starts background refresh threads that outlive
+    the fixture and perturb timing-sensitive tests elsewhere in the session
+    (it made the symbol-search debounce tests emit twice).
     """
     from aurantium.panel import discover_panels
-    from aurantium.providers import register_all_providers
 
-    register_all_providers()
     discover_panels([], packages=("aurantium.panels",))
 
     from aurantium.app import MainWindow
@@ -49,7 +52,12 @@ def window(qapp):
     win.show()
     qapp.processEvents()
     yield win
+    # Tear down fully — a live window keeps panel timers running for the rest
+    # of the session.
+    win.apply_layout({"version": 1, "panels": [], "ads_state": "", "symbols": {}})
     win.close()
+    win.deleteLater()
+    qapp.processEvents()
 
 
 def _areas(win) -> dict[int, tuple[object, list[str]]]:
