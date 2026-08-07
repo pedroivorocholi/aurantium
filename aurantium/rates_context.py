@@ -65,10 +65,19 @@ class RatesContext(QObject):
         return dict(self._countries)
 
     def from_json(self, data: dict) -> None:
-        """Restore from layout JSON. Must never raise: this runs inside
-        MainWindow.__init__, which __main__.py:327 does not wrap in a try,
-        so an exception here means no window at all."""
-        for group, code in (data or {}).items():
+        """Restore from layout JSON. Must never raise.
+
+        This runs under apply_layout during startup restore, which IS wrapped
+        (__main__.py:344) — so a raise doesn't kill the app, it silently costs
+        the user their entire saved workspace and shows a startup error
+        instead. `data` comes from doc.get("rates", {}), and .get returns the
+        raw value when the key exists, so a hand-edited layout can hand us a
+        string or a list. Guard the shape, not just the contents:
+        symbol_context.py:66's `(data or {})` only substitutes on a FALSY
+        value and raises AttributeError on any truthy non-dict."""
+        if not isinstance(data, dict):
+            return
+        for group, code in data.items():
             if not isinstance(group, str) or not isinstance(code, str):
                 continue
             meta = by_code(code)
