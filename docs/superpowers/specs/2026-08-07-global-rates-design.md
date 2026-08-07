@@ -180,10 +180,18 @@ FRED absent → BIS columns still render. `rates:policy` publishes whatever it a
 
 Three failure modes this codebase has already been bitten by:
 
-- **Nothing in a panel construction path may raise.** `MainWindow.__init__` is not wrapped
-  in a try at `__main__.py:327` — an exception there means no window at all (this exact bug
-  happened with `available_presets()`). `RatesContext.from_json()` reads user-editable
-  layout JSON: it validates codes against `rates_meta.py` and silently drops unknowns.
+- **Nothing in `MainWindow.__init__` may raise.** `__main__.py:327` constructs the window
+  outside any try, so an exception there means no window at all — the handoff records
+  `available_presets()` doing exactly that. `rates_meta.py` is a static table, so it
+  cannot fail at runtime.
+- **`RatesContext.from_json()` must not raise either**, for a lesser reason. It is reached
+  via `__main__.py:352 → default_startup → apply_layout`, which **is** wrapped
+  (`__main__.py:344`). A raise therefore aborts the restore and drops the user into an
+  empty workspace with a startup error, rather than killing the app. Losing someone's
+  saved layout is still unacceptable, so `from_json()` must tolerate a non-dict argument,
+  non-string keys and values, and unknown codes. Note that `symbol_context.py:66` does
+  **not** guard the non-dict case — `(data or {}).items()` only substitutes on a falsy
+  value, so any truthy non-dict raises `AttributeError`. Do not copy that pattern.
 - **A missing FRED key is a normal state**, not a `⚠`.
 - **An unlisted FRED series is refused before the request is made**, never fetched-then-
   filtered, so a network failure cannot fail open. Refusals are logged so a stale allowlist

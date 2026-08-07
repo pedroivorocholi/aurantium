@@ -20,7 +20,8 @@
 - **BIS-sourced policy rates are free-tier and must never be gated.** Licence condition.
 - **A FRED series is fetched only if it is in the generated allowlist.** Refuse before the request, never fetch-then-filter.
 - **The provider never interpolates yield curves.** Return observed points only.
-- **Nothing in a panel's construction path may raise.** `MainWindow.__init__` is not wrapped in a try at `__main__.py:327`; an exception there means no window at all.
+- **Nothing in `MainWindow.__init__` may raise.** `__main__.py:327` constructs the window outside any try; an exception there means no window at all.
+- **Layout-restore code must not raise either**, for a lesser reason: `from_json`/`apply_layout` run under a try at `__main__.py:344`, so a raise costs the user their saved layout and shows a startup error rather than killing the app. Still unacceptable — validate inputs.
 - Run the suite with `.venv/Scripts/python.exe -m pytest tests/ -q` from `app/`.
 
 ---
@@ -506,11 +507,17 @@ def test_json_round_trip(ctx):
 
 @pytest.mark.parametrize(
     "junk",
-    [None, {}, {"A": None}, {"A": 42}, {"A": "ZZ"}, {"A": ""}, {7: "US"}],
+    [
+        None, {}, {"A": None}, {"A": 42}, {"A": "ZZ"}, {"A": ""}, {7: "US"},
+        # truthy non-dicts: doc.get("rates", {}) returns the raw value when the
+        # key exists, so a hand-edited layout can hand us any of these
+        [], ["A", "US"], "US", 42, (1, 2), {"A"}, b"US", object(),
+        {"A": {"nested": 1}}, {"A": ["US"]}, {"A": b"US"}, {"A": " us "},
+    ],
 )
 def test_from_json_tolerates_junk(ctx, junk):
-    ctx.from_json(junk)          # must not raise — runs inside MainWindow.__init__
-    assert ctx.country("A") == ""
+    ctx.from_json(junk)          # must not raise — a raise costs the saved layout
+    assert ctx.country("A") in ("", "US")
 
 
 def test_default_group_matches_symbol_context():
@@ -592,10 +599,19 @@ class RatesContext(QObject):
         return dict(self._countries)
 
     def from_json(self, data: dict) -> None:
-        """Restore from layout JSON. Must never raise: this runs inside
-        MainWindow.__init__, which __main__.py:327 does not wrap in a try,
-        so an exception here means no window at all."""
-        for group, code in (data or {}).items():
+        """Restore from layout JSON. Must never raise.
+
+        This runs under apply_layout during startup restore, which IS wrapped
+        (__main__.py:344) — so a raise doesn't kill the app, it silently costs
+        the user their entire saved workspace and shows a startup error
+        instead. `data` comes from doc.get("rates", {}), and .get returns the
+        raw value when the key exists, so a hand-edited layout can hand us a
+        string or a list. Guard the shape, not just the contents:
+        symbol_context.py:66's `(data or {})` only substitutes on a FALSY
+        value and raises AttributeError on any truthy non-dict."""
+        if not isinstance(data, dict):
+            return
+        for group, code in data.items():
             if not isinstance(group, str) or not isinstance(code, str):
                 continue
             meta = by_code(code)
