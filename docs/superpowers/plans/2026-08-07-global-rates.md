@@ -382,6 +382,12 @@ COUNTRIES: tuple[CountryMeta, ...] = (
     CountryMeta("China", "CN", "CN", "none", (), None, None, BIS, "free"),
 )
 
+#: Do NOT add the legacy euro-area members (DE, FR, IT, ES, AT, BE, NL, PT,
+#: GR) here. BIS still carries their national policy rates, but the series
+#: stop in 1998-12 (2000-12 for Greece) when policy passed to the ECB — so
+#: "the latest observation" for Germany is a 1998 Bundesbank rate. Their
+#: current policy lives in the euro-area aggregate, "XM". Verified against
+#: tests/fixtures/rates/bis_cbpol.csv.
 _BY_CODE = {c.code: c for c in COUNTRIES}
 
 
@@ -969,6 +975,31 @@ def test_bis_policy_tolerates_garbage():
     assert parse_bis_policy("not,a,valid\ncsv,file,really") == {}
 
 
+def test_bis_policy_drops_literal_nan_observations():
+    """BIS marks missing observations OBS_STATUS=M and writes the literal
+    string "NaN" into OBS_VALUE — 21 such rows exist in the fixture (Croatia,
+    2021-22). A NaN reaching a rate would poison every downstream diff and
+    serialize to invalid JSON."""
+    result = parse_bis_policy(_fixture("bis_cbpol"))
+    for code, point in result.items():
+        assert point.rate == point.rate, f"{code} rate is NaN"
+        if point.prev is not None:
+            assert point.prev == point.prev, f"{code} prev is NaN"
+
+
+def test_bis_policy_skips_a_nan_row_synthetically():
+    csv_text = (
+        "FREQ,REF_AREA,TIME_PERIOD,OBS_VALUE,OBS_STATUS\n"
+        "M,US,2026-05,4.50,A\n"
+        "M,US,2026-06,NaN,M\n"
+        "M,US,2026-07,4.25,A\n"
+    )
+    point = parse_bis_policy(csv_text)["US"]
+    assert point.rate == 4.25
+    assert point.prev == 4.50      # the NaN row must not become the previous value
+    assert point.direction == "down"
+
+
 def test_ust_curve_is_complete_and_ordered():
     curve = parse_ust_curve(_fixture("ust_curve"))
     assert isinstance(curve, Curve)
@@ -1266,7 +1297,7 @@ def parse_mof_curve(text: str) -> Curve:
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_rates_provider.py -q`
-Expected: 11 passed. If a parse test fails, compare against the Task 1 fixture and fix the parsing — do not change the assertions or the return types.
+Expected: 13 passed. If a parse test fails, compare against the Task 1 fixture and fix the parsing — do not change the assertions or the return types.
 
 **Read `docs/superpowers/2026-08-07-rates-probe-findings.md` before you start.** It records the exact column names, date formats and units for every source, taken from the recorded fixtures. It is the reference for this task — do not re-probe the live endpoints.
 
