@@ -621,6 +621,14 @@ git commit -m "feat: add RatesContext for country-scoped panel linking"
 
 ### Task 4: The FRED copyright allowlist
 
+> **RESEQUENCED 2026-08-07.** This task needs a `FRED_API_KEY`, which was not
+> available when execution reached it, so **Task 5 ran first and created
+> `aurantium/providers/rates.py`** with the parsers only. When this task runs,
+> the module already exists: *add* the allowlist section to it (the
+> `rates_allowlist` import, `FredNotAllowed`, `fred_allowed`,
+> `fetch_fred_series`) rather than creating the file. Everything else about
+> the task is unchanged, including the decision checkpoint in Step 4.
+
 Run this **before** any panel work. Its output determines how much sparse-curve coverage actually survives the copyright filter — the FRED international rate series are largely OECD-sourced, and if most get filtered out, `rates_meta.py`'s `fred`-sourced countries need demoting to `curve_source="none"`. Better to learn that now than after two panels are built on the assumption.
 
 **Files:**
@@ -894,6 +902,24 @@ git commit -m "feat: vet FRED series against the copyright filter, fail closed"
 ---
 
 ### Task 5: Parse each upstream
+
+> **RESEQUENCED 2026-08-07.** Task 4 is blocked awaiting a `FRED_API_KEY`, so
+> this task runs first and **creates** `aurantium/providers/rates.py` instead
+> of appending to it. Write the module docstring below, then the parser code.
+> Do **not** write the FRED/allowlist section — no `rates_allowlist` import,
+> no `FredNotAllowed`, no `fetch_fred_series`. Task 4 adds those later. The
+> parsers have no dependency on the allowlist, so this split is clean.
+>
+> ```python
+> """Global rates provider: BIS policy rates, sovereign yield curves.
+>
+> Serves rates:policy (one envelope, all jurisdictions) and rates:curve:<CC>.
+> HTTP and parsing are kept separate — every upstream has a pure parse_*()
+> function tested against recorded fixtures, plus a thin fetch_*() wrapper.
+> """
+>
+> from __future__ import annotations
+> ```
 
 Pure functions over recorded text. No network, no Qt.
 
