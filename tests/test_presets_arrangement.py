@@ -19,11 +19,13 @@ from aurantium.presets import available_presets
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
-# Each desk's analytical centrepiece — the panel the layout is built around,
-# and the one that must be widest. See the sizing rule in tools/generate_presets.py.
+# Each desk's hero — the panel the layout is built around, and the one that must
+# be the widest thing on screen. It is NOT the price chart everywhere: on a macro
+# desk the rates panel is the point, and on a commodities desk it is the curve.
+# See the sizing rule in tools/generate_presets.py.
 CENTREPIECE = {
-    "Macro Desk": "chart#1",
-    "Commodities Desk": "chart#1",
+    "Macro Desk": "macro#1",
+    "Commodities Desk": "futures_curve#1",
     "Equity Research": "chart#1",
 }
 

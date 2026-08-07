@@ -59,14 +59,6 @@
       }
     },
     {
-      "instance": "news#1",
-      "panel_id": "news",
-      "link_group": "A",
-      "settings": {
-        "read": []
-      }
-    },
-    {
       "instance": "cot_history#1",
       "panel_id": "cot_history",
       "link_group": "A",
@@ -123,9 +115,17 @@
         "annotations_symbol": "^TNX",
         "drawing_color": "#2196f3"
       }
+    },
+    {
+      "instance": "news#1",
+      "panel_id": "news",
+      "link_group": "A",
+      "settings": {
+        "read": []
+      }
     }
   ],
-  "ads_state": "000002ef78daad52d14ac330147df72b2ef179b6dd7cd8a0ed18953d2ad24d1f2526972dd82692dc4d277ebc49572a63ed40f02124f79c9373ee859bce3feb0af6689d323a63c94dcc00b53052e94dc6d6abe568cae679fa480bb9e75aa0bc33e2cd73e5c111d6f0d47d64b07668bbdadb14461357da2381ced3ae866565383501b1c7cbf74a1179f8c12af4126a0cbe83c14e53c6c6839a51a749fec92768161639acf86bd336143b6b31503517d65c87a06725374870cf6bfc85a1a88c4319468af2340a268356c2d0cb563932f6706e784af6da96ea0b5d3e9ecc209c343ad6fe6ea71b0cd6f8e1ce135bf442d4249941387d5147e4761affa511b1e5967a666fe10badc4d01f1475ebe5df03eb9a5ffd003003f49e",
+  "ads_state": "000002b278da8d52414ec33010bcf38a953997a449a1414a5255413d82505b382293ac5a8bc446f6b650c4e3b14308aa1a230e96bdb3e3995969d3d97b53c31eb5114a666c7c11324059aa4ac84dc6d6abc52861b33cbda779b5e7b2c4ea46952fb6b73c18c2061efa8f0cd606755f5b994249e2425ac4b5f3b4af61512b4ead4168f1e56b2d882c7ca7055a0ab5029f4e602729639197333ae2cc357258f1e7d60e8a9dd6e85a0d2fb53a77011e45b541825bdee02f0c45ad0c562e4a90a78113f95f248f5da9e8692b0c297d38353d6e0e5afb64b75cd38060070f4f213ed0e4577102eea4c1776def6eba1fc6e47a02f1e57490e18923f1cd9ca6e9d03fc28ca3690271140e7a05fd86d8b767e3f2b32f9b09dfb0",
   "symbols": {
     "A": "^TNX"
   },

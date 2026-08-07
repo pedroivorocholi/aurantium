@@ -24,31 +24,6 @@
       }
     },
     {
-      "instance": "news#1",
-      "panel_id": "news",
-      "link_group": "A",
-      "settings": {
-        "read": []
-      }
-    },
-    {
-      "instance": "fundamentals#1",
-      "panel_id": "fundamentals",
-      "link_group": "A",
-      "settings": {
-        "statement": "income",
-        "period": "annual"
-      }
-    },
-    {
-      "instance": "analyst#1",
-      "panel_id": "analyst",
-      "link_group": "A",
-      "settings": {
-        "hidden_cols": []
-      }
-    },
-    {
       "instance": "chart#1",
       "panel_id": "chart",
       "link_group": "A",
@@ -97,9 +72,34 @@
         "annotations_symbol": "AAPL",
         "drawing_color": "#2196f3"
       }
+    },
+    {
+      "instance": "fundamentals#1",
+      "panel_id": "fundamentals",
+      "link_group": "A",
+      "settings": {
+        "statement": "income",
+        "period": "annual"
+      }
+    },
+    {
+      "instance": "analyst#1",
+      "panel_id": "analyst",
+      "link_group": "A",
+      "settings": {
+        "hidden_cols": []
+      }
+    },
+    {
+      "instance": "news#1",
+      "panel_id": "news",
+      "link_group": "A",
+      "settings": {
+        "read": []
+      }
     }
   ],
-  "ads_state": "0000031978daad925f4fc23014c5dffd1437f519f7071f20d946c80c8f1a33d0e7ba5ea1b16b4ddb81183fbcedc0c9c24662e243b3de73cf7ee7b66932fba8046c511bae644aa29b9000ca52312ed729592d17a3099965c9a39db32d9525b23b55beb95eb137162b786a7f24b032a8dbda6172252de5d229be9d256d0d0ba1a86d0242a717ef825bebe407cdd1596c03f8f2805ada94c4839e51eb89fe89e33d738d1496f4a5191bf25a6bf4ad1db5e5467063af7dd833676bb4704f2becb62017ca20f3470bb224f0b00e323e415249c5be0ff85a4be6366e4061ce981de72fa237b8e09f68b2783c05bf92e050bbeff11e064f2b7167cee73aaa17a2c6d114fcea8b3a28b793f02f83941baa7b6ee847be304a08fd4141fb10dd7ee0616757df4d93026a",
+  "ads_state": "0000031f78da8d52cb4ec33010bcf3159639973c5b8294a4aa827a04a13e389b78692d1c1bd94e4b111f8f5ddad0aa49e014efcc6466d6723afea838da80d24c8a0c07373e46204a4999586578319f0e123cced32733a11b224aa0f7b27cb3dc6ca70d5468d9fc88d142836a666b53486108131671749e36339a7249cc3ec0b7f8ec9d33632cfca8185889d91b7c39835a980c879d9a41a309fee9335140d09cbcec2ba1a2560a1cb525a65c73a6cdb5337a667405063d900ace295470a981bada5e9e7aceecef6a3db1e59aa896c823dc1a7762159e581141f8aeadff6b2da83dd8625c5f789e297f2ddaf7649fa0f3f82e46d1f016a5decf6cbf87fd8f8a301aa1c0f7931e49328c5ad98e6b12b0d5978b1dd09eae41188f6cd9b035cb6b9ea33d773ceffcea1b7ee803a3",
   "symbols": {
     "A": "AAPL"
   },
