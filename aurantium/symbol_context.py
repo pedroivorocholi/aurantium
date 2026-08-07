@@ -63,7 +63,17 @@ class SymbolContext(QObject):
         return dict(self._symbols)
 
     def from_json(self, data: dict) -> None:
-        for group, symbol in (data or {}).items():
+        """Restore from layout JSON. Must not raise.
+
+        ``data`` comes from ``doc.get("symbols", {})`` (app.py), and ``.get``
+        returns the raw value whenever the key exists — so a hand-edited or
+        corrupted layout can hand us a string or a list, not a dict. Guard the
+        shape as well as the contents: this runs under ``apply_layout`` during
+        startup restore, and raising here costs the user their whole saved
+        workspace. Every panel ``restore()`` guards the same way."""
+        if not isinstance(data, dict):
+            return
+        for group, symbol in data.items():
             if isinstance(symbol, str) and symbol:
                 self._symbols[group] = symbol
         # replay so freshly-restored panels sync up
