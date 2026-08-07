@@ -819,7 +819,7 @@ from typing import Any, Callable
 
 import requests
 
-from ..rates_allowlist import ALLOWED
+from .. import rates_allowlist
 
 
 class FredNotAllowed(RuntimeError):
@@ -830,7 +830,9 @@ class FredNotAllowed(RuntimeError):
 
 
 def fred_allowed(series_id: str) -> bool:
-    return series_id in ALLOWED
+    # read through the module, not a from-import: a from-import would bind the
+    # frozenset here and make the allowlist untestable by monkeypatch
+    return series_id in rates_allowlist.ALLOWED
 
 
 def fetch_fred_series(
@@ -1653,6 +1655,18 @@ PAYLOAD = {
     "sources": ["BIS", "U.S. Treasury"],
     "as_of": "2026-07-01",
 }
+
+
+@pytest.fixture(autouse=True)
+def fresh_rates_context():
+    """RatesContext is a process-wide singleton; without this, a country
+    selected by one test leaks into the next and set_country() no-ops on the
+    same value, making these tests order-dependent."""
+    from aurantium.rates_context import RatesContext
+
+    RatesContext._inst = None
+    yield
+    RatesContext._inst = None
 
 
 @pytest.fixture
