@@ -927,6 +927,7 @@ from aurantium.providers.rates import (
     parse_bis_policy,
     parse_mof_curve,
     parse_ust_curve,
+    tenor_years,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures" / "rates"
@@ -985,11 +986,38 @@ def test_ust_curve_tolerates_garbage():
     assert curve.complete is False
 
 
+def test_tenor_years_handles_every_observed_label_spelling():
+    """Treasury mixes "Mo"/"Month"/"Yr" in one header row and includes a
+    fractional "1.5 Month"; MOF uses bare "40Y". One normalizer, all of them."""
+    assert tenor_years("1 Mo") == pytest.approx(1 / 12)
+    assert tenor_years("1.5 Month") == pytest.approx(0.125)
+    assert tenor_years("4 Mo") == pytest.approx(1 / 3)
+    assert tenor_years("10 Yr") == 10.0
+    assert tenor_years("40Y") == 40.0
+    assert tenor_years("Date") is None
+    assert tenor_years("") is None
+
+
+def test_ust_curve_includes_the_short_end_tenors():
+    """Regression: an earlier lookup-table approach silently dropped the
+    "1.5 Month", "2 Mo" and "4 Mo" columns Treasury actually publishes."""
+    curve = parse_ust_curve(_fixture("ust_curve"))
+    assert len(curve.points) >= 12, [p.years for p in curve.points]
+
+
 def test_mof_curve_parses():
     curve = parse_mof_curve(_fixture("mof_jgb"))
     assert curve.code == "JP"
     assert len(curve.points) >= 5
     assert "Japan MOF" in curve.sources
+
+
+def test_mof_curve_ignores_the_trailing_footer_note():
+    """The MOF file ends with a blank row then a "clear your browser cache"
+    note. Reading the last non-empty row would parse that as a curve."""
+    curve = parse_mof_curve(_fixture("mof_jgb"))
+    assert curve.as_of and "/" in curve.as_of, curve.as_of
+    assert all(0.0 < p.rate < 20.0 for p in curve.points)
 
 
 def test_no_parser_interpolates():
@@ -1011,7 +1039,7 @@ Append to `aurantium/providers/rates.py`:
 ```python
 import csv
 import io
-import json
+import re
 from typing import NamedTuple, Optional
 
 from ..rates_meta import UST, MOF, ECB, BIS, by_code
@@ -1113,64 +1141,55 @@ def parse_bis_policy(text: str) -> dict[str, PolicyPoint]:
     return out
 
 
-#: Treasury column label -> maturity in years
-_UST_TENOR_LABELS = {
-    "1 Mo": 0.0833, "1_month": 0.0833, "bc_1month": 0.0833,
-    "3 Mo": 0.25, "3_month": 0.25, "bc_3month": 0.25,
-    "6 Mo": 0.5, "6_month": 0.5, "bc_6month": 0.5,
-    "1 Yr": 1.0, "1_year": 1.0, "bc_1year": 1.0,
-    "2 Yr": 2.0, "2_year": 2.0, "bc_2year": 2.0,
-    "3 Yr": 3.0, "3_year": 3.0, "bc_3year": 3.0,
-    "5 Yr": 5.0, "5_year": 5.0, "bc_5year": 5.0,
-    "7 Yr": 7.0, "7_year": 7.0, "bc_7year": 7.0,
-    "10 Yr": 10.0, "10_year": 10.0, "bc_10year": 10.0,
-    "20 Yr": 20.0, "20_year": 20.0, "bc_20year": 20.0,
-    "30 Yr": 30.0, "30_year": 30.0, "bc_30year": 30.0,
-}
-
 _EMPTY_US = Curve("US", (), False, (UST,), "")
+
+#: Treasury's header mixes unit spellings within one row — "1 Mo", "1.5 Month",
+#: "2 Mo", "4 Mo", "10 Yr" — so a lookup table can't cover it. Normalize.
+_TENOR_LABEL = re.compile(r"^\s*([\d.]+)\s*(Mo(?:nth)?s?|Yrs?|Years?|Y|M)\s*$", re.I)
+
+
+def tenor_years(label: str) -> Optional[float]:
+    """"3 Mo" -> 0.25, "1.5 Month" -> 0.125, "10 Yr" -> 10.0, "40Y" -> 40.0.
+
+    Returns None for anything that isn't a maturity label, which is how
+    non-tenor columns ("Date") get skipped."""
+    match = _TENOR_LABEL.match(label or "")
+    if match is None:
+        return None
+    magnitude = _f(match.group(1))
+    if magnitude is None:
+        return None
+    unit = match.group(2).lower()
+    return magnitude / 12.0 if unit.startswith("m") else magnitude
 
 
 def parse_ust_curve(text: str) -> Curve:
-    """US Treasury daily par yield curve -> Curve. Accepts either the
-    FiscalData JSON envelope or the CSV download; both carry one row per
-    date with one column per tenor."""
+    """US Treasury daily par yield curve -> Curve.
+
+    The CSV is scoped to a calendar year and sorted newest-first, so row 0 is
+    today's curve. (The FiscalData JSON endpoint 404s — see the probe findings;
+    do not reintroduce a JSON branch for it.)"""
     if not text or not text.strip():
         return _EMPTY_US
-
-    row: dict = {}
-    as_of = ""
-    stripped = text.lstrip()
     try:
-        if stripped.startswith("{"):
-            data = json.loads(text).get("data", [])
-            if not data:
-                return _EMPTY_US
-            row = data[0]
-            as_of = str(row.get("record_date", ""))
-        else:
-            rows = list(csv.DictReader(io.StringIO(text)))
-            if not rows:
-                return _EMPTY_US
-            row = rows[0]
-            as_of = str(row.get("Date", "") or row.get("record_date", ""))
+        rows = list(csv.DictReader(io.StringIO(text)))
     except Exception:
         return _EMPTY_US
+    if not rows:
+        return _EMPTY_US
 
+    row = rows[0]
+    as_of = str(row.get("Date", ""))
     points = []
-    for label, years in _UST_TENOR_LABELS.items():
-        if label not in row:
+    for label, cell in row.items():
+        years = tenor_years(label)
+        if years is None:
             continue
-        value = _f(row[label])
+        value = _f(cell)   # Treasury leaves a tenor blank on days it isn't quoted
         if value is not None:
             points.append(CurvePoint(years, value))
     points.sort()
-    # a label can appear under two spellings; keep one point per maturity
-    deduped: list[CurvePoint] = []
-    for p in points:
-        if not deduped or deduped[-1].years != p.years:
-            deduped.append(p)
-    return Curve("US", tuple(deduped), len(deduped) >= 5, (UST,), as_of)
+    return Curve("US", tuple(points), len(points) >= 5, (UST,), as_of)
 
 
 def parse_ecb_curve(rows: dict[float, str]) -> Curve:
@@ -1194,46 +1213,70 @@ def parse_ecb_curve(rows: dict[float, str]) -> Curve:
     return Curve("XM", tuple(points), len(points) >= 5, (ECB,), as_of)
 
 
+_EMPTY_JP = Curve("JP", (), False, (MOF,), "")
+
+#: MOF dates are YYYY/M/D with no zero-padding, e.g. "2026/8/3"
+_MOF_DATE = re.compile(r"^\s*\d{4}/\d{1,2}/\d{1,2}\s*$")
+
+
 def parse_mof_curve(text: str) -> Curve:
-    """Japan MOF JGB CSV: a preamble, then a header row of tenor labels
-    ("1Y", "2Y", ... "40Y") and one row per date, newest last."""
+    """Japan MOF JGB CSV -> Curve.
+
+    The file is NOT a clean rectangle. Row 1 is a title carrying the units
+    marker ("Interest Rate (August 2026),,,…,(Unit : %)"); row 2 is the real
+    header ("Date,1Y,2Y,…,40Y"); then data rows; then a blank row and a footer
+    note about clearing the browser cache. Taking the last non-empty row would
+    read that footer as a curve — the last row whose first cell is a DATE is
+    the one we want."""
     if not text or not text.strip():
-        return Curve("JP", (), False, (MOF,), "")
+        return _EMPTY_JP
     try:
         rows = [r for r in csv.reader(io.StringIO(text)) if r]
     except Exception:
-        return Curve("JP", (), False, (MOF,), "")
+        return _EMPTY_JP
 
     header_idx = None
     for i, row in enumerate(rows):
-        if sum(1 for cell in row if cell.strip().upper().endswith("Y")) >= 5:
+        if sum(1 for cell in row if tenor_years(cell) is not None) >= 5:
             header_idx = i
             break
-    if header_idx is None or header_idx + 1 >= len(rows):
-        return Curve("JP", (), False, (MOF,), "")
+    if header_idx is None:
+        return _EMPTY_JP
+
+    last = None
+    for row in rows[header_idx + 1:]:
+        if row and _MOF_DATE.match(row[0]):
+            last = row
+    if last is None:
+        return _EMPTY_JP
 
     header = rows[header_idx]
-    last = rows[-1]
-    as_of = last[0].strip() if last else ""
     points = []
     for col, label in enumerate(header):
-        label = label.strip().upper()
-        if not label.endswith("Y"):
-            continue
-        years = _f(label[:-1])
+        years = tenor_years(label)
         if years is None or col >= len(last):
             continue
         value = _f(last[col])
         if value is not None:
             points.append(CurvePoint(years, value))
     points.sort()
-    return Curve("JP", tuple(points), len(points) >= 5, (MOF,), as_of)
+    return Curve("JP", tuple(points), len(points) >= 5, (MOF,), as_of=last[0].strip())
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_rates_provider.py -q`
-Expected: 8 passed. If a parse test fails, compare against the Task 1 fixture and fix the parsing — do not change the assertions or the return types.
+Expected: 11 passed. If a parse test fails, compare against the Task 1 fixture and fix the parsing — do not change the assertions or the return types.
+
+**Read `docs/superpowers/2026-08-07-rates-probe-findings.md` before you start.** It records the exact column names, date formats and units for every source, taken from the recorded fixtures. It is the reference for this task — do not re-probe the live endpoints.
+
+Two facts from it that this task's code already accounts for, so you don't
+"fix" them back:
+- **BIS uses `XM` for the euro area, ECB uses `U2`.** No alias table is needed:
+  `rates_meta.py` keys the euro area as `XM` (matching BIS), and the ECB URL
+  hardcodes `U2` in the series key. The mismatch is already absorbed.
+- **The Treasury fixture is named `ust_curve.raw`** but its content is CSV.
+  The `_fixture()` helper globs `ust_curve.*`, so this is handled.
 
 - [ ] **Step 5: Commit**
 
@@ -1346,6 +1389,7 @@ Expected: FAIL — `ImportError: cannot import name 'build_policy_payload'`
 Append to `aurantium/providers/rates.py`:
 
 ```python
+import datetime
 import os
 
 from ..datahub import DataHub, Provider
@@ -1435,18 +1479,31 @@ def _get_text(url: str, **kwargs) -> str:
 class RatesProvider(Provider):
     """Serves ``rates:policy`` and ``rates:curve:<CC>``."""
 
-    #: set from the Task 1 findings note
-    BIS_URL = (
-        "https://stats.bis.org/api/v2/data/dataflow/BIS/WS_CBPOL/1.0/"
-        "M..?format=csv&lastNObservations=24"
-    )
-    UST_URL = (
-        "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/"
-        "accounting/od/daily_treasury_yield_curve?sort=-record_date&page[size]=1"
-    )
+    # URLs confirmed live by tools/probe_rates.py — see
+    # docs/superpowers/2026-08-07-rates-probe-findings.md. Both BIS's and
+    # Treasury's first-choice candidates 404'd; these are the ones that work.
+    # Do NOT "modernize" them back to the v2/fiscaldata paths.
+    #: The v1 CSV endpoint ignores lastNObservations and returns the full
+    #: history since 1986 (12.7 MB, 25k rows, 49 countries) — far too heavy to
+    #: pull on every refresh. `startPeriod` is standard SDMX REST; try it first
+    #: and fall back to the unfiltered URL if BIS rejects it (see Step 3a).
+    BIS_URL = "https://stats.bis.org/api/v1/data/WS_CBPOL/M../all?format=csv"
+    BIS_URL_WINDOWED = BIS_URL + "&startPeriod={start}"
     MOF_URL = (
         "https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/jgbcme.csv"
     )
+
+    @staticmethod
+    def ust_url() -> str:
+        """Treasury's CSV export is scoped to a calendar year, so the year must
+        be current — a hardcoded one silently returns nothing every January."""
+        year = datetime.date.today().year
+        return (
+            "https://home.treasury.gov/resource-center/data-chart-center/"
+            f"interest-rates/daily-treasury-rates.csv/{year}/all"
+            f"?type=daily_treasury_yield_curve&field_tdr_date_value={year}"
+            "&page&_format=csv"
+        )
 
     def topic_patterns(self) -> list[str]:
         return ["rates:*"]
@@ -1470,7 +1527,7 @@ class RatesProvider(Provider):
 
         policy: dict[str, PolicyPoint] = {}
         try:
-            policy = parse_bis_policy(_get_text(self.BIS_URL))
+            policy = parse_bis_policy(self._bis_text())
         except Exception:
             partial.append(BIS)
         if not policy and BIS not in partial:
@@ -1482,6 +1539,19 @@ class RatesProvider(Provider):
             hub.publish_error(topic, "no rates sources reachable")
             return
         hub.publish(topic, build_policy_payload(policy, enrich, partial))
+
+    def _bis_text(self) -> str:
+        """Fetch BIS policy rates, windowed if the API allows it.
+
+        Three years is enough to derive the last change for any jurisdiction
+        that has moved recently; the full feed is 12.7 MB and we only need the
+        tail. If BIS rejects startPeriod, fall back to the full feed rather
+        than failing — correctness beats bandwidth."""
+        start = f"{datetime.date.today().year - 3}-01"
+        try:
+            return _get_text(self.BIS_URL_WINDOWED.format(start=start))
+        except Exception:
+            return _get_text(self.BIS_URL)
 
     def _fred_enrichment(self, partial: list[str]) -> dict[str, dict]:
         """Short/long yields for countries no curve source reaches.
@@ -1546,7 +1616,7 @@ class RatesProvider(Provider):
 
     def _curve_for(self, meta) -> Curve:
         if meta.curve_source == "ust":
-            return parse_ust_curve(_get_text(self.UST_URL))
+            return parse_ust_curve(_get_text(self.ust_url()))
         if meta.curve_source == "mof":
             return parse_mof_curve(_get_text(self.MOF_URL))
         if meta.curve_source == "ecb":
@@ -1581,6 +1651,22 @@ class RatesProvider(Provider):
         points.sort()
         return Curve(meta.code, tuple(points), False, ("FRED",), as_of)
 ```
+
+- [ ] **Step 3a: Confirm the BIS window actually works**
+
+`startPeriod` is standard SDMX REST but the BIS v1 CSV endpoint was observed
+ignoring `lastNObservations`, so it may ignore this too. Check once, by hand:
+
+```bash
+.venv/Scripts/python.exe -c "import requests; r=requests.get('https://stats.bis.org/api/v1/data/WS_CBPOL/M../all?format=csv&startPeriod=2023-01', timeout=60); print(r.status_code, len(r.text))"
+```
+
+Compare against the unwindowed 12.7 MB baseline. Record the result in your
+report:
+- **Materially smaller** → the window works, keep `_bis_text()` as written.
+- **Still ~12.7 MB** → BIS ignores it. Keep `_bis_text()` (harmless), and note
+  in the report that every refresh pulls 12.7 MB. Do **not** invent a different
+  endpoint — flag it and let the controller decide.
 
 - [ ] **Step 4: Register the provider**
 
