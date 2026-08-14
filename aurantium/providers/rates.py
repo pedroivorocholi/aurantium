@@ -12,10 +12,11 @@ import datetime
 import io
 import os
 import re
-from typing import Any, NamedTuple, Optional
+from typing import Any, Callable, NamedTuple, Optional
 
 import requests
 
+from .. import rates_allowlist
 from ..datahub import DataHub, Provider
 from ..rates_meta import UST, MOF, ECB, BIS, COUNTRIES, by_code
 
@@ -54,6 +55,60 @@ def direction_of(rate: float, prev: Optional[float]) -> str:
     if prev is None or rate == prev:
         return "flat"
     return "up" if rate > prev else "down"
+
+
+# -- FRED access control ---------------------------------------------------
+
+
+class FredNotAllowed(RuntimeError):
+    """Raised when a FRED series is not on the vetted allowlist.
+
+    FRED carries third-party copyrighted series whose commercial
+    redistribution is not permitted; see tools/verify_rates.py."""
+
+
+def fred_allowed(series_id: str) -> bool:
+    # read through the module, not a from-import: a from-import would bind the
+    # frozenset here and make the allowlist untestable by monkeypatch
+    return series_id in rates_allowlist.ALLOWED
+
+
+def fetch_fred_series(
+    series_id: str,
+    api_key: str,
+    *,
+    limit: int = 24,
+    get: Callable[..., Any] = requests.get,
+) -> list[tuple[str, float]]:
+    """Observations for one FRED series, oldest -> newest.
+
+    Refuses a non-allowlisted series BEFORE making any request, so a network
+    failure can never fail open."""
+    if not fred_allowed(series_id):
+        raise FredNotAllowed(series_id)
+    resp = get(
+        "https://api.stlouisfed.org/fred/series/observations",
+        params={
+            "series_id": series_id,
+            "api_key": api_key,
+            "file_type": "json",
+            "sort_order": "desc",
+            "limit": limit,
+        },
+        timeout=15,
+    )
+    resp.raise_for_status()
+    out: list[tuple[str, float]] = []
+    for obs in resp.json().get("observations", []):
+        raw = obs.get("value")
+        if raw in (None, ".", ""):
+            continue
+        try:
+            out.append((obs.get("date", ""), float(raw)))
+        except (TypeError, ValueError):
+            continue
+    out.reverse()
+    return out
 
 
 #: BIS column names vary by API version; try each in order.
@@ -404,19 +459,37 @@ class RatesProvider(Provider):
     def _fred_enrichment(self, partial: list[str]) -> dict[str, dict]:
         """Short/long yields for countries no curve source reaches.
 
-        TASK 4 PENDING — returns nothing, on purpose. FRED carries third-party
-        copyrighted series whose commercial redistribution isn't permitted, so
-        every request must first be checked against the generated allowlist in
-        ``aurantium/rates_allowlist.py``. That module does not exist yet
-        (tools/verify_rates.py needs a FRED_API_KEY to generate it), and
-        without it there is nothing to check against — so this fails CLOSED
-        rather than issuing an unfiltered request. Task 4 of
-        docs/superpowers/plans/2026-08-07-global-rates.md restores the body.
-
-        A missing FRED key is a NORMAL state either way, not an error: the
-        free tier must work with zero configuration. Blank columns, no
-        warning — which is exactly what returning {} produces here."""
-        return {}
+        A missing FRED key is a NORMAL state, not an error: the free tier
+        must work with zero configuration. Blank columns, no warning."""
+        api_key = os.environ.get("FRED_API_KEY")
+        if not api_key:
+            return {}
+        out: dict[str, dict] = {}
+        failures = 0
+        for meta in COUNTRIES:
+            if not (meta.fred_short or meta.fred_long):
+                continue
+            entry: dict = {}
+            for field, series_id in (
+                ("short", meta.fred_short),
+                ("long", meta.fred_long),
+            ):
+                if not series_id:
+                    continue
+                try:
+                    observations = fetch_fred_series(series_id, api_key, limit=2)
+                except FredNotAllowed:
+                    continue  # refused by the copyright filter, by design
+                except Exception:
+                    failures += 1
+                    continue
+                if observations:
+                    entry[field] = observations[-1][1]
+            if entry:
+                out[meta.code] = entry
+        if failures and "FRED" not in partial:
+            partial.append("FRED")
+        return out
 
     # -- rates:curve:<CC> --------------------------------------------------
 
@@ -464,8 +537,22 @@ class RatesProvider(Provider):
                 except Exception:
                     continue
             return parse_ecb_curve(rows)
-        # "fred": the sparse case — observed points only, never interpolated.
-        # TASK 4 PENDING, same licence reason as _fred_enrichment: no
-        # allowlist yet, so no request. GB/CA/AU/CH publish an empty curve
-        # until Task 4 lands; their policy rate still renders from BIS.
-        return Curve(meta.code, (), False, ("FRED",), "")
+        # "fred": the sparse case — observed points only, never interpolated
+        api_key = os.environ.get("FRED_API_KEY")
+        points, as_of = [], ""
+        if api_key:
+            for years, series_id in (
+                (0.25, meta.fred_short),
+                (10.0, meta.fred_long),
+            ):
+                if not series_id:
+                    continue
+                try:
+                    observations = fetch_fred_series(series_id, api_key, limit=2)
+                except Exception:
+                    continue
+                if observations:
+                    as_of = max(as_of, observations[-1][0])
+                    points.append(CurvePoint(years, observations[-1][1]))
+        points.sort()
+        return Curve(meta.code, tuple(points), False, ("FRED",), as_of)
