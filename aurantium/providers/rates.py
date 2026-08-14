@@ -8,11 +8,16 @@ function tested against recorded fixtures, plus a thin fetch_*() wrapper.
 from __future__ import annotations
 
 import csv
+import datetime
 import io
+import os
 import re
 from typing import Any, NamedTuple, Optional
 
-from ..rates_meta import UST, MOF, ECB, BIS, by_code
+import requests
+
+from ..datahub import DataHub, Provider
+from ..rates_meta import UST, MOF, ECB, BIS, COUNTRIES, by_code
 
 
 class PolicyPoint(NamedTuple):
@@ -231,3 +236,236 @@ def parse_mof_curve(text: str) -> Curve:
             points.append(CurvePoint(years, value))
     points.sort()
     return Curve("JP", tuple(points), len(points) >= 5, (MOF,), as_of=last[0].strip())
+
+
+# -- the join --------------------------------------------------------------
+
+
+def build_policy_payload(
+    policy: dict[str, PolicyPoint],
+    enrich: dict[str, dict],
+    partial: list[str],
+) -> dict:
+    """Join BIS policy rates with FRED short/long enrichment.
+
+    Degrades per-source: whatever assembled is published, with the names of
+    the sources that failed in `partial`."""
+    countries: list[dict] = []
+    sources: set[str] = set()
+    codes = set(policy) | set(enrich)
+    for meta in COUNTRIES:
+        if meta.code not in codes:
+            continue
+        point = policy.get(meta.code)
+        extra = enrich.get(meta.code) or {}
+        short = extra.get("short")
+        long = extra.get("long")
+        # a slope needs two OBSERVED yields; a policy rate is not a 2y
+        slope = None
+        if short is not None and long is not None:
+            slope = (long - short) * 100.0
+        if point is not None:
+            sources.add(BIS)
+        if short is not None or long is not None:
+            sources.add("FRED")
+        countries.append(
+            {
+                "code": meta.code,
+                "label": meta.label,
+                "policy": point.rate if point else None,
+                "prev": point.prev if point else None,
+                "last_change": point.last_change if point else None,
+                "direction": point.direction if point else "flat",
+                "short": short,
+                "long": long,
+                "slope": slope,
+                "citation": meta.citation,
+                "has_curve": meta.curve_source != "none",
+            }
+        )
+    countries.sort(key=lambda r: r["label"])
+    as_of = max((p.as_of for p in policy.values()), default="")
+    return {
+        "countries": countries,
+        "partial": list(partial),
+        "sources": sorted(sources),
+        "as_of": as_of,
+    }
+
+
+def build_curve_payload(curve: Curve) -> dict:
+    """Serialize a Curve for the hub. Adds nothing the source didn't publish."""
+    return {
+        "code": curve.code,
+        "points": [[p.years, p.rate] for p in curve.points],
+        "complete": bool(curve.complete),
+        "observed": len(curve.points),
+        "sources": list(curve.sources),
+        "as_of": curve.as_of,
+    }
+
+
+# -- the provider ----------------------------------------------------------
+
+_ECB_SERIES = {
+    0.25: "SR_3M", 0.5: "SR_6M", 1.0: "SR_1Y", 2.0: "SR_2Y", 3.0: "SR_3Y",
+    5.0: "SR_5Y", 7.0: "SR_7Y", 10.0: "SR_10Y", 15.0: "SR_15Y",
+    20.0: "SR_20Y", 30.0: "SR_30Y",
+}
+_ECB_BASE = "https://data-api.ecb.europa.eu/service/data/YC/B.U2.EUR.4F.G_N_A.SV_C_YM."
+_TIMEOUT = 20
+_UA = {"User-Agent": "aurantium/1.0"}
+
+
+def _get_text(url: str, **kwargs) -> str:
+    resp = requests.get(url, timeout=_TIMEOUT, headers=_UA, **kwargs)
+    resp.raise_for_status()
+    return resp.text
+
+
+class RatesProvider(Provider):
+    """Serves ``rates:policy`` and ``rates:curve:<CC>``."""
+
+    # URLs confirmed live by tools/probe_rates.py — see
+    # docs/superpowers/2026-08-07-rates-probe-findings.md. Both BIS's and
+    # Treasury's first-choice candidates 404'd; these are the ones that work.
+    # Do NOT "modernize" them back to the v2/fiscaldata paths.
+    #: The v1 CSV endpoint ignores lastNObservations and returns the full
+    #: history since 1986 (12.7 MB, 25k rows, 49 countries) — far too heavy to
+    #: pull on every refresh. `startPeriod` IS honoured, though: measured
+    #: 2026-08-14, the 3-year window returns 678 KB / 1,657 rows against the
+    #: unwindowed 12.7 MB / 25,055. Keep the window.
+    BIS_URL = "https://stats.bis.org/api/v1/data/WS_CBPOL/M../all?format=csv"
+    BIS_URL_WINDOWED = BIS_URL + "&startPeriod={start}"
+    MOF_URL = (
+        "https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/jgbcme.csv"
+    )
+
+    @staticmethod
+    def ust_url() -> str:
+        """Treasury's CSV export is scoped to a calendar year, so the year must
+        be current — a hardcoded one silently returns nothing every January."""
+        year = datetime.date.today().year
+        return (
+            "https://home.treasury.gov/resource-center/data-chart-center/"
+            f"interest-rates/daily-treasury-rates.csv/{year}/all"
+            f"?type=daily_treasury_yield_curve&field_tdr_date_value={year}"
+            "&page&_format=csv"
+        )
+
+    def topic_patterns(self) -> list[str]:
+        return ["rates:*"]
+
+    def refresh(self, topics: list[str]) -> None:
+        hub = DataHub.instance()
+        for topic in topics:
+            parts = topic.split(":")
+            if len(parts) == 2 and parts[1] == "policy":
+                hub.run_async(lambda t=topic: self._fetch_policy(t))
+            elif len(parts) == 3 and parts[1] == "curve":
+                hub.run_async(lambda t=topic, c=parts[2]: self._fetch_curve(t, c))
+            else:
+                hub.publish_error(topic, f"unrecognized topic: {topic}")
+
+    # -- rates:policy ------------------------------------------------------
+
+    def _fetch_policy(self, topic: str) -> None:
+        hub = DataHub.instance()
+        partial: list[str] = []
+
+        policy: dict[str, PolicyPoint] = {}
+        try:
+            policy = parse_bis_policy(self._bis_text())
+        except Exception:
+            partial.append(BIS)
+        if not policy and BIS not in partial:
+            partial.append(BIS)
+
+        enrich = self._fred_enrichment(partial)
+
+        if not policy and not enrich:
+            hub.publish_error(topic, "no rates sources reachable")
+            return
+        hub.publish(topic, build_policy_payload(policy, enrich, partial))
+
+    def _bis_text(self) -> str:
+        """Fetch BIS policy rates, windowed if the API allows it.
+
+        Three years is enough to derive the last change for any jurisdiction
+        that has moved recently; the full feed is 12.7 MB and we only need the
+        tail. If BIS rejects startPeriod, fall back to the full feed rather
+        than failing — correctness beats bandwidth."""
+        start = f"{datetime.date.today().year - 3}-01"
+        try:
+            return _get_text(self.BIS_URL_WINDOWED.format(start=start))
+        except Exception:
+            return _get_text(self.BIS_URL)
+
+    def _fred_enrichment(self, partial: list[str]) -> dict[str, dict]:
+        """Short/long yields for countries no curve source reaches.
+
+        TASK 4 PENDING — returns nothing, on purpose. FRED carries third-party
+        copyrighted series whose commercial redistribution isn't permitted, so
+        every request must first be checked against the generated allowlist in
+        ``aurantium/rates_allowlist.py``. That module does not exist yet
+        (tools/verify_rates.py needs a FRED_API_KEY to generate it), and
+        without it there is nothing to check against — so this fails CLOSED
+        rather than issuing an unfiltered request. Task 4 of
+        docs/superpowers/plans/2026-08-07-global-rates.md restores the body.
+
+        A missing FRED key is a NORMAL state either way, not an error: the
+        free tier must work with zero configuration. Blank columns, no
+        warning — which is exactly what returning {} produces here."""
+        return {}
+
+    # -- rates:curve:<CC> --------------------------------------------------
+
+    def _fetch_curve(self, topic: str, code: str) -> None:
+        hub = DataHub.instance()
+        meta = by_code(code)
+        if meta is None:
+            hub.publish_error(topic, f"unknown country: {code}")
+            return
+        if meta.curve_source == "none":
+            hub.publish(
+                topic,
+                {
+                    "code": meta.code,
+                    "points": [],
+                    "complete": False,
+                    "observed": 0,
+                    "sources": [BIS],
+                    "as_of": "",
+                    "note": f"No curve published for {meta.label}. Policy rate only.",
+                },
+            )
+            return
+        try:
+            curve = self._curve_for(meta)
+        except Exception as exc:
+            hub.publish_error(topic, f"curve fetch failed for {meta.code}: {exc}")
+            return
+        hub.publish(topic, build_curve_payload(curve))
+
+    def _curve_for(self, meta) -> Curve:
+        if meta.curve_source == "ust":
+            return parse_ust_curve(_get_text(self.ust_url()))
+        if meta.curve_source == "mof":
+            return parse_mof_curve(_get_text(self.MOF_URL))
+        if meta.curve_source == "ecb":
+            rows = {}
+            for years, suffix in _ECB_SERIES.items():
+                if years not in meta.tenors:
+                    continue
+                try:
+                    rows[years] = _get_text(
+                        f"{_ECB_BASE}{suffix}?format=csvdata&lastNObservations=1"
+                    )
+                except Exception:
+                    continue
+            return parse_ecb_curve(rows)
+        # "fred": the sparse case — observed points only, never interpolated.
+        # TASK 4 PENDING, same licence reason as _fred_enrichment: no
+        # allowlist yet, so no request. GB/CA/AU/CH publish an empty curve
+        # until Task 4 lands; their policy rate still renders from BIS.
+        return Curve(meta.code, (), False, ("FRED",), "")
