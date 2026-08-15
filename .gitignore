@@ -9,3 +9,5 @@ tools/eddsa_private.key
 # build artifacts
 build/
 dist/
+# runtime logs (contain local paths / tracebacks)
+*.log

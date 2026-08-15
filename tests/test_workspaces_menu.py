@@ -30,14 +30,10 @@ class _Host(QWidget):
         self.applied.append(doc)
         return True
 
-    def statusBar(self):  # noqa: N802 (Qt naming)
-        host = self
-
-        class _Bar:
-            def showMessage(self, text, timeout=0):  # noqa: N802
-                host.messages.append(text)
-
-        return _Bar()
+    def notify(self, text, msecs=4000, level="info"):
+        # transient feedback now goes to the floating notice card, not the
+        # (hidden) status bar — see aurantium.notifier
+        self.messages.append(text)
 
 
 def _presets():

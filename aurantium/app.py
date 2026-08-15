@@ -10,7 +10,6 @@ from pathlib import Path
 
 import PySide6QtAds as QtAds
 from PySide6.QtCore import Qt, QSettings
-from PySide6.QtCore import QAbstractAnimation, QEasingCurve, QPropertyAnimation
 from PySide6.QtGui import (
     QAction,
     QActionGroup,
@@ -36,7 +35,9 @@ from PySide6.QtWidgets import (
 from .alerts import AlertEngine
 from .command_bar import CommandBar
 from .datahub import DataHub
+from . import motion
 from .layout_store import LayoutStore
+from .notifier import Notifier
 from .panel import Panel, PanelRegistry
 from .paths import BUNDLE_DIR
 from .presets import Preset, available_presets
@@ -140,12 +141,31 @@ class MainWindow(QMainWindow):
         self._install_more_shortcuts()
         self._install_undo()
         self._install_tray()
-        self.statusBar().showMessage(
-            "Click any ticker — every linked panel follows. Data: Yahoo Finance/Google News (free, delayed)."
-        )
-        # Bottom bar removed to give the taller top bar (logo) room without
-        # growing the window — showMessage() calls above are harmless no-ops.
+        # The bottom status bar is gone (the taller top bar with the logo took
+        # its height), so transient feedback goes to a floating notice card
+        # instead — see notifier.py and self.notify().
         self.statusBar().setVisible(False)
+        self._notifier = Notifier(self)
+
+    # -- transient feedback --------------------------------------------------
+
+    def notify(self, text: str, msecs: int = 4000, level: str = "info") -> None:
+        """Report something that just happened — layout saved, undo, refresh,
+        an unknown command, a fired alert — in the floating notice card.
+
+        Every call site that used to write to the (now hidden) status bar comes
+        through here. ``level="warn"`` tints it amber for "you asked for
+        something and it didn't happen".
+        """
+        self._notifier.show_message(text, msecs, level)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        super().resizeEvent(event)
+        # keep the notice pinned to the bottom-right corner as the window,
+        # or the full-screen toggle, changes its size
+        notifier = getattr(self, "_notifier", None)
+        if notifier is not None:
+            notifier.reposition()
 
     # -- full screen (maximize one panel in the window) ----------------------
 
@@ -226,9 +246,9 @@ class MainWindow(QMainWindow):
             return
         label = UndoStack.instance().undo()
         if label:
-            self.statusBar().showMessage(f"Undid: {label}", 3000)
+            self.notify(f"Undid: {label}", 3000)
         else:
-            self.statusBar().showMessage("Nothing to undo.", 2500)
+            self.notify("Nothing to undo.", 2500, level="warn")
 
     # -- system tray + price alerts ----------------------------------------
 
@@ -340,7 +360,7 @@ class MainWindow(QMainWindow):
                 "Aurantium — price alert", message,
                 self._tray.icon(), 8000,
             )
-        self.statusBar().showMessage(f"⚠ Alert: {message}", 8000)
+        self.notify(f"⚠ Alert: {message}", 8000, level="warn")
 
     def _close_focused_dock(self) -> None:
         dock = self.dock_manager.focusedDockWidget()
@@ -356,14 +376,14 @@ class MainWindow(QMainWindow):
         panel = dock.widget()
         if isinstance(panel, Panel):
             panel.set_link_group(GROUPS[index])
-            self.statusBar().showMessage(
+            self.notify(
                 f"Panel linked to group {GROUPS[index]}", 2500
             )
 
     def _reopen_last_closed(self) -> None:
         info = self._last_closed
         if not info or not info.get("panel_id"):
-            self.statusBar().showMessage("No recently closed panel to reopen.", 3000)
+            self.notify("No recently closed panel to reopen.", 3000, level="warn")
             return
         self._last_closed = None
         self.add_panel(
@@ -383,7 +403,7 @@ class MainWindow(QMainWindow):
         hub = DataHub.instance()
         topics = hub.subscribed_topics()
         hub.request(topics, force=True)
-        self.statusBar().showMessage(f"Refreshing {len(topics)} feeds…", 2500)
+        self.notify(f"Refreshing {len(topics)} feeds…", 2500)
 
     def _chrome_icon(self, kind: str, color: str | None = None):
         """The panel-chrome icon set — close, maximize, restore, menu, pin —
@@ -446,23 +466,19 @@ class MainWindow(QMainWindow):
         except Exception:
             pass  # icon provider is a nicety; never block startup on it
 
-    def _fade_in(self, widget) -> None:
-        """A very slight fade-in on the focal panel so maximize/restore eases
-        rather than snapping. Partial start opacity keeps it subtle; the effect
-        is removed when done so it never affects normal rendering."""
-        if widget is None:
-            return
-        from PySide6.QtWidgets import QGraphicsOpacityEffect
-
-        eff = QGraphicsOpacityEffect(widget)
-        widget.setGraphicsEffect(eff)
-        anim = QPropertyAnimation(eff, b"opacity", self)
-        anim.setDuration(150)
-        anim.setStartValue(0.5)
-        anim.setEndValue(1.0)
-        anim.setEasingCurve(QEasingCurve.Type.OutCubic)
-        anim.finished.connect(lambda w=widget: w.setGraphicsEffect(None))
-        anim.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
+    # Panel maximize/restore is deliberately NOT animated.
+    #
+    # It used to fade the focal panel in from 50% opacity over 150ms. Three
+    # things were wrong with that. It is reached from the keyboard (F11 to
+    # maximize, Esc or F11 to restore) — keyboard actions are repeated all day
+    # and any animation on them reads as lag on the exact frame the user is
+    # watching. It faded the *data*: the thing being maximized is a chart or a
+    # table the user just asked to see larger, and content being read should
+    # not move or dim for style. And it did it through a
+    # QGraphicsOpacityEffect, which forces Qt to render the whole panel to an
+    # offscreen pixmap for the duration — the most expensive way to do the
+    # least useful thing. Snapping straight to the maximized panel is both
+    # faster and correct.
 
     def _toggle_maximize_focused(self) -> None:
         """F11: maximize the focused panel, or restore if already maximized."""
@@ -475,8 +491,10 @@ class MainWindow(QMainWindow):
             if len(self._docks) == 1:
                 iid = next(iter(self._docks))
             else:
-                self.statusBar().showMessage(
-                    "Click a panel first, then press F11 to maximize it.", 4000
+                self.notify(
+                    "Click a panel first, then press F11 to maximize it.",
+                    4000,
+                    level="warn",
                 )
                 return
         self._set_maximized(iid, True)
@@ -502,11 +520,10 @@ class MainWindow(QMainWindow):
             self._maximizing = False
         target.toggleView(True)
         target.setAsCurrentTab()
-        self._fade_in(target.widget())
         self._maximized_instance = instance_id
         self._esc_shortcut.setEnabled(True)
         self._sync_maximize_action(instance_id, True)
-        self.statusBar().showMessage(
+        self.notify(
             "Panel maximized — press F11 or Esc to restore.", 4000
         )
 
@@ -518,9 +535,6 @@ class MainWindow(QMainWindow):
         self._esc_shortcut.setEnabled(False)
         self._restore_pre_maximize()
         self._sync_maximize_action(iid, False)
-        dock = self._docks.get(iid)
-        if dock is not None:
-            self._fade_in(dock.widget())
 
     def _restore_pre_maximize(self) -> None:
         state, self._pre_maximize_state = self._pre_maximize_state, None
@@ -783,7 +797,7 @@ class MainWindow(QMainWindow):
         from .settings_dialog import ApiKeysDialog
 
         if ApiKeysDialog(self).exec():
-            self.statusBar().showMessage(
+            self.notify(
                 "API keys saved — panels use them on their next refresh.", 5000
             )
 
@@ -884,7 +898,7 @@ class MainWindow(QMainWindow):
         """Replace the current arrangement with a shipped preset. Matches the
         no-confirmation behaviour of loading a saved layout."""
         if self.apply_layout(preset.doc):
-            self.statusBar().showMessage(f"Workspace loaded: {preset.name}", 4000)
+            self.notify(f"Workspace loaded: {preset.name}", 4000)
 
     def _rebuild_layout_menu(self) -> None:
         m = self._m_layout
@@ -950,12 +964,12 @@ class MainWindow(QMainWindow):
                 return
         self.layout_store.put(name, self.serialize_layout())
         self._rebuild_layout_menu()
-        self.statusBar().showMessage(f"Layout saved: {name}", 4000)
+        self.notify(f"Layout saved: {name}", 4000)
 
     def _load_named_layout(self, name: str) -> None:
         doc = self.layout_store.get(name)
         if doc and self.apply_layout(doc):
-            self.statusBar().showMessage(f"Layout loaded: {name}", 4000)
+            self.notify(f"Layout loaded: {name}", 4000)
 
     def _delete_named_layout(self, name: str) -> None:
         resp = QMessageBox.question(
@@ -964,7 +978,7 @@ class MainWindow(QMainWindow):
         if resp == QMessageBox.StandardButton.Yes:
             self.layout_store.delete(name)
             self._rebuild_layout_menu()
-            self.statusBar().showMessage(f"Layout deleted: {name}", 4000)
+            self.notify(f"Layout deleted: {name}", 4000)
 
     def _reset_to_default(self) -> None:
         default = LAYOUTS_DIR / "default.json"
@@ -1080,25 +1094,29 @@ class MainWindow(QMainWindow):
         if cmd == "add":
             if PanelRegistry.get(arg):
                 self.add_panel(arg)
-                self.statusBar().showMessage(f"Added panel: {arg}", 3000)
+                self.notify(f"Added panel: {arg}", 3000)
             else:
-                self.statusBar().showMessage(f"Unknown panel: {arg or '(none)'}", 3000)
+                self.notify(
+                    f"Unknown panel: {arg or '(none)'}", 3000, level="warn"
+                )
         elif cmd == "layout":
             if arg in self.layout_store.names():
                 self._load_named_layout(arg)
             else:
-                self.statusBar().showMessage(f"Unknown layout: {arg or '(none)'}", 3000)
+                self.notify(
+                    f"Unknown layout: {arg or '(none)'}", 3000, level="warn"
+                )
         elif cmd == "save":
             if arg:
                 self.layout_store.put(arg, self.serialize_layout())
                 self._rebuild_layout_menu()
-                self.statusBar().showMessage(f"Layout saved: {arg}", 4000)
+                self.notify(f"Layout saved: {arg}", 4000)
             else:
                 self._save_named_layout()
         elif cmd == "refresh":
             self._refresh_all()
         else:
-            self.statusBar().showMessage(f"Unknown command: /{cmd}", 3000)
+            self.notify(f"Unknown command: /{cmd}", 3000, level="warn")
 
     # -- panel management --------------------------------------------------------
 
@@ -1140,8 +1158,8 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
             # one broken panel must not blank the whole window — report it to
             # the user and skip; the invalid panel never reaches the dock manager
-            self.statusBar().showMessage(
-                f"Couldn't open {meta.title}: {exc}", 6000
+            self.notify(
+                f"Couldn't open {meta.title}: {exc}", 6000, level="warn"
             )
             return None
         if link_group:
@@ -1186,6 +1204,11 @@ class MainWindow(QMainWindow):
         sym = SymbolContext.instance().symbol(panel.link_group)
         if sym:
             panel._apply_symbol(sym)
+        if not self._loading_layout:
+            # Only for a panel the user just asked for. Restoring a saved
+            # layout builds a dozen at once, and fading them all in would just
+            # delay the data they opened the app to read.
+            motion.fade_in_panel(panel)
         return dock
 
     # -- layout serialization (dict in / dict out) ---------------------------
@@ -1228,10 +1251,11 @@ class MainWindow(QMainWindow):
         except (TypeError, ValueError):
             layout_version = 1  # malformed version — treat as current, try to load
         if layout_version > CURRENT_LAYOUT_VERSION:
-            self.statusBar().showMessage(
+            self.notify(
                 "This layout was saved by a newer version of Aurantium — "
                 "update to load it.",
                 6000,
+                level="warn",
             )
             return False
         # drop any maximize state — we're rebuilding the whole arrangement
@@ -1287,7 +1311,7 @@ class MainWindow(QMainWindow):
         except OSError as exc:
             QMessageBox.warning(self, "Export layout", f"Couldn't save:\n{exc}")
             return
-        self.statusBar().showMessage(f"Layout exported: {Path(fn).name}", 5000)
+        self.notify(f"Layout exported: {Path(fn).name}", 5000)
 
     def _import_layout_file(self) -> None:
         """Import a shared layout file into the saved layouts, then load it."""
@@ -1326,7 +1350,7 @@ class MainWindow(QMainWindow):
         self.layout_store.put(name, doc)
         self._rebuild_layout_menu()
         self.apply_layout(doc)
-        self.statusBar().showMessage(f"Layout imported: {name}", 5000)
+        self.notify(f"Layout imported: {name}", 5000)
 
     def _open_core_four(self) -> None:
         self.add_panel("watchlist", area=QtAds.DockWidgetArea.LeftDockWidgetArea)
