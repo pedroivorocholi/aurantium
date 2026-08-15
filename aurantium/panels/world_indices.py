@@ -80,11 +80,21 @@ class WorldIndicesPanel(Panel):
 
         self.table = MarketTable(0, len(HEADERS), self)
         self.table.setHorizontalHeaderLabels(HEADERS)
+        self.table.set_empty_text(
+            "No index data",
+            "Press F5 to refresh, or check your connection",
+        )
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(COL_NAME, QHeaderView.ResizeMode.ResizeToContents)
         for col in (COL_LAST, COL_CHG, COL_CHGPCT):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
         self.table.itemSelectionChanged.connect(self._on_row_selected)
+        # Narrow panels drop columns instead of eliding the price:
+        # a row crushed to "4,432.…" has lost the number it exists for.
+        self.table.set_column_priority(
+            keep=[COL_NAME, COL_LAST],
+            droppable=[COL_CHG, COL_CHGPCT],
+        )
         self.table.enable_column_menu()
         self.table.set_row_actions(self._row_actions)
 

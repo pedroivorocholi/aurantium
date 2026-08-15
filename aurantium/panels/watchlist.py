@@ -75,11 +75,21 @@ class WatchlistPanel(Panel):
 
         self.table = MarketTable(0, len(HEADERS), self)
         self.table.setHorizontalHeaderLabels(HEADERS)
+        self.table.set_empty_text(
+            "Watchlist is empty",
+            "Add a symbol below, or type one in the SYMBOL bar",
+        )
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(COL_SYMBOL, QHeaderView.ResizeMode.ResizeToContents)
         for col in (COL_LAST, COL_CHG, COL_CHGPCT, COL_VOLUME):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
         self.table.itemSelectionChanged.connect(self._on_row_selected)
+        # Narrow panels drop columns instead of eliding the price:
+        # a row crushed to "4,432.…" has lost the number it exists for.
+        self.table.set_column_priority(
+            keep=[COL_SYMBOL, COL_LAST],
+            droppable=[COL_VOLUME, COL_CHG, COL_CHGPCT],
+        )
         self.table.installEventFilter(self)
         self.table.enable_sorting()
         self.table.enable_column_menu()
@@ -160,6 +170,16 @@ class WatchlistPanel(Panel):
         change = data.get("change")
         change_pct = data.get("change_pct")
         volume = data.get("volume")
+
+        # Flash the price cell when it actually moved. Every poll calls this
+        # method, so comparing against the last value we rendered is what keeps
+        # the flash meaningful — tinting on every refresh, including the ones
+        # that changed nothing, would be noise the eye learns to ignore.
+        previous = cells.get("_last_price")
+        if previous is not None and price is not None and price != previous:
+            self.table.flash_cell(cells["last"], price - previous)
+        if price is not None:
+            cells["_last_price"] = price
 
         # update via cached item references — correct even after the user has
         # sorted the table (visual row indices no longer track symbols). The

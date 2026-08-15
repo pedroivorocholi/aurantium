@@ -72,11 +72,21 @@ class MoversPanel(Panel):
 
         self.table = MarketTable(0, len(HEADERS), self)
         self.table.setHorizontalHeaderLabels(HEADERS)
+        self.table.set_empty_text(
+            "No movers yet",
+            "Waiting for the market scan — press F5 to refresh",
+        )
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(COL_SYMBOL, QHeaderView.ResizeMode.ResizeToContents)
         for col in (COL_NAME, COL_LAST, COL_CHGPCT, COL_VOLUME):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
         self.table.itemSelectionChanged.connect(self._on_row_selected)
+        # Narrow panels drop columns instead of eliding the price:
+        # a row crushed to "4,432.…" has lost the number it exists for.
+        self.table.set_column_priority(
+            keep=[COL_SYMBOL, COL_CHGPCT],
+            droppable=[COL_VOLUME, COL_NAME, COL_LAST],
+        )
         self.table.enable_sorting()
         self.table.enable_column_menu()
 
