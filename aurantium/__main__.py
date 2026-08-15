@@ -376,12 +376,15 @@ def main() -> int:
         except OSError:
             pass
 
-    # First run: show the onboarding guide once, then offer the API-keys dialog
-    # (both no-ops after first launch / once keys are connected). Delayed so the
-    # window paints first; run sequentially since each dialog is modal.
+    # First run: pick reading languages, show the onboarding guide once, then
+    # offer the API-keys dialog (all no-ops after first launch / once keys are
+    # connected). Delayed so the window paints first; run sequentially since
+    # each dialog is modal. Languages come first — it's the only one that
+    # changes what the panels behind the dialog will show.
     from PySide6.QtCore import QTimer
 
     def _first_run_dialogs() -> None:
+        win.maybe_prompt_languages()
         win.maybe_show_onboarding()
         win.maybe_prompt_api_keys()
 

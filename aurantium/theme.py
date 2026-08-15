@@ -343,7 +343,32 @@ QToolButton:hover {{ background: rgba(128,128,128,0.18); }}
 QToolButton:pressed {{ background: rgba(128,128,128,0.30); }}
 
 /* -- checkboxes / radios ------------------------------------------------- */
+/* The indicator needs explicit borders: unstyled, Qt draws a dark native box
+   on our near-black surfaces, so an unticked option reads as plain text with
+   nothing to click. Ticked is a filled amber square rather than a checkmark
+   glyph — a QSS-styled indicator doesn't draw the native check, and a solid
+   fill reads faster at 12px anyway. */
 QCheckBox, QRadioButton {{ spacing: 6px; }}
+QCheckBox::indicator, QRadioButton::indicator {{
+    width: 12px; height: 12px;
+    background: {p['BG_ELEV']};
+    border: 1px solid {p['BORDER_STRONG']};
+}}
+QCheckBox::indicator {{ border-radius: 2px; }}
+QRadioButton::indicator {{ border-radius: 7px; }}
+QCheckBox::indicator:hover, QRadioButton::indicator:hover {{
+    border-color: {p['ACCENT']};
+}}
+QCheckBox::indicator:checked, QRadioButton::indicator:checked {{
+    background: {p['ACCENT']}; border-color: {p['ACCENT']};
+}}
+QCheckBox::indicator:disabled, QRadioButton::indicator:disabled {{
+    border-color: {p['BORDER']};
+}}
+QCheckBox::indicator:checked:disabled, QRadioButton::indicator:checked:disabled {{
+    background: {p['ACCENT_DEEP']}; border-color: {p['ACCENT_DEEP']};
+}}
+QCheckBox:disabled, QRadioButton:disabled {{ color: {p['FG_MUTED']}; }}
 
 /* -- menus --------------------------------------------------------------- */
 QMenu {{

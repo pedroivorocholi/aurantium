@@ -727,6 +727,14 @@ class MainWindow(QMainWindow):
         self._m_layout = m.addMenu("Layout")
         self._rebuild_layout_menu()
 
+        # -- news languages --------------------------------------------------
+        a_langs = QAction("News Languages…", self)
+        a_langs.setToolTip(
+            "Which languages news headlines may appear in"
+        )
+        a_langs.triggered.connect(self._show_languages)
+        m.addAction(a_langs)
+
         # -- optional data-source keys --------------------------------------
         a_apis = QAction("API Keys…", self)
         a_apis.triggered.connect(self._show_api_keys)
@@ -792,6 +800,29 @@ class MainWindow(QMainWindow):
                 act.blockSignals(True)
                 act.setChecked(on)
                 act.blockSignals(False)
+
+    def _show_languages(self, first_run: bool = False) -> None:
+        """Open the reading-languages picker; on save, refresh every live topic
+        so the news panels re-fetch under the new languages immediately. The
+        provider's RSS cache is keyed by language set, so the refresh picks up
+        the new feeds rather than replaying the old cached ones."""
+        from . import languages
+        from .language_dialog import prompt_languages
+
+        if not prompt_languages(self, first_run=first_run):
+            return
+        self._refresh_all()
+        names = ", ".join(languages.endonym(c) for c in languages.spoken_languages())
+        self.notify(f"News languages: {names}", 5000)
+
+    def maybe_prompt_languages(self) -> None:
+        """First launch only: ask which languages to show news in. Gated by its
+        own flag, so adding the feature to an existing install prompts once."""
+        from . import languages
+
+        if languages.has_chosen():
+            return
+        self._show_languages(first_run=True)
 
     def _show_api_keys(self) -> None:
         from .settings_dialog import ApiKeysDialog

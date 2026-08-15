@@ -141,7 +141,8 @@ Esc or F11 to bring the rest back.</p>
 
 <h2>Settings</h2>
 <p>Everything except <b>Panels</b> now lives under the <b>Settings</b> menu —
-theme, color-blind mode, layouts, API keys, the guide, updates, and quit.</p>
+theme, color-blind mode, layouts, news languages, API keys, the guide, updates,
+and quit.</p>
 
 <h2>Theme &amp; accessibility</h2>
 <p>Switch between the <b>dark</b> (default) and <b>light</b> theme under
@@ -195,6 +196,14 @@ preview snippet below the list — the headline dims once you've read it.
 <b>Double-click</b> to open the full article in your browser. The filter box
 narrows the headlines live, and read/unread state is remembered with the
 layout.</p>
+
+<h2>News languages</h2>
+<p>On first launch Aurantium asks for your <b>main language</b> plus any others
+you read; change it anytime under <b>Settings &#9656; News Languages…</b>.
+Headlines appear <i>only</i> in the languages you picked — everything else is
+filtered out before it reaches a panel — and your main language is listed first.
+Adding a language also adds that language's market feeds, so you get more
+coverage, not just less noise.</p>
 
 <h2>Price alerts &amp; the tray</h2>
 <p>Add a <b>Price Alerts</b> panel to set threshold rules (e.g. <i>AAPL price

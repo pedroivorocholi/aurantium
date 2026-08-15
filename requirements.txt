@@ -9,4 +9,5 @@ requests>=2.31
 pandas>=2.0
 lxml>=5.0
 openpyxl>=3.1
+langdetect>=1.0.9  # news language gate (languages.py); ships model data — see aurantium.spec
 cryptography>=42.0  # macOS updater verifies EdDSA signatures at runtime (updater_mac.py)

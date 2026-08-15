@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..components.empty_state import EmptyState
+from ..languages import main_language
 from ..panel import Panel
 from ..symbol_context import GROUPS, SymbolContext
 from ..theme import ACCENT, FG_DIM
@@ -95,17 +96,23 @@ def make_news_table(parent) -> QTableWidget:
 def _ranked_with_dates(items: list) -> list[tuple[dict, Optional[datetime]]]:
     """Parse each item's ``published`` exactly once, then rank the items.
 
-    Ranking rule (user-approved): relevance tier first, then recency. Tier 1 —
-    headline mentions an active linked symbol (word-boundary, case-sensitive
-    ticker match across all link groups); Tier 2 — the rest. Within each tier
-    newest first; items whose timestamp can't be parsed sink to the bottom of
-    their tier. Returns ``(entry, parsed_dt)`` pairs so callers reuse the parsed
-    datetime instead of parsing it again for display. Non-dict entries are
-    dropped (they carry no renderable fields).
+    Ranking rule (user-approved): relevance tier, then language tier, then
+    recency. Relevance tier 0 — headline mentions an active linked symbol
+    (word-boundary, case-sensitive ticker match across all link groups); tier 1
+    — the rest. Language tier 0 — the user's main language, or an item whose
+    source declared none (yfinance); tier 1 — their other languages. Untagged
+    items rank with the main language rather than below it, since sinking
+    unlabelled headlines would demote the entire yfinance fallback.
+
+    Within each tier newest first; items whose timestamp can't be parsed sink to
+    the bottom of their tier. Returns ``(entry, parsed_dt)`` pairs so callers
+    reuse the parsed datetime instead of parsing it again for display. Non-dict
+    entries are dropped (they carry no renderable fields).
     """
     ctx = SymbolContext.instance()
     symbols = {s for s in (ctx.symbol(g) for g in GROUPS) if s}
     patterns = [re.compile(rf"\b{re.escape(s)}\b") for s in symbols]
+    main_lang = main_language()
 
     pairs: list[tuple[dict, Optional[datetime]]] = [
         (entry, parse_published(entry.get("published")))
@@ -117,8 +124,10 @@ def _ranked_with_dates(items: list) -> list[tuple[dict, Optional[datetime]]]:
         entry, dt = pair
         title = entry.get("title") or ""
         tier = 0 if any(p.search(title) for p in patterns) else 1
+        lang = str(entry.get("lang") or "").split("-")[0].lower()
+        lang_tier = 0 if not lang or lang == main_lang else 1
         ts = dt.timestamp() if dt is not None else float("-inf")
-        return (tier, -ts)
+        return (tier, lang_tier, -ts)
 
     pairs.sort(key=key)
     return pairs

@@ -66,6 +66,8 @@ hiddenimports += [
     "aurantium.components",
     "aurantium.components.market_table",
     "aurantium.onboarding_dialog",
+    "aurantium.language_dialog",
+    "aurantium.languages",
     "aurantium.alerts",
     "aurantium.command_bar",
     "aurantium.undo",
@@ -83,8 +85,12 @@ hiddenimports += [
     "openpyxl",  # imported lazily by the Financials xlsx export
 ]
 
-# Packages with data files or native binaries to bundle fully.
-for _pkg in ("yfinance", "gnews", "feedparser", "curl_cffi", "PySide6QtAds"):
+# Packages with data files or native binaries to bundle fully. langdetect is
+# here because its language models live in a `profiles/` data directory that
+# static analysis never sees — without collect_all the frozen build imports
+# fine and then raises at the first detection, silently disabling the news
+# language gate (languages.py treats a missing detector as "accept").
+for _pkg in ("yfinance", "gnews", "feedparser", "curl_cffi", "PySide6QtAds", "langdetect"):
     try:
         _d, _b, _h = collect_all(_pkg)
         datas += _d
