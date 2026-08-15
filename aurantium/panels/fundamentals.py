@@ -152,7 +152,7 @@ class FundamentalsPanel(Panel):
     # -- linked-symbol lifecycle ------------------------------------------------
 
     def on_symbol(self, symbol: str) -> None:
-        self.set_status(f"{symbol} loading…")
+        self.set_status("loading…")
         self._data = {}
         self.unsubscribe_all()
         self.subscribe(f"financials:{symbol}", self._on_financials)
@@ -212,7 +212,7 @@ class FundamentalsPanel(Panel):
         sym = self.current_symbol or "—"
         stmt_label = dict(STATEMENTS).get(self._statement, self._statement)
         period_label = dict(PERIODS).get(self._period, self._period)
-        self.set_status(f"{sym} · {stmt_label} · {period_label} · {len(rows)} lines")
+        self.set_status(f"{stmt_label} · {period_label} · {len(rows)} lines")
         self._update_actions()
 
     # -- statement actions: browser / download / copy -------------------------

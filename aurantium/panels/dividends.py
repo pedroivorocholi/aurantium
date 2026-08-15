@@ -62,11 +62,16 @@ class DividendsPanel(Panel):
         # -- history / splits table -------------------------------------------
         self.table = MarketTable(0, len(HEADERS), self)
         self.table.setHorizontalHeaderLabels(HEADERS)
+        self.table.set_empty_text(
+            "No symbol selected",
+            "Click a ticker in any linked panel, or type one in the SYMBOL bar",
+        )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.content_layout.addWidget(self.table, 1)
 
     def on_symbol(self, symbol: str) -> None:
-        self.set_status(f"{symbol} loading…")
+        self.set_status("loading…")
+        self.table.set_empty_text(f"No dividend history for {symbol}", "")
         for lbl in self._stat_labels.values():
             lbl.setText("-")
         self.table.setRowCount(0)
@@ -116,7 +121,7 @@ class DividendsPanel(Panel):
                 self._set_ro_item(r, 1, str(ratio) if ratio is not None else "-", align_right=True)
 
         sym = self.current_symbol or "—"
-        self.set_status(f"{sym} · {len(history)} dividends · {len(splits)} splits")
+        self.set_status(f"{len(history)} dividends · {len(splits)} splits")
 
     def _set_ro_item(self, row: int, col: int, text: str, align_right: bool = False) -> None:
         item = QTableWidgetItem(text)

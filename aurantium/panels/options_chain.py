@@ -223,7 +223,7 @@ class OptionsChainPanel(Panel):
     # -- symbol / subscription lifecycle -------------------------------------
 
     def on_symbol(self, symbol: str) -> None:
-        self.set_status(f"{symbol} loading…")
+        self.set_status("loading…")
         self._expiries = []
         self._current_expiry = ""
         self._spot = None
@@ -276,7 +276,7 @@ class OptionsChainPanel(Panel):
         self._populate_puts(puts, spot)
 
         sym = data.get("symbol") or self.current_symbol
-        self.set_status(f"{sym} · {expiry or '-'} · {len(calls)}C / {len(puts)}P")
+        self.set_status(f"{expiry or '-'} · {len(calls)}C / {len(puts)}P")
 
     def _populate_expiry_combo(self, expiries: list, current: Any) -> None:
         # Guard against feedback loops while repopulating.

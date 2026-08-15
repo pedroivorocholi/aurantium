@@ -128,7 +128,7 @@ class ProfilePanel(Panel):
         self.content_layout.addWidget(scroll, 1)
 
     def on_symbol(self, symbol: str) -> None:
-        self.set_status(f"{symbol} loading…")
+        self.set_status("loading…")
         self.unsubscribe_all()
         self.subscribe(f"profile:{symbol}", self._on_profile)
 
@@ -183,4 +183,4 @@ class ProfilePanel(Panel):
             lbl.setStyleSheet("font-size: 11px;")
             self.officers_layout.addWidget(lbl)
 
-        self.set_status(f"{self.current_symbol} · {info.get('sector') or ''}".rstrip(" ·"))
+        self.set_status(info.get("sector") or "")

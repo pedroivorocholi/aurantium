@@ -61,6 +61,12 @@ class HoldersPanel(Panel):
 
         self.table = MarketTable(0, len(HEADERS), self)
         self.table.setHorizontalHeaderLabels(HEADERS)
+        # Narrow panels give up columns instead of squeezing every one
+        self.table.set_column_priority(keep=[0, 2], droppable=[3, 1])
+        self.table.set_empty_text(
+            "No symbol selected",
+            "Click a ticker in any linked panel, or type one in the SYMBOL bar",
+        )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.enable_sorting()
         self.table.enable_column_menu()
@@ -70,7 +76,8 @@ class HoldersPanel(Panel):
         self.content_layout.addWidget(self.table, 1)
 
     def on_symbol(self, symbol: str) -> None:
-        self.set_status(f"{symbol} loading…")
+        self.set_status("loading…")
+        self.table.set_empty_text(f"No holder data for {symbol}", "")
         self.insiders_lbl.setText("Insiders: -")
         self.institutions_lbl.setText("Institutions: -")
         self.table.setRowCount(0)
@@ -104,7 +111,7 @@ class HoldersPanel(Panel):
         self.table.apply_filter(self._filter.text())
 
         sym = self.current_symbol or "—"
-        self.set_status(f"{sym} · {len(top)} holders")
+        self.set_status(f"{len(top)} holders")
 
     def _set_ro_item(
         self, row: int, col: int, text: str, align_right: bool = False, numeric: bool = False

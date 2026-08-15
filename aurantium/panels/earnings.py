@@ -49,6 +49,12 @@ class EarningsPanel(Panel):
 
         self.table = MarketTable(0, len(HEADERS), self)
         self.table.setHorizontalHeaderLabels(HEADERS)
+        # Narrow panels give up columns instead of squeezing every one
+        self.table.set_column_priority(keep=[0, 2], droppable=[1, 3])
+        self.table.set_empty_text(
+            "No symbol selected",
+            "Click a ticker in any linked panel, or type one in the SYMBOL bar",
+        )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.enable_sorting()
         self.table.enable_column_menu()
@@ -58,7 +64,8 @@ class EarningsPanel(Panel):
         self.content_layout.addWidget(self.table, 1)
 
     def on_symbol(self, symbol: str) -> None:
-        self.set_status(f"{symbol} loading…")
+        self.set_status("loading…")
+        self.table.set_empty_text(f"No earnings history for {symbol}", "")
         self.next_lbl.setText("Next earnings: -")
         self.table.setRowCount(0)
         self.unsubscribe_all()
@@ -117,7 +124,7 @@ class EarningsPanel(Panel):
         self.table.apply_filter(self._filter.text())
 
         sym = self.current_symbol or "—"
-        self.set_status(f"{sym} · {len(rows)} reports")
+        self.set_status(f"{len(rows)} reports")
 
     # -- persistence ------------------------------------------------------------
 

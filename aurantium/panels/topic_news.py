@@ -45,6 +45,9 @@ class TopicNewsPanel(NewsPanelBase):
         self.query_edit.setText(query)
         self._query = query
         self.set_status(query)
+        self.set_news_empty_text(
+            f"No headlines for “{query}”", "Try a broader search above"
+        )
         self.unsubscribe_all()
         self.subscribe(f"newsq:{query}", self._on_news)
 

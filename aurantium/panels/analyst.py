@@ -75,6 +75,12 @@ class AnalystPanel(Panel):
         # -- upgrades table -------------------------------------------------
         self.table = MarketTable(0, len(UPGRADE_HEADERS), self)
         self.table.setHorizontalHeaderLabels(UPGRADE_HEADERS)
+        # Narrow panels give up columns instead of squeezing every one
+        self.table.set_column_priority(keep=[0, 2], droppable=[3, 4, 1])
+        self.table.set_empty_text(
+            "No symbol selected",
+            "Click a ticker in any linked panel, or type one in the SYMBOL bar",
+        )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.enable_sorting()
         self.table.enable_column_menu()
@@ -84,7 +90,8 @@ class AnalystPanel(Panel):
         self.content_layout.addWidget(self.table, 1)
 
     def on_symbol(self, symbol: str) -> None:
-        self.set_status(f"{symbol} loading…")
+        self.set_status("loading…")
+        self.table.set_empty_text(f"No analyst actions for {symbol}", "")
         self.unsubscribe_all()
         self.subscribe(f"analyst:{symbol}", self._on_analyst)
 
@@ -126,7 +133,7 @@ class AnalystPanel(Panel):
                     self.table.setItem(row, col, item)
         self.table.apply_filter(self._filter.text())
 
-        self.set_status(f"{self.current_symbol} · {len(upgrades)} upgrades/downgrades")
+        self.set_status(f"{len(upgrades)} upgrades/downgrades")
 
     # -- persistence ------------------------------------------------------------
 

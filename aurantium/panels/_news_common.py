@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from ..components.empty_state import EmptyState
 from ..panel import Panel
 from ..symbol_context import GROUPS, SymbolContext
 from ..theme import ACCENT, FG_DIM
@@ -81,6 +82,9 @@ def make_news_table(parent) -> QTableWidget:
     table.setWordWrap(False)
     table.setTextElideMode(Qt.TextElideMode.ElideRight)
     table.setAlternatingRowColors(True)
+    # per-pixel scrolling, same as MarketTable — headlines get scanned by drag
+    table.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+    table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
     hh = table.horizontalHeader()
     hh.setHighlightSections(False)
     hh.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -252,6 +256,16 @@ class NewsPanelBase(Panel):
         self.table.cellClicked.connect(self._on_cell_clicked)
         self.table.cellDoubleClicked.connect(self._open_row)
         self.content_layout.addWidget(self.table, 1)
+        # This is a plain QTableWidget rather than a MarketTable, so it needs
+        # the empty state attached by hand — without it a news panel with no
+        # symbol yet was an unexplained blank rectangle.
+        self._news_empty_title = "No symbol selected"
+        self._news_empty_hint = (
+            "Click a ticker in any linked panel, or type one in the SYMBOL bar"
+        )
+        self.news_empty = EmptyState.attach(
+            self.table, self._news_empty_title, self._news_empty_hint
+        )
 
         self.preview_lbl = QLabel("", self)
         self.preview_lbl.setWordWrap(True)
@@ -277,8 +291,29 @@ class NewsPanelBase(Panel):
         filter_news_table(self.table, self._news_filter.text())
         return count
 
+    def set_news_empty_text(self, title: str, hint: str = "") -> None:
+        """What the headline table says when it has nothing to show. Subclasses
+        call this from ``on_symbol`` (or when their query changes) so the
+        message names the actual situation rather than a generic 'no data'."""
+        self._news_empty_title = title
+        self._news_empty_hint = hint
+        self._apply_news_filter(self._news_filter.text())
+
     def _apply_news_filter(self, text: str) -> None:
         filter_news_table(self.table, text)
+        # Hiding rows isn't a model change, so the overlay has to be told —
+        # and a filter that matches nothing is its own case, not "no news".
+        needle = (text or "").strip()
+        if needle:
+            self.news_empty.set_text(
+                f"No headlines match “{needle}”",
+                "Clear the filter to see everything",
+            )
+        else:
+            self.news_empty.set_text(
+                self._news_empty_title, self._news_empty_hint
+            )
+        self.news_empty.sync()
 
     def _apply_read_styling(self) -> None:
         dim = QColor(FG_DIM)
