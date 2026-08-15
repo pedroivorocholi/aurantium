@@ -29,7 +29,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ..panel import Panel, register_panel
+from ..components.empty_state import EmptyState
+from ..panel import COMPACT, Panel, register_panel
 from ..undo import UndoStack
 from ..theme import (
     ACCENT,
@@ -38,6 +39,7 @@ from ..theme import (
     DOWN,
     FG,
     FG_DIM,
+    FG_MUTED,
     MONO_FONT,
     THEMES,
     UP,
@@ -83,11 +85,45 @@ _DAILY_FETCH_LADDER = [
 
 RSI_WINDOW = 14
 
-# Colors handed to newly added indicators, in order.
-INDICATOR_PALETTE = [
-    "#e91e63", "#4a90d9", "#f8e71c", "#9c27b0", "#00bcd4",
-    "#ff7043", "#8bc34a", "#f06292",
-]
+# -- indicator colors ------------------------------------------------------
+#
+# Per theme, like UP/DOWN, because one set of hues cannot clear 3:1 against
+# both true black and white: a color light enough to read on #000000 is too
+# pale on #ffffff. The palette that used to be here was a single theme-blind
+# list, and it failed on both surfaces — #8bc34a and #ff7043 sat ΔE 3.2 apart
+# under deuteranopia (indistinguishable), and #f8e71c rendered at 1.28:1 on
+# the light theme, effectively invisible. Shipping a color-blind mode for
+# up/down ticks while the chart itself collapsed was a half-kept promise.
+#
+# Four slots, not eight. Green, red and amber are all spoken for — gain, loss,
+# and "this is the price" — so an indicator must stay clear of them as well as
+# of the color-blind mode's blue/vermillion substitutes. What's left of the
+# wheel holds four well-separated hues, not eight; more series would mean
+# colors too close to tell apart, which is worse than reusing one. Charts with
+# more than four indicators cycle, and the labeled color chip above the plot
+# is what disambiguates them.
+#
+# Every value is computed, not picked: see tests/test_chart_palette.py, which
+# re-runs the lightness, chroma, color-vision, contrast and reserved-color
+# checks on each release. Do not hand-edit these without re-running it.
+_INDICATOR_PALETTES = {
+    # blue · olive · violet · teal
+    "dark": ("#0c699a", "#6e6b03", "#7035f5", "#15957b"),
+    "light": ("#2745f6", "#3c5b07", "#791c8a", "#0fa4b0"),
+}
+
+
+def indicator_palette(theme: str | None = None) -> tuple[str, ...]:
+    """The indicator colors for a theme (defaults to the active one)."""
+    name = theme or current_theme()
+    return _INDICATOR_PALETTES.get(name, _INDICATOR_PALETTES["dark"])
+
+
+def default_indicator_colors(theme: str | None = None) -> tuple[str, ...]:
+    """Colors for the three indicators every chart opens with — SMA 50, SMA
+    200, RSI. They take the first slots so the set the user always sees is the
+    best-separated one, rather than whatever the cycle happened to land on."""
+    return indicator_palette(theme)[:3]
 
 DEFAULT_COLORS = {
     "up": UP,
@@ -598,7 +634,8 @@ class ChartPanel(Panel):
         title_row = QHBoxLayout()
         title_row.setContentsMargins(2, 2, 2, 2)
         title_row.setSpacing(10)
-        self.title_lbl = QLabel("—", self)
+        self.title_lbl = QLabel("", self)
+        self.title_lbl.setVisible(False)  # shown once a symbol arrives
         tf = QFont()
         tf.setPointSize(15)
         tf.setBold(True)
@@ -620,10 +657,22 @@ class ChartPanel(Panel):
         title_row.addStretch(1)
         self.content_layout.addLayout(title_row)
 
-        # -- range selector ---------------------------------------------------
+        # -- range + interval selectors ---------------------------------------
+        # Two rows. They were briefly merged into one to save a band of chrome,
+        # but ten range chips plus eight interval chips need ~890px of minimum
+        # width, and a chart panel sharing the screen with another column is
+        # narrower than that — the interval chips were pushed past the right
+        # edge with no way to scroll to them, so the control was gone. A row of
+        # vertical space is worth less than a control the user can reach.
+        #
+        # The density win came from the compact chip style, not the merge:
+        # #chartChip took each row from ~50px to ~24px, so two rows still cost
+        # a third of what three loose rows did.
         range_row = QHBoxLayout()
-        range_row.setSpacing(6)
-        range_row.addWidget(self._eyebrow("RANGE"))
+        self._range_row = range_row
+        range_row.setSpacing(3)
+        self._range_eyebrow = self._eyebrow("RANGE")
+        range_row.addWidget(self._range_eyebrow)
         self._range_buttons: dict[str, QPushButton] = {}
         for label in RANGE_PRESETS:
             btn = QPushButton(label, self)
@@ -634,15 +683,17 @@ class ChartPanel(Panel):
             self._range_buttons[label] = btn
         self._custom_btn = QPushButton("custom…", self)
         self._custom_btn.setCheckable(True)
+        self._custom_btn.setObjectName("chartChip")
         self._custom_btn.clicked.connect(self._pick_custom_range)
         range_row.addWidget(self._custom_btn)
         range_row.addStretch(1)
         self.content_layout.addLayout(range_row)
 
-        # -- interval selector ------------------------------------------------
         int_row = QHBoxLayout()
-        int_row.setSpacing(6)
-        int_row.addWidget(self._eyebrow("INTERVAL"))
+        self._interval_row = int_row
+        int_row.setSpacing(3)
+        self._interval_eyebrow = self._eyebrow("INTERVAL")
+        int_row.addWidget(self._interval_eyebrow)
         self._interval_buttons: dict[str, QPushButton] = {}
         for label in INTERVALS:
             btn = QPushButton(label, self)
@@ -659,10 +710,17 @@ class ChartPanel(Panel):
         # to recolor / edit / remove; "+" adds a new indicator.
         chips_row = QHBoxLayout()
         chips_row.setSpacing(6)
-        chips_row.addWidget(self._eyebrow("INDICATORS"))
+        self._indicators_eyebrow = self._eyebrow("INDICATORS")
+        chips_row.addWidget(self._indicators_eyebrow)
         self._chips_row = chips_row
+        # The chip style is load-bearing here, not cosmetic: the default
+        # QPushButton padding is 13px a side, so inside a 28px fixed width Qt
+        # had no room left for the glyph and elided it away — the only control
+        # for adding an indicator rendered as an empty box.
         self._add_btn = QPushButton("+", self)
-        self._add_btn.setFixedWidth(28)
+        self._add_btn.setObjectName("chartChip")
+        self._add_btn.setFixedWidth(26)
+        self._add_btn.setToolTip("Add an indicator")
         self._add_btn.clicked.connect(self._show_add_menu)
         chips_row.addWidget(self._add_btn)
         chips_row.addStretch(1)
@@ -689,6 +747,18 @@ class ChartPanel(Panel):
         self.line_curve.setVisible(False)
         self.content_layout.addWidget(self.plot_widget, 3)
 
+        # -- empty state -------------------------------------------------------
+        # A chart with no series still draws a full axis pair, so an unset (or
+        # unavailable) symbol rendered as a grid labelled with meaningless
+        # values — "59.600 / 21:00:00 / 0.2 / -0.2" — which reads as a broken
+        # app rather than as "pick a name". Say so instead, and hide the axes
+        # while there is nothing for them to measure.
+        # Parented to the viewport, not the PlotWidget: a QGraphicsView is a
+        # scroll area, and a child of the widget itself would be drawn behind
+        # the viewport and never seen.
+        self._empty = EmptyState(self.plot_widget.viewport())
+        self.plot_widget.viewport().installEventFilter(self)
+
         # right-click settings menu on the chart
         self.plot_widget.setMenuEnabled(False)
         self.plot_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -696,24 +766,105 @@ class ChartPanel(Panel):
 
         self._setup_crosshair()
 
-        # default working set mirrors the old fixed layout: SMA50 + SMA200 + RSI
-        self._add_indicator("sma", {"window": 50}, color="#e91e63", rebuild=False)
-        self._add_indicator("sma", {"window": 200}, color="#f8e71c", rebuild=False)
-        self._add_indicator("rsi", {"window": 14}, color=ACCENT, rebuild=False)
+        # default working set mirrors the old fixed layout: SMA50 + SMA200 + RSI.
+        # RSI used to draw in ACCENT — the amber that means "this is the price"
+        # everywhere else in the app, so the oscillator wore the one color
+        # already spoken for. All three now come from the checked palette.
+        _sma50, _sma200, _rsi = default_indicator_colors()
+        self._add_indicator("sma", {"window": 50}, color=_sma50, rebuild=False)
+        self._add_indicator("sma", {"window": 200}, color=_sma200, rebuild=False)
+        self._add_indicator("rsi", {"window": 14}, color=_rsi, rebuild=False)
 
         self._update_range_interval_buttons()
+        # last in build(), so the default indicators above already exist and
+        # their sub-panes hide along with the empty price plot
+        self._sync_empty()
+
+    # -- responsive controls -------------------------------------------------
+
+    #: What a narrow chart keeps: a day, a month, half a year, a year, and
+    #: everything. Enough to cover the everyday moves without a horizontal row
+    #: that clips off the panel edge.
+    COMPACT_RANGES = ("1d", "1mo", "6mo", "1y", "max")
+    COMPACT_INTERVALS = ("1m", "1h", "1d", "1wk")
+
+    def on_size_class(self, size_class: str) -> None:
+        """Reorganize the control rows for the width the panel now has.
+
+        At 320px the full rows clipped: "RANGE" rendered as "RAN(", "custom…"
+        as "to", and the add-indicator button was sliced in half — controls
+        that are present but unreachable. Compact drops the eyebrows (the chips
+        already say what they are) and the less-used presets, keeping the
+        common set plus whatever is currently selected, so the row always fits.
+        """
+        compact = size_class == COMPACT
+        self._range_eyebrow.setVisible(not compact)
+        self._interval_eyebrow.setVisible(not compact)
+        self._indicators_eyebrow.setVisible(not compact)
+        self._custom_btn.setVisible(not compact)
+
+        for label, btn in self._range_buttons.items():
+            btn.setVisible(
+                not compact
+                or label in self.COMPACT_RANGES
+                or btn.isChecked()  # never hide what is currently selected
+            )
+        for label, btn in self._interval_buttons.items():
+            btn.setVisible(
+                not compact or label in self.COMPACT_INTERVALS or btn.isChecked()
+            )
+
+    # -- empty state ---------------------------------------------------------
+
+    def _sync_empty(self) -> None:
+        """Show the "nothing to plot" message when there are no bars, and hide
+        the axes with it — an axis labelled with placeholder numbers is worse
+        than no axis at all. Indicator sub-panes hide entirely: an empty RSI
+        strip with its 30/70 guides drawn is the same lie in miniature."""
+        empty = not self._hist_t
+        for inst in self._indicators:
+            if inst.pane is not None:
+                inst.pane.setVisible(not empty)
+        self.plot_widget.getAxis("left").setVisible(not empty)
+        self.plot_widget.getAxis("bottom").setVisible(not empty)
+        if empty:
+            if self.current_symbol:
+                self._empty.set_text(
+                    f"No price history for {self.current_symbol}",
+                    "Try a different range or interval, or press F5 to refresh",
+                )
+            else:
+                self._empty.set_text(
+                    "No symbol selected",
+                    "Click a ticker in any linked panel, or type one in the SYMBOL bar",
+                )
+            self._empty.setGeometry(self.plot_widget.viewport().rect())
+            self._empty.show()
+            self._empty.raise_()
+        else:
+            self._empty.hide()
 
     def _size_selector_btn(self, btn: QPushButton) -> None:
-        """Fixed width sized to the label (checked state renders bold, which
-        is wider than the metrics of the normal font — hence the margin), so
-        short tags stay compact without clipping '3mo'/'15m'-style labels."""
+        """Size a range/interval chip to its label.
+
+        These are terminal chips, not form buttons: they take the compact
+        ``#chartChip`` style (see theme.py) rather than the app's default
+        QPushButton padding, which spent roughly a third of a short chart
+        panel's height on three rows of selectors. Width still tracks the
+        label — the checked state renders bold, which is wider than the normal
+        font's metrics, hence the margin — so '3mo'/'15m' never clip.
+        """
+        btn.setObjectName("chartChip")
         text_w = btn.fontMetrics().horizontalAdvance(btn.text())
-        btn.setFixedWidth(max(40, text_w + 28))
+        btn.setFixedWidth(max(30, text_w + 18))
 
     def _eyebrow(self, text: str) -> QLabel:
+        # FG_MUTED, not a hardcoded grey: the literal that used to be here was
+        # picked for the dark theme and stayed put on the light one.
         lbl = QLabel(text, self)
         lbl.setStyleSheet(
-            "color: #565d67; font-size: 10px; font-weight: 600; letter-spacing: 1px;"
+            f"color: {FG_MUTED}; font-size: 10px; font-weight: 600;"
+            " letter-spacing: 1px;"
         )
         return lbl
 
@@ -821,7 +972,8 @@ class ChartPanel(Panel):
     # -- indicators -----------------------------------------------------------
 
     def _next_color(self) -> str:
-        color = INDICATOR_PALETTE[self._palette_iter % len(INDICATOR_PALETTE)]
+        palette = indicator_palette()
+        color = palette[self._palette_iter % len(palette)]
         self._palette_iter += 1
         return color
 
@@ -1334,9 +1486,10 @@ class ChartPanel(Panel):
         self._log_on = False
         self._range = {"preset": "6mo"}
         self._interval = "1d"
-        self._add_indicator("sma", {"window": 50}, color="#e91e63", rebuild=False)
-        self._add_indicator("sma", {"window": 200}, color="#f8e71c", rebuild=False)
-        self._add_indicator("rsi", {"window": 14}, color=ACCENT, rebuild=False)
+        _sma50, _sma200, _rsi = default_indicator_colors()
+        self._add_indicator("sma", {"window": 50}, color=_sma50, rebuild=False)
+        self._add_indicator("sma", {"window": 200}, color=_sma200, rebuild=False)
+        self._add_indicator("rsi", {"window": 14}, color=_rsi, rebuild=False)
         self.plot_widget.showGrid(x=True, y=True, alpha=0.15)
         self.plot_widget.setLogMode(y=False)
         self._apply_colors()
@@ -1369,8 +1522,20 @@ class ChartPanel(Panel):
         self.plot_widget.installEventFilter(self)
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt override)
+        """One filter for both plot-widget concerns — the crosshair and the
+        empty-state overlay. They must share a method: a second ``eventFilter``
+        defined later in the class body would silently replace this one."""
         if obj is self.plot_widget and event.type() == QEvent.Type.Leave:
             self._hide_crosshair()
+        elif (
+            obj is self.plot_widget.viewport()
+            and event.type() == QEvent.Type.Resize
+        ):
+            # Unconditional, not gated on isVisible(): the resizes that matter
+            # happen while the window is still being laid out, when isVisible()
+            # is still False for every widget — gating there leaves the overlay
+            # stuck at its initial geometry and the message off-center.
+            self._empty.setGeometry(self.plot_widget.viewport().rect())
         return super().eventFilter(obj, event)
 
     def _hide_crosshair(self) -> None:
@@ -1613,7 +1778,7 @@ class ChartPanel(Panel):
         if symbol != self._annotations_symbol:
             self._clear_drawings()
             self._annotations_symbol = symbol
-        self.set_status(f"{symbol} loading…")
+        self.set_status("loading…")
         self._hide_crosshair()
         self._last_quote = {}
         self._hist_t, self._hist_o, self._hist_c = [], [], []
@@ -1699,10 +1864,11 @@ class ChartPanel(Panel):
         c = data.get("c") or []
         v = data.get("v") or []
         if not t:
-            self.set_status(f"{self.current_symbol} · no data")
+            self.set_status("no data")
             self._hist_t, self._hist_o, self._hist_c = [], [], []
             self._hist_hi, self._hist_lo, self._hist_v = [], [], []
             self._refresh_all_indicators()
+            self._sync_empty()
             return
         self.candle_item.set_ohlc(t, o, h, l, c)
         self.bar_item.set_ohlc(t, o, h, l, c)
@@ -1735,7 +1901,8 @@ class ChartPanel(Panel):
         rng = self._range.get("preset") or (
             f"{self._range.get('start')}→{self._range.get('end')}"
         )
-        self.set_status(f"{self.current_symbol} · {rng} · {self._interval}")
+        self.set_status(f"{rng} · {self._interval}")
+        self._sync_empty()
 
     def _on_quote(self, data: Any) -> None:
         if not isinstance(data, dict):
@@ -1744,7 +1911,11 @@ class ChartPanel(Panel):
         self._update_title()
 
     def _update_title(self) -> None:
-        sym = self.current_symbol or "—"
+        # With no symbol the row held a lone em dash above an empty canvas —
+        # a placeholder for a placeholder. The empty state on the plot says it
+        # properly, so the title row simply steps aside until there's a name.
+        sym = self.current_symbol
+        self.title_lbl.setVisible(bool(sym))
         self.title_lbl.setText(sym)
         price = self._last_quote.get("price")
         change_pct = self._last_quote.get("change_pct")
@@ -1892,7 +2063,10 @@ class ChartPanel(Panel):
 
     def _migrate_legacy(self, old: dict) -> dict:
         indicators = []
-        for w, color in ((50, "#e91e63"), (100, "#4a90d9"), (200, "#f8e71c")):
+        # a layout saved before the palette was theme-aware carries no colors
+        # of its own for these; give them the current checked slots
+        _legacy = indicator_palette()
+        for w, color in ((50, _legacy[0]), (100, _legacy[3]), (200, _legacy[1])):
             if old.get(f"sma{w}", w != 100):  # old defaults: 50/200 on, 100 off
                 indicators.append(
                     {"kind": "sma", "params": {"window": w}, "color": color, "on": True}
