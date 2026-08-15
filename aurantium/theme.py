@@ -188,15 +188,24 @@ QToolTip {{
     border: 1px solid {p['CHROME_BORDER']}; border-radius: 3px; padding: 5px 9px;
 }}
 
-/* -- panel header: a thin context strip under the title bar --------------- */
-QWidget#panelHeader {{
-    background: {p['BG']}; border-bottom: 1px solid {p['BORDER']};
+/* -- panel header: a thin context strip under the title bar ---------------
+   The strip itself paints its own background and hairline (panel._HeaderStrip)
+   so it can animate the link flash; only its children are styled here. Child
+   backgrounds must be explicitly transparent — the blanket QWidget rule above
+   would otherwise paint each label with a flat BG rectangle that the flash
+   couldn't tint. */
+QWidget#panelHeader > QLabel {{ background: transparent; }}
+QLabel#panelSymbol {{
+    background: transparent; color: {p['ACCENT']};
+    font-family: "{MONO_FONT}"; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.5px;
 }}
 QLabel#panelEyebrow {{
     color: {p['FG_MUTED']}; font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
 }}
 QLabel#panelStatus {{
-    color: {p['ACCENT_DEEP']}; font-size: 10px; font-family: "{MONO_FONT}";
+    background: transparent; color: {p['ACCENT_DEEP']};
+    font-size: 10px; font-family: "{MONO_FONT}";
 }}
 
 /* -- app top bar: steel-blue like the Launchpad title bar ---------------- */
@@ -308,6 +317,23 @@ QPushButton:checked {{
 }}
 QPushButton:checked:hover {{ background: {p['ACCENT_DEEP']}; border-color: {p['ACCENT_DEEP']}; }}
 QPushButton:disabled {{ color: {p['FG_MUTED']}; border-color: {p['BORDER']}; background: {p['BG_ALT']}; }}
+
+/* Chart range/interval chips: a compact terminal selector, not a form button.
+   The checked state is an amber outline rather than an amber fill — with the
+   panel-header symbol, the command bar and the indicator legend all already
+   speaking amber, two solid amber blocks per chart were spending the accent on
+   a setting rather than on data. */
+QPushButton#chartChip {{
+    padding: 1px 7px; font-size: 10px; font-weight: 600;
+    min-height: 18px; max-height: 18px; border-radius: 2px;
+}}
+QPushButton#chartChip:checked {{
+    background: {p['BG_ELEV']}; color: {p['ACCENT']};
+    border-color: {p['ACCENT']}; font-weight: 700;
+}}
+QPushButton#chartChip:checked:hover {{
+    background: {p['CHROME_HOVER']}; border-color: {p['ACCENT']};
+}}
 
 QToolButton {{
     background: transparent; border: 0; border-radius: 2px;
