@@ -22,6 +22,8 @@ from PySide6.QtWidgets import (
 from .presets import Preset
 
 
+from . import motion
+
 class WorkspaceChooser(QDialog):
     """Modal list of shipped workspaces shown on first run."""
 
@@ -78,6 +80,12 @@ class WorkspaceChooser(QDialog):
             return self._presets[row]
         return None
 
+
+    def showEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        # First-run tier: a beat of arrival is welcome here in a way it would
+        # not be on a control the user hits all day.
+        super().showEvent(event)
+        motion.fade_in_dialog(self)
 
 def pick_workspace(
     presets: list[Preset], parent: QWidget | None = None

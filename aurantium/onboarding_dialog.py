@@ -156,6 +156,22 @@ direction reads without relying on color; it also restarts to apply.</p>
 in the same group share a symbol, so clicking a name in one (a mover, a holding,
 a commodity) drives the others. Use the badge to move a panel to another group,
 or Unlink it so it navigates on its own.</p>
+<p>Every panel prints the symbol it is currently showing at the <b>left of its
+header strip</b>, so you can tell at a glance which name each panel is on — and
+spot a panel that has fallen out of the group. When a symbol arrives from
+another panel, that header briefly <b>flashes the group's color</b>, so you can
+see the click propagate across the workspace.</p>
+<p>In the watchlist, a price that moves briefly <b>flashes green or red</b> in
+place, so you can see which row just ticked without watching every number.
+Both effects follow your system's <i>reduce motion</i> setting.</p>
+
+<h2>Panel sizes</h2>
+<p>Panels reorganize for whatever size you drag them to. Squeeze one narrow and
+its table <b>drops its least important columns</b> rather than squashing all of
+them — the symbol and its price always survive — and the chart trims its range
+and interval chips to the common set. Widen it and everything comes back.
+Columns you switch off yourself in the right-click <b>Columns</b> menu stay off
+at every size.</p>
 
 <h2>Charts</h2>
 <p>Hover the price chart to read any bar: a <b>crosshair</b> snaps to the nearest
@@ -166,6 +182,12 @@ chart for type (candles, bars, line, area), colors, indicators, and
 its points — each click <b>snaps to the nearest candle</b>, and the shape follows
 your cursor between clicks. Drawings are <b>blue</b> by default (change it under
 Drawing &#9656; Drawing color…) and are saved with the layout for that symbol.</p>
+<p>Each indicator gets a <b>colored chip</b> above the chart in its own line
+color, so the chip doubles as the legend — right-click a chip to recolor, edit,
+or remove it. The default colors are chosen to stay apart under red-green color
+blindness and to stay clear of the green/red/amber that mean gain, loss, and
+price, so an indicator is never mistaken for a signal. There are four; a chart
+with more indicators than that reuses them, and the chips tell them apart.</p>
 
 <h2>News</h2>
 <p>In a News or Topic News panel, <b>single-click</b> a headline for a quick
@@ -270,6 +292,8 @@ a fresh refresh runs.</p>
 """
 
 
+from . import motion
+
 class OnboardingDialog(QDialog):
     """Tabbed shortcuts + guide modal with a 'don't auto-show' preference."""
 
@@ -311,3 +335,9 @@ class OnboardingDialog(QDialog):
     def should_auto_show() -> bool:
         """True on first launch (flag unset) — i.e. show the modal once."""
         return not QSettings().value(_SETTINGS_KEY, False, type=bool)
+
+    def showEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        # First-run tier: a beat of arrival is welcome here in a way it would
+        # not be on a control the user hits all day.
+        super().showEvent(event)
+        motion.fade_in_dialog(self)
