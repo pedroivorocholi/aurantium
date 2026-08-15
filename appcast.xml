@@ -20,6 +20,107 @@
     <language>en</language>
 
     <item>
+      <title>Aurantium 1.6.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.6.0</h3>
+        <ul>
+          <li>Panels now reshape themselves to fit, and the terminal tells you what it&#x27;s doing.</li>
+          <li>Workspaces</li>
+          <li>Three ready-made desks — Macro, Commodities and Equity Research — under Settings &gt; Workspaces, offered on first run instead of an empty window.</li>
+          <li>Panels fit their size</li>
+          <li>Drag a panel narrow and its table drops the least important columns instead of squashing every one; the symbol and its price always survive. Prices no longer get cut to &quot;4,432.&quot; to make room for a column you can&#x27;t read anyway.</li>
+          <li>Widen it and the columns come back. Columns you switch off yourself stay off at every size.</li>
+          <li>Charts trim their range and interval chips when narrow, so nothing sits off the edge where you can&#x27;t click it.</li>
+          <li>Tables scroll by pixel rather than jumping a whole row per wheel notch.</li>
+          <li>You can see what the terminal is doing</li>
+          <li>&quot;Layout saved&quot;, &quot;Nothing to undo&quot;, &quot;Unknown command&quot;, a panel that failed to open and fired price alerts now appear in a notice at the bottom right. All of it was previously invisible.</li>
+          <li>Empty panels say which thing is missing — no symbol picked yet, no coverage for this name, or a filter that matched nothing — instead of showing a blank rectangle.</li>
+          <li>Linking is visible</li>
+          <li>Every panel prints the symbol it&#x27;s showing in its header, so you can tell at a glance which name each panel is on and spot one that&#x27;s fallen out of its group.</li>
+          <li>When a symbol arrives from another panel, that header briefly flashes its group colour, so you can see a click travel across the workspace.</li>
+          <li>A watchlist price that moves flashes green or red in place.</li>
+          <li>Colour and accessibility</li>
+          <li>Chart indicator colours are now chosen per theme and checked for red-green colour blindness. The old set had two indicators that were identical under deuteranopia, and a yellow that was effectively invisible on the light theme.</li>
+          <li>Indicator colours also stay clear of the green, red and amber that mean gain, loss and price, so a line is never mistaken for a signal.</li>
+          <li>Motion follows your system&#x27;s reduce-motion setting.</li>
+          <li>Rates and data</li>
+          <li>Policy rates joined across BIS, US Treasury, ECB and MOF, with country-scoped panel linking.</li>
+          <li>FRED series are vetted against the copyright filter and fail closed.</li>
+          <li>Fixes</li>
+          <li>A corrupt preset or layout file no longer stops the app from launching.</li>
+          <li>The first-run workspace chooser is offered exactly once.</li>
+          <li>The add-indicator &quot;+&quot; button was rendering as an empty box.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sat, 15 Aug 2026 02:15:45 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.6.0/aurantium-setup.exe"
+        sparkle:version="1.6.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="70263791"
+        sparkle:edSignature="WOnxuAq64JquoCFtKgjWh6rjlWjMluBqiS/1zq87/dwrKecLLeCTjTuT+fUmNqUg2oidA+CC9RveZ/SiuBT4Bw=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.6.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.6.0</h3>
+        <ul>
+          <li>Panels now reshape themselves to fit, and the terminal tells you what it&#x27;s doing.</li>
+          <li>Workspaces</li>
+          <li>Three ready-made desks — Macro, Commodities and Equity Research — under Settings &gt; Workspaces, offered on first run instead of an empty window.</li>
+          <li>Panels fit their size</li>
+          <li>Drag a panel narrow and its table drops the least important columns instead of squashing every one; the symbol and its price always survive. Prices no longer get cut to &quot;4,432.&quot; to make room for a column you can&#x27;t read anyway.</li>
+          <li>Widen it and the columns come back. Columns you switch off yourself stay off at every size.</li>
+          <li>Charts trim their range and interval chips when narrow, so nothing sits off the edge where you can&#x27;t click it.</li>
+          <li>Tables scroll by pixel rather than jumping a whole row per wheel notch.</li>
+          <li>You can see what the terminal is doing</li>
+          <li>&quot;Layout saved&quot;, &quot;Nothing to undo&quot;, &quot;Unknown command&quot;, a panel that failed to open and fired price alerts now appear in a notice at the bottom right. All of it was previously invisible.</li>
+          <li>Empty panels say which thing is missing — no symbol picked yet, no coverage for this name, or a filter that matched nothing — instead of showing a blank rectangle.</li>
+          <li>Linking is visible</li>
+          <li>Every panel prints the symbol it&#x27;s showing in its header, so you can tell at a glance which name each panel is on and spot one that&#x27;s fallen out of its group.</li>
+          <li>When a symbol arrives from another panel, that header briefly flashes its group colour, so you can see a click travel across the workspace.</li>
+          <li>A watchlist price that moves flashes green or red in place.</li>
+          <li>Colour and accessibility</li>
+          <li>Chart indicator colours are now chosen per theme and checked for red-green colour blindness. The old set had two indicators that were identical under deuteranopia, and a yellow that was effectively invisible on the light theme.</li>
+          <li>Indicator colours also stay clear of the green, red and amber that mean gain, loss and price, so a line is never mistaken for a signal.</li>
+          <li>Motion follows your system&#x27;s reduce-motion setting.</li>
+          <li>Rates and data</li>
+          <li>Policy rates joined across BIS, US Treasury, ECB and MOF, with country-scoped panel linking.</li>
+          <li>FRED series are vetted against the copyright filter and fail closed.</li>
+          <li>Fixes</li>
+          <li>A corrupt preset or layout file no longer stops the app from launching.</li>
+          <li>The first-run workspace chooser is offered exactly once.</li>
+          <li>The add-indicator &quot;+&quot; button was rendering as an empty box.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sat, 15 Aug 2026 02:15:45 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.6.0/aurantium-mac.zip"
+        sparkle:version="1.6.0"
+        sparkle:os="macos"
+        length="279391861"
+        sparkle:edSignature="PBpn41hRlVpQ1S6gTJ61VRwBIGSIMHl4d6A7qDjf3wMzpm4NLquyAS4xUCh7EaGej/oJ8xL3uFgD6AlMqYXeBQ=="
+        type="application/zip" />
+    </item>
+    <item>
       <title>Aurantium 1.5.3</title>
       <description><![CDATA[
         <style>
