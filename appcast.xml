@@ -20,6 +20,69 @@
     <language>en</language>
 
     <item>
+      <title>Aurantium 1.7.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.7.0</h3>
+        <ul>
+          <li>New Day Brief panel — why a stock moved on any past date</li>
+          <li>Chart events lane marks days with earnings, dividends, splits, rating changes or an unusually large move</li>
+          <li>Click a mark, hover a bar and press D, or right-click the chart to open a brief for that day</li>
+          <li>Command bar: /day 2026-03-14, /day 2026-03-09..2026-03-15, or just AAPL 2026-03-14</li>
+          <li>EXCESS line gives the stock&#x27;s move minus its benchmark — was it the company or the whole market</li>
+          <li>Historical headlines for any date, years back, with no API key needed</li>
+          <li>Briefs open as their own window, so they never squeeze your layout</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 24 Aug 2026 23:19:38 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.7.0/aurantium-setup.exe"
+        sparkle:version="1.7.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="71127818"
+        sparkle:edSignature="m2lzPy7RPMyy/pIcrnZAqu18MInBchKyIdgMClhB7QD1qfWsFbFPmquO+w7t9a2syNwmYsP/WqIfocgtqu80Bg=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.7.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.7.0</h3>
+        <ul>
+          <li>New Day Brief panel — why a stock moved on any past date</li>
+          <li>Chart events lane marks days with earnings, dividends, splits, rating changes or an unusually large move</li>
+          <li>Click a mark, hover a bar and press D, or right-click the chart to open a brief for that day</li>
+          <li>Command bar: /day 2026-03-14, /day 2026-03-09..2026-03-15, or just AAPL 2026-03-14</li>
+          <li>EXCESS line gives the stock&#x27;s move minus its benchmark — was it the company or the whole market</li>
+          <li>Historical headlines for any date, years back, with no API key needed</li>
+          <li>Briefs open as their own window, so they never squeeze your layout</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 24 Aug 2026 23:19:38 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.7.0/aurantium-mac.zip"
+        sparkle:version="1.7.0"
+        sparkle:os="macos"
+        length="281570437"
+        sparkle:edSignature="geiRUI5nkPnssNXsOfAzxHPhNnwHsow0tTnHmxXN6g4QQKO2LcNeejsOYfDL/UX+ShYLrWmmeTy4Bc0/M79MBQ=="
+        type="application/zip" />
+    </item>
+    <item>
       <title>Aurantium 1.6.1</title>
       <description><![CDATA[
         <style>
