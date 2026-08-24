@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from ..datahub import DataHub, TopicPolicy
 from . import _yf
+from .dayinfo import DayInfoProvider
 from .econ import EconProvider
 from .fundamentals import FundamentalsProvider
 from .market import MarketProvider
@@ -23,6 +24,7 @@ def register_all_providers() -> None:
 
     hub.register_provider(MarketProvider())
     hub.register_provider(NewsProvider())
+    hub.register_provider(DayInfoProvider())
     hub.register_provider(EconProvider())
     hub.register_provider(FundamentalsProvider())
     hub.register_provider(RatesProvider())
@@ -32,6 +34,12 @@ def register_all_providers() -> None:
     hub.set_policy("analyst:*", TopicPolicy(ttl_s=3600, min_interval_s=60))
     hub.set_policy("news:*", TopicPolicy(ttl_s=300, min_interval_s=30))
     hub.set_policy("newsq:*", TopicPolicy(ttl_s=300, min_interval_s=30))
+    # Day Brief topics describe a *past* trading day, which never changes.
+    # Long TTLs plus the SQLite topic cache mean re-opening a date the user
+    # has looked at before is instant, and works with no network at all.
+    hub.set_policy("newsr:*", TopicPolicy(ttl_s=21600, min_interval_s=30))
+    hub.set_policy("daystat:*", TopicPolicy(ttl_s=21600, min_interval_s=60))
+    hub.set_policy("dayev:*", TopicPolicy(ttl_s=21600, min_interval_s=60))
     hub.set_policy("profile:*", TopicPolicy(ttl_s=86400, min_interval_s=120))
     hub.set_policy("fred:*", TopicPolicy(ttl_s=3600, min_interval_s=120))
     hub.set_policy("wb:*", TopicPolicy(ttl_s=3600, min_interval_s=120))

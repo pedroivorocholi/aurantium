@@ -23,7 +23,7 @@ import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any, Optional
 from xml.etree import ElementTree
@@ -36,8 +36,10 @@ from ..datahub import DataHub, Provider
 MAX_ITEMS = 25
 
 # Curated market-focused RSS feeds — free, no key. The English set is a subset
-# of Fincept Terminal's defaults (research/fincept-terminal
-# .../NewsService_Feeds.cpp); the rest give each offered language at least one
+# of Fincept Terminal's defaults (fincept-qt/src/services/news/
+# NewsService_Feeds.cpp — upstream repo and commit are recorded in
+# research/fincept-terminal.md); the rest give each offered language at
+# least one
 # live market feed, so picking a language actually *adds* coverage rather than
 # only filtering. Every URL here was probed for a parseable feed with items.
 RSS_FEEDS: list[tuple[str, str, str, str]] = [
@@ -128,6 +130,46 @@ def _parse_feed_datetime(value: str) -> Optional[datetime]:
     if dt is not None and dt.tzinfo is None:  # keep sort keys comparable
         dt = dt.replace(tzinfo=timezone.utc)
     return dt
+
+
+#: NewsAPI's free tier indexes roughly the last month. Asking it for 2019
+#: doesn't error, it just returns nothing -- so the guard is ours to apply.
+NEWSAPI_LOOKBACK_DAYS = 28
+
+
+def _date_tuple(iso: Optional[str]) -> Optional[tuple]:
+    """'YYYY-MM-DD' -> (y, m, d), the shape gnews wants for start_date/end_date
+    (gnews.py:159-186 also accepts a datetime, but the tuple is unambiguous)."""
+    if not iso:
+        return None
+    try:
+        d = date.fromisoformat(str(iso).strip())
+    except (TypeError, ValueError):
+        return None
+    return (d.year, d.month, d.day)
+
+
+def _within_newsapi_window(start: Optional[str]) -> bool:
+    """True when a window starts recently enough for NewsAPI's free tier to
+    have anything at all. Skipping the call is better than a wasted round trip
+    against a rate-limited key."""
+    d = _date_tuple(start)
+    if d is None:
+        return False
+    return (date.today() - date(*d)).days <= NEWSAPI_LOOKBACK_DAYS
+
+
+def _published_within(published: Any, start: str, end: str) -> bool:
+    """Is a feed item's publish date inside [start, end] (inclusive)?
+
+    Used to post-filter the RSS tier, which cannot be asked for a range.
+    Items with an unparseable date are **excluded**: in a historical window an
+    undated headline is far more likely to be today's than the day in
+    question, and showing it would answer the user's question wrongly."""
+    dt = _parse_feed_datetime(published if isinstance(published, str) else "")
+    if dt is None:
+        return False
+    return start <= dt.date().isoformat() <= end
 
 
 def _clean_summary(text: Any, limit: int = 320) -> str:
@@ -254,7 +296,7 @@ class NewsProvider(Provider):
     """Serves ``news:*`` topics."""
 
     def topic_patterns(self) -> list[str]:
-        return ["news:*", "newsq:*"]
+        return ["news:*", "newsq:*", "newsr:*"]
 
     def refresh(self, topics: list[str]) -> None:
         hub = DataHub.instance()
@@ -262,6 +304,18 @@ class NewsProvider(Provider):
             if topic.startswith("newsq:"):
                 query = topic.split(":", 1)[1]
                 hub.run_async(lambda t=topic, q=query: self._fetch_query(t, q))
+                continue
+            if topic.startswith("newsr:"):
+                parts = topic.split(":")
+                if len(parts) != 3 or ".." not in parts[2]:
+                    hub.publish_error(topic, f"malformed ranged news topic: {topic}")
+                    continue
+                start, _, end = parts[2].partition("..")
+                hub.run_async(
+                    lambda t=topic, s=parts[1], a=start, b=end: self._fetch_ranged(
+                        t, s, a, b
+                    )
+                )
                 continue
             parts = topic.split(":")
             if len(parts) != 2:
@@ -303,6 +357,62 @@ class NewsProvider(Provider):
             hub.publish(topic, self._gate(items, langs))
         except Exception as exc:
             hub.publish_error(topic, f"news query fetch failed: {exc}")
+
+    def _fetch_ranged(self, topic: str, symbol: str, start: str, end: str) -> None:
+        """Historical waterfall for ``newsr:SYM:START..END``.
+
+        The order is deliberately **not** the live one. gnews goes first
+        because it is the only tier with real archive depth -- Google News
+        honours ``before:``/``after:`` operators years back, verified to 2019.
+        NewsAPI is second but only inside its free-tier lookback. RSS is a
+        recency top-up, post-filtered on the parsed publish date, and useless
+        for anything older than a few days. yfinance is absent entirely:
+        ``Ticker.news`` has no date control at all, so including it would
+        silently return today's headlines for a 2019 query -- the single worst
+        failure this feature could have.
+        """
+        hub = DataHub.instance()
+        try:
+            langs = languages.spoken_languages()
+            items = self._from_gnews_ranged(symbol, start, end, langs)
+            if items is None and _within_newsapi_window(start):
+                items = self._from_newsapi(symbol, langs, start=start, end=end)
+            if items is None:
+                items = self._rss_in_range(symbol, start, end, langs)
+            if items is None:
+                items = []
+            kept = self._gate(items, langs)
+            hub.publish(
+                topic,
+                {
+                    "symbol": symbol,
+                    "start": start,
+                    "end": end,
+                    "items": kept,
+                    # so the panel can say "12 hidden by your reading languages"
+                    # instead of showing a bare, baffling empty state
+                    "found": len(items),
+                    "hidden": max(0, len(items) - len(kept)),
+                },
+            )
+        except Exception as exc:
+            hub.publish_error(topic, f"ranged news fetch failed: {exc}")
+
+    def _from_gnews_ranged(
+        self, symbol: str, start: str, end: str, langs: Optional[list[str]] = None
+    ) -> Optional[list[dict]]:
+        return self._gnews_search(f'"{symbol}" stock', langs, start=start, end=end)
+
+    def _rss_in_range(
+        self, symbol: str, start: str, end: str, langs: Optional[list[str]] = None
+    ) -> Optional[list[dict]]:
+        """Whatever the live feeds happen to still be carrying, filtered to the
+        window. Only ever useful when the window touches the last few days."""
+        items = self._from_rss_symbol(symbol, langs)
+        if not items:
+            return None
+        kept = [i for i in items if _published_within(i.get("published"), start, end)]
+        return kept or None
 
     @staticmethod
     def _gate(items: list[dict], langs: list[str]) -> list[dict]:
@@ -360,7 +470,11 @@ class NewsProvider(Provider):
             return None
 
     def _from_newsapi(
-        self, symbol: str, langs: Optional[list[str]] = None
+        self,
+        symbol: str,
+        langs: Optional[list[str]] = None,
+        start: Optional[str] = None,
+        end: Optional[str] = None,
     ) -> Optional[list[dict]]:
         """NewsAPI ``/v2/everything``, once per language.
 
@@ -378,15 +492,20 @@ class NewsProvider(Provider):
             return None  # nothing this source can serve; fall through to gnews
         items: list[dict] = []
         for code in supported:
+            params = {
+                "q": symbol,
+                "language": code,
+                "sortBy": "publishedAt",
+                "pageSize": MAX_ITEMS,
+            }
+            if start and end:
+                # /v2/everything takes ISO-8601; the free tier only indexes
+                # roughly the last month, which _within_newsapi_window guards
+                params["from"], params["to"] = start, end
             try:
                 resp = requests.get(
                     "https://newsapi.org/v2/everything",
-                    params={
-                        "q": symbol,
-                        "language": code,
-                        "sortBy": "publishedAt",
-                        "pageSize": MAX_ITEMS,
-                    },
+                    params=params,
                     headers={"X-Api-Key": api_key},
                     timeout=10,
                 )
@@ -424,16 +543,24 @@ class NewsProvider(Provider):
 
     @staticmethod
     def _gnews_search(
-        query: str, langs: Optional[list[str]] = None
+        query: str,
+        langs: Optional[list[str]] = None,
+        start: Optional[str] = None,
+        end: Optional[str] = None,
     ) -> Optional[list[dict]]:
         """One gnews edition per language, merged newest-first. GNews defaults
         to the US/English edition, so the language/country pair is what makes
-        the other languages show up at all."""
+        the other languages show up at all.
+
+        ``start``/``end`` (ISO dates) turn this into a historical search:
+        gnews translates them into Google News ``after:``/``before:``
+        operators (gnews.py:93-109), which reach back years."""
         try:
             from gnews import GNews
         except Exception:
             return None
         codes = langs if langs is not None else languages.spoken_languages()
+        window = _date_tuple(start), _date_tuple(end)
         items: list[dict] = []
         for code in codes[:MAX_LANGS_PER_FETCH]:
             try:
@@ -442,6 +569,8 @@ class NewsProvider(Provider):
                     country=GNEWS_COUNTRY.get(code, "US"),
                     max_results=MAX_ITEMS,
                 )
+                if window[0] and window[1]:
+                    gn.start_date, gn.end_date = window
                 results = gn.get_news(query) or []
             except Exception:
                 continue

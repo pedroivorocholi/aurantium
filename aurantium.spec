@@ -51,7 +51,11 @@ if not IS_MAC and os.path.exists("WinSparkle.dll"):
 # subprocess that cannot import the non-installed `aurantium` package.)
 from aurantium.panels import BUILTIN as _PANELS
 
-hiddenimports += ["aurantium.panels", "aurantium.panels._news_common"]
+hiddenimports += [
+    "aurantium.panels",
+    "aurantium.panels._news_common",
+    "aurantium.panels._events_lane",
+]
 hiddenimports += [f"aurantium.panels.{m}" for m in _PANELS]
 hiddenimports += [
     "aurantium.providers",
@@ -59,6 +63,7 @@ hiddenimports += [
     "aurantium.providers.fundamentals",
     "aurantium.providers.market",
     "aurantium.providers.news",
+    "aurantium.providers.dayinfo",
 ]
 # Shared UI components (imported by panels) and the onboarding dialog (imported
 # lazily inside app.py). Listed explicitly so the frozen build never misses them.
@@ -69,6 +74,8 @@ hiddenimports += [
     "aurantium.language_dialog",
     "aurantium.languages",
     "aurantium.alerts",
+    "aurantium.date_context",
+    "aurantium.sector_meta",
     "aurantium.command_bar",
     "aurantium.undo",
 ]

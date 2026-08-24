@@ -329,6 +329,21 @@ class Panel(QWidget):
     panel_title: str = ""
     panel_category: str = "General"
 
+    #: May this panel exist as a free-floating window?
+    #:
+    #: Aurantium's rule is that panels move and snap but never tear off
+    #: (app.py sets DockWidgetFloatable False), because a workspace of
+    #: overlapping windows stops being a terminal. A panel opts out of that
+    #: rule only when docking would actively harm it -- the Day Brief is the
+    #: case that earned it: auto-docking a brief into the side of a tuned
+    #: layout squeezes every other panel to open something the user will read
+    #: once and close.
+    #:
+    #: This is a class attribute rather than an add_panel() argument on
+    #: purpose: the dock feature has to be set identically when a saved layout
+    #: is restored, and the layout spec carries no such flag.
+    FLOATABLE: bool = False
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._hub = DataHub.instance()

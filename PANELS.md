@@ -37,6 +37,9 @@ providers keep the topics fresh (TTL-based polling, shared cache, rate limits):
 | `cftc:gold` | COT positioning `{commercial_net, noncommercial_net, noncommercial_net_prev, open_interest, bias, history:[[date, net, oi], …]}` (keyless; markets: gold, silver, copper, brent, natgas, crude_oil, sp500, bitcoin, euro_fx) | 1 h |
 | `eia:spot:wti` | Energy spot price series (needs EIA_API_KEY) | 1 h |
 | `newsq:any free text` | Keyword news feed (e.g. `newsq:Brazil`) — same payload as `news:` | 5 min |
+| `newsr:AAPL:2026-03-09..2026-03-15` | Date-ranged headlines `{symbol, start, end, items:[…], found, hidden}` — `hidden` counts what the language gate removed | 6 h |
+| `daystat:AAPL:2026-03-14` | One session explained `{date, snapped_from, o,h,l,c,v, pct, avg_vol_30, vol_ratio, bench_sym, bench_pct, sector_sym, sector_pct, excess_pct, verdict}` | 6 h |
+| `dayev:AAPL:2026-03-09..2026-03-15` | Dated corporate events `{events:[{date, kind, title, detail}]}`; kinds `earnings`/`dividend`/`split`/`rating` | 6 h |
 | `profile:AAPL` | Company profile `{name, description, sector, industry, market_cap, pe_trailing/forward, eps, dividend_yield, beta, week52_high/low, employees, website, officers}` | 24 h |
 | `financials:AAPL` | Income/balance/cashflow statements, annual+quarterly: `{income|balance|cashflow: {annual|quarterly: {columns, rows}}}` | 24 h |
 | `earnings:AAPL` | `{next_date, rows: [[date, eps_est, eps_reported, surprise_pct]]}` | 6 h |
@@ -65,6 +68,7 @@ as you like (e.g. two Topic News feeds with different queries):
 |---|---|---|
 | Watchlist | Live quote table; rows drive linked panels | Add/Remove any Yahoo symbols; list persists per instance |
 | Chart | Candlesticks + SMA 50/100/200 overlays + RSI(14) sub-chart | Period buttons (1d…max), indicator toggles; all persist |
+| Day Brief | Why a stock moved on one date: session OHLCV, volume vs 30-day average, move vs index and sector with the EXCESS between them, corporate events, and the news window | Date + `1D/3D/1W/1M` window (follows link group and the date bus) |
 | News | Company headlines for the linked symbol | — (follows link group) |
 | Topic News | Keyword news feed, independent of linked symbol | Editable query (e.g. "Brazil", "energy commodities") |
 | Analyst Recs | Consensus, targets, upgrades/downgrades | — (follows link group) |

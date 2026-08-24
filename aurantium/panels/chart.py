@@ -14,7 +14,16 @@ from typing import Any, Callable, Optional
 import numpy as np
 import pyqtgraph as pg
 from PySide6.QtCore import QDate, QEvent, QPointF, QRectF, Qt
-from PySide6.QtGui import QAction, QActionGroup, QColor, QFont, QPainter, QPicture
+from PySide6.QtGui import (
+    QAction,
+    QActionGroup,
+    QColor,
+    QFont,
+    QKeySequence,
+    QPainter,
+    QPicture,
+    QShortcut,
+)
 from PySide6.QtWidgets import (
     QColorDialog,
     QDateEdit,
@@ -30,7 +39,9 @@ from PySide6.QtWidgets import (
 )
 
 from ..components.empty_state import EmptyState
+from ..date_context import DateContext
 from ..panel import COMPACT, Panel, register_panel
+from ..symbol_context import DEFAULT_GROUP, UNLINKED
 from ..undo import UndoStack
 from ..theme import (
     ACCENT,
@@ -46,6 +57,7 @@ from ..theme import (
     current_theme,
     palette_colors,
 )
+from ._events_lane import EventsLane, build_marks
 
 # -- range / interval model -------------------------------------------------
 #
@@ -630,6 +642,16 @@ class ChartPanel(Panel):
         self._draw_points: list = []
         self._preview_items: list = []
 
+        # -- events lane (#day-brief): marks under the price on days that have
+        # something to explain, and the click target that opens a Day Brief.
+        # Event payloads arrive on their own topics and are merged with the
+        # unusual-move flags computed from the loaded closes.
+        self._lane_on = True
+        self._lane: Optional[EventsLane] = None
+        self._lane_events: list[dict] = []
+        self._menu_bar_date = ""  # bar under the cursor when the menu opened
+        self._cross_index: Optional[int] = None
+
         # -- title row: ticker · price · change ------------------------------
         title_row = QHBoxLayout()
         title_row.setContentsMargins(2, 2, 2, 2)
@@ -747,6 +769,15 @@ class ChartPanel(Panel):
         self.line_curve.setVisible(False)
         self.content_layout.addWidget(self.plot_widget, 3)
 
+        # -- events lane -------------------------------------------------------
+        # Deliberately its own x-linked strip rather than marks inside the price
+        # plot: nothing to reposition on zoom, no fight with auto-range, and a
+        # far bigger click target. See _events_lane.py for the full argument.
+        lane_pane = pg.PlotWidget(axisItems={"bottom": pg.DateAxisItem(orientation="bottom")})
+        lane_pane.setXLink(self.plot_widget)
+        self._lane = EventsLane(lane_pane, self._pick_date, self._colors["bg"])
+        self.content_layout.addWidget(lane_pane)
+
         # -- empty state -------------------------------------------------------
         # A chart with no series still draws a full axis pair, so an unset (or
         # unavailable) symbol rendered as a grid labelled with meaningless
@@ -765,6 +796,7 @@ class ChartPanel(Panel):
         self.plot_widget.customContextMenuRequested.connect(self._show_chart_menu)
 
         self._setup_crosshair()
+        self._install_day_shortcut()
 
         # default working set mirrors the old fixed layout: SMA50 + SMA200 + RSI.
         # RSI used to draw in ACCENT — the amber that means "this is the price"
@@ -1304,10 +1336,27 @@ class ChartPanel(Panel):
     # -- right-click settings menu --------------------------------------------
 
     def _show_chart_menu(self, pos) -> None:
+        # capture the bar before the menu grabs the mouse and the crosshair
+        # stops tracking, so the entry can name the date the user pointed at
+        self._menu_bar_date = self._date_under_cursor()
         self._build_chart_menu().exec(self.plot_widget.mapToGlobal(pos))
 
     def _build_chart_menu(self) -> QMenu:
         menu = QMenu(self.plot_widget)
+
+        # -- day brief: first, and labelled with the real date. An action that
+        # opens a panel should never leave the user guessing which day it will
+        # act on, so the date is in the menu item itself.
+        iso = self._menu_bar_date
+        if iso:
+            try:
+                pretty = date.fromisoformat(iso).strftime("%a %d %b %Y")
+            except ValueError:
+                pretty = iso
+            day_act = QAction(f"What happened on {pretty}?", menu)
+            day_act.triggered.connect(lambda _=False, d=iso: self._pick_date(d))
+            menu.addAction(day_act)
+            menu.addSeparator()
 
         type_menu = menu.addMenu("Chart type")
         grp = QActionGroup(type_menu)
@@ -1330,6 +1379,11 @@ class ChartPanel(Panel):
             color_menu.addAction(act)
 
         menu.addSeparator()
+        lane_act = QAction("Events lane", menu, checkable=True)
+        lane_act.setChecked(self._lane_on)
+        lane_act.setToolTip("Marks on days with earnings, dividends, rating changes or an unusual move")
+        lane_act.triggered.connect(self._toggle_lane)
+        menu.addAction(lane_act)
         grid_act = QAction("Grid", menu, checkable=True)
         grid_act.setChecked(self._grid_on)
         grid_act.triggered.connect(self._toggle_grid)
@@ -1539,6 +1593,7 @@ class ChartPanel(Panel):
         return super().eventFilter(obj, event)
 
     def _hide_crosshair(self) -> None:
+        self._cross_index = None
         for item in (self._cross_v, self._cross_h, self._cross_text):
             item.setVisible(False)
 
@@ -1566,6 +1621,7 @@ class ChartPanel(Panel):
         if i is None:
             self._hide_crosshair()
             return
+        self._cross_index = i  # the `D` shortcut reads the bar from here
         self._cross_v.setPos(self._hist_t[i])
         self._cross_h.setPos(mp.y())
         self._cross_v.setVisible(True)
@@ -1829,6 +1885,138 @@ class ChartPanel(Panel):
         topic = f"history:{symbol}:{period_token}:{interval}"
         self.subscribe(topic, self._on_history)
         self.subscribe(f"quote:{symbol}", self._on_quote)
+        if self._lane_on:
+            # All three already exist with long TTLs, so these are usually
+            # cache hits rather than new network work.
+            self._lane_events = []
+            self.subscribe(f"earnings:{symbol}", self._on_lane_earnings)
+            self.subscribe(f"dividends:{symbol}", self._on_lane_cash)
+            self.subscribe(f"analyst:{symbol}", self._on_lane_ratings)
+
+    # -- events lane ---------------------------------------------------------
+
+    def _merge_lane_events(self, kind: str, rows: list[dict]) -> None:
+        """Replace this source's contribution and redraw. Each source arrives
+        on its own topic and at its own time, so they are kept separable
+        rather than appended blindly."""
+        self._lane_events = [
+            e for e in self._lane_events if e.get("_src") != kind
+        ] + [dict(r, _src=kind) for r in rows]
+        self._render_lane()
+
+    def _on_lane_earnings(self, data: Any) -> None:
+        rows = []
+        if isinstance(data, dict):
+            for row in data.get("rows") or []:
+                if isinstance(row, (list, tuple)) and row and row[0]:
+                    rows.append({"date": str(row[0])[:10], "kind": "earnings"})
+        self._merge_lane_events("earnings", rows)
+
+    def _on_lane_cash(self, data: Any) -> None:
+        rows = []
+        if isinstance(data, dict):
+            for entry in data.get("history") or []:
+                if isinstance(entry, (list, tuple)) and entry and entry[0]:
+                    rows.append({"date": str(entry[0])[:10], "kind": "dividend"})
+            for entry in data.get("splits") or []:
+                if isinstance(entry, (list, tuple)) and entry and entry[0]:
+                    rows.append({"date": str(entry[0])[:10], "kind": "split"})
+        self._merge_lane_events("cash", rows)
+
+    def _on_lane_ratings(self, data: Any) -> None:
+        rows = []
+        if isinstance(data, dict):
+            for up in data.get("upgrades") or []:
+                if isinstance(up, dict) and up.get("date"):
+                    rows.append(
+                        {
+                            "date": str(up["date"])[:10],
+                            "kind": "rating",
+                            "action": up.get("action", ""),
+                            "detail": f"{up.get('from_grade','')} → {up.get('to_grade','')}",
+                        }
+                    )
+        self._merge_lane_events("ratings", rows)
+
+    def _render_lane(self) -> None:
+        if self._lane is None:
+            return
+        if not self._lane_on:
+            self._lane.clear()
+            return
+        self._lane.set_marks(
+            build_marks(self._hist_t, self._hist_c, self._lane_events)
+        )
+
+    def _toggle_lane(self, on: bool) -> None:
+        self._lane_on = bool(on)
+        if self._lane is not None:
+            self._lane.pane.setVisible(self._lane_on)
+        if self._lane_on and self.current_symbol:
+            self._resubscribe(self.current_symbol)
+        else:
+            self._render_lane()
+
+    def _pick_date(self, iso: str) -> None:
+        """Open a Day Brief on ``iso`` and point this panel's link group at it.
+
+        Routed through ``MainWindow.open_day_brief`` rather than publishing to
+        DateContext directly: publishing alone leaves the click with no visible
+        effect whenever no Day Brief happens to be docked, which is the default
+        state of every workspace saved before that panel existed.
+        """
+        if not iso:
+            return
+        group = self.link_group
+        win = self.window()
+        opener = getattr(win, "open_day_brief", None)
+        if callable(opener):
+            opener(iso, group=group if group != UNLINKED else DEFAULT_GROUP, source=self)
+        elif group != UNLINKED:  # detached panel (tests, previews)
+            DateContext.instance().set_date(group, iso, source=self)
+        try:
+            pretty = date.fromisoformat(iso).strftime("%a %d %b %Y")
+        except ValueError:
+            pretty = iso
+        notify = getattr(win, "notify", None)
+        if callable(notify):
+            notify(f"Day Brief · {pretty}", 2500)
+        else:
+            self.set_status(pretty)
+
+    def _date_under_cursor(self) -> str:
+        """ISO date of the bar the crosshair is currently on, or ''.
+
+        Derived from the bar itself, exactly as the crosshair readout does
+        (chart.py's _update_readout) -- never from a separate local-midnight
+        conversion, which would drift by a day near the boundary."""
+        idx = self._cross_index
+        if idx is None or not (0 <= idx < len(self._hist_t)):
+            return ""
+        try:
+            return datetime.fromtimestamp(self._hist_t[idx]).date().isoformat()
+        except (ValueError, OSError, OverflowError):
+            return ""
+
+    def _install_day_shortcut(self) -> None:
+        """`D` explains the day under the crosshair.
+
+        Scoped to this widget and its children (not the window) so it only
+        fires when the chart has focus, and so it never steals a keystroke
+        from the command bar or any other panel's text entry."""
+        sc = QShortcut(QKeySequence("D"), self)
+        sc.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        sc.activated.connect(self._explain_cursor_day)
+        self._day_shortcut = sc
+
+    def _explain_cursor_day(self) -> None:
+        """The `D` shortcut. Nothing under the crosshair means nothing
+        happens, rather than a guess at which day was meant."""
+        iso = self._date_under_cursor()
+        if iso:
+            self._pick_date(iso)
+        else:
+            self.set_status("hover a bar, then press D")
 
     def _frame_window(self, t: list, highs: list, lows: list) -> None:
         """Zoom the plot to the selected range even though more bars may have
@@ -1868,6 +2056,7 @@ class ChartPanel(Panel):
             self._hist_t, self._hist_o, self._hist_c = [], [], []
             self._hist_hi, self._hist_lo, self._hist_v = [], [], []
             self._refresh_all_indicators()
+            self._render_lane()
             self._sync_empty()
             return
         self.candle_item.set_ohlc(t, o, h, l, c)
@@ -1897,6 +2086,7 @@ class ChartPanel(Panel):
         self._apply_chart_type()
         self._frame_window(valid_t, valid_h, valid_l)
         self._render_annotations()  # keep horizontal drawings spanning the bars
+        self._render_lane()  # unusual-move flags depend on the loaded closes
 
         rng = self._range.get("preset") or (
             f"{self._range.get('start')}→{self._range.get('end')}"
@@ -1953,6 +2143,7 @@ class ChartPanel(Panel):
             ],
             "annotations_symbol": self._annotations_symbol,
             "drawing_color": self._drawing_color,
+            "events_lane": self._lane_on,
         }
 
     def restore(self, settings: dict) -> None:
@@ -2013,6 +2204,12 @@ class ChartPanel(Panel):
                     on=bool(entry.get("on", True)),
                     rebuild=False,
                 )
+
+        lane = settings.get("events_lane")
+        if isinstance(lane, bool):
+            self._lane_on = lane
+            if self._lane is not None:
+                self._lane.pane.setVisible(lane)
 
         # drawings (validated) + the symbol they belong to, so on_symbol() keeps
         # them when the same symbol is re-applied post-restore

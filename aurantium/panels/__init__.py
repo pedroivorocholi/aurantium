@@ -14,6 +14,7 @@ BUILTIN = (
     "chart_grid",
     "commodities",
     "cot_history",
+    "day_brief",
     "dividends",
     "earnings",
     "fundamentals",

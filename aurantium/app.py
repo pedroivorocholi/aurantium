@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from datetime import date, timedelta
 from collections.abc import Callable
 from pathlib import Path
 
@@ -35,6 +36,7 @@ from PySide6.QtWidgets import (
 from .alerts import AlertEngine
 from .command_bar import CommandBar
 from .datahub import DataHub
+from .date_context import WINDOW_SPAN_DAYS, WINDOWS, DateContext, parse_iso
 from . import motion
 from .layout_store import LayoutStore
 from .notifier import Notifier
@@ -45,6 +47,33 @@ from .symbol_context import DEFAULT_GROUP, GROUPS, SymbolContext
 from .undo import UndoStack
 
 LAYOUTS_DIR = BUNDLE_DIR / "layouts"
+
+
+def _as_of_spec(arg: str) -> tuple:
+    """Parse a /day argument into ``(anchor_iso, window_token)``.
+
+    Accepts ``YYYY-MM-DD`` or ``START..END``. A range is converted to the
+    midpoint plus the smallest window token that still covers it: the Day
+    Brief is built around one anchor session, because a stat block that
+    averaged several days would answer a different question than the one
+    the user asked. Returns ``(None, "")`` for anything unparseable."""
+    text = (arg or "").strip()
+    if ".." in text:
+        raw_a, _, raw_b = text.partition("..")
+        a, b = parse_iso(raw_a), parse_iso(raw_b)
+        if a is None or b is None:
+            return None, ""
+        if b < a:
+            a, b = b, a
+        mid = a + timedelta(days=(b - a).days // 2)
+        span = (b - a).days + 1
+        for token in WINDOWS:
+            if WINDOW_SPAN_DAYS[token] >= span:
+                return mid.isoformat(), token
+        return mid.isoformat(), WINDOWS[-1]
+    day = parse_iso(text)
+    return (day.isoformat(), "1D") if day else (None, "")
+
 
 # Shareable single-layout file (JSON inside). Import also accepts plain .json.
 LAYOUT_EXT = ".aurantiumlayout"
@@ -107,9 +136,11 @@ class MainWindow(QMainWindow):
         bl.addWidget(self._cmd, 1)
         self.setMenuWidget(self._wrap_menu_and_bar(bar))
 
-        # Docking behaviour: panels move and snap into place, but never tear off
-        # into free-floating windows (floating is disabled per-panel in
-        # add_panel). Live splitter resize + even splits for free arranging.
+        # Docking behaviour: panels move and snap into place and never tear off
+        # into free-floating windows — floating is disabled per-panel in
+        # add_panel unless the panel class opts in via Panel.FLOATABLE (only
+        # the Day Brief does). Live splitter resize + even splits for free
+        # arranging.
         _cfg = QtAds.CDockManager
         for _flag in (
             _cfg.OpaqueSplitterResize,
@@ -1086,10 +1117,63 @@ class MainWindow(QMainWindow):
         if raw.startswith("/"):
             self._run_slash_command(raw)
         else:
-            SymbolContext.instance().set_symbol(
-                DEFAULT_GROUP, raw.upper(), source=self
-            )
+            # "AAPL 2026-03-14" -- symbol and as-of date in one entry. Only a
+            # second token that actually parses as a date is treated this way;
+            # anything else falls through to the plain symbol path unchanged.
+            parts = raw.split()
+            if len(parts) == 2 and parse_iso(parts[1]) is not None:
+                SymbolContext.instance().set_symbol(
+                    DEFAULT_GROUP, parts[0].upper(), source=self
+                )
+                self._set_as_of(parts[1])
+            else:
+                SymbolContext.instance().set_symbol(
+                    DEFAULT_GROUP, raw.upper(), source=self
+                )
         self._cmd.clear()
+
+    def _set_as_of(self, arg: str) -> None:
+        """Point the Day Brief at a date, opening one if none is on screen.
+
+        ``arg`` is ``YYYY-MM-DD`` or ``START..END``. A range is expressed as an
+        anchor plus the smallest window that covers it, because the Day Brief's
+        model is an anchor day with a sweep around it -- the stat block has to
+        describe one session to mean anything."""
+        anchor, window = _as_of_spec(arg)
+        if anchor is None:
+            self.notify(f"Not a date: {arg}", 3000, level="warn")
+            return
+        self.open_day_brief(anchor, window, source=self)
+
+    def open_day_brief(
+        self,
+        anchor: str,
+        window: str | None = None,
+        group: str = DEFAULT_GROUP,
+        source=None,
+    ) -> None:
+        """Put a Day Brief on screen and point it at ``anchor``.
+
+        **Every** gesture that names a date routes through here — the chart's
+        events lane, the `D` key, the chart context menu and `/day` alike.
+        Publishing to DateContext alone is not enough: a workspace with no Day
+        Brief docked (which is every workspace saved before this panel existed)
+        has nobody listening, so the date goes nowhere and the click reads as
+        broken. The panel joins ``group`` so a brief opened from a group-B
+        chart follows that chart rather than group A.
+        """
+        if parse_iso(anchor) is None:
+            return
+        if not any(
+            getattr(d.widget(), "panel_id", "") == "day_brief"
+            for d in self._docks.values()
+        ):
+            # Opened as its own window, not docked: wedging a brief into the
+            # side of a tuned workspace steals width from every other panel to
+            # show something the user will read once and close. Dragging it
+            # onto a dock area still docks it if they want it to stay.
+            self.add_panel("day_brief", link_group=group, floating=True)
+        DateContext.instance().set_date(group, anchor, window, source=source)
 
     def _on_suggestion_picked(self, suggestion) -> None:
         """A suggestion row was accepted in the top bar: navigate immediately
@@ -1105,7 +1189,7 @@ class MainWindow(QMainWindow):
         from the suggestion engine, not this list.)"""
         items = [f"/add {m.id}" for m in PanelRegistry.all()]
         items += [f"/layout {name}" for name in self.layout_store.names()]
-        items += ["/save", "/refresh"]
+        items += ["/save", "/refresh", "/day"]
         return items
 
     def _watchlist_symbols(self) -> list[str]:
@@ -1146,10 +1230,38 @@ class MainWindow(QMainWindow):
                 self._save_named_layout()
         elif cmd == "refresh":
             self._refresh_all()
+        elif cmd == "day":
+            self._set_as_of(arg or date.today().isoformat())
         else:
             self.notify(f"Unknown command: /{cmd}", 3000, level="warn")
 
     # -- panel management --------------------------------------------------------
+
+    def _place_floating(self, container, size: tuple[int, int] = (620, 700)) -> None:
+        """Size and position a freshly floated panel.
+
+        Parked against the right edge of the screen rather than centred: these
+        windows open in response to a click on the chart, and landing on top of
+        the chart would hide the very thing the user is asking about. Clamped
+        to the available geometry so it can never open partly off-screen or
+        taller than the display.
+        """
+        if container is None:
+            return
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is None:
+            return
+        avail = screen.availableGeometry()
+        w = min(size[0], int(avail.width() * 0.9))
+        h = min(size[1], int(avail.height() * 0.9))
+        margin = 24
+        x = max(avail.left(), avail.right() - w - margin)
+        y = max(avail.top(), avail.center().y() - h // 2)
+        try:
+            container.resize(w, h)
+            container.move(x, y)
+        except Exception:  # pragma: no cover - geometry is best-effort
+            pass
 
     def add_panel(
         self,
@@ -1159,11 +1271,18 @@ class MainWindow(QMainWindow):
         settings: dict | None = None,
         area: QtAds.DockWidgetArea = QtAds.DockWidgetArea.CenterDockWidgetArea,
         target_instance: str | None = None,
+        floating: bool = False,
     ) -> QtAds.CDockWidget | None:
         """Create a panel dock. ``area`` is global unless ``target_instance``
         names an existing panel instance — then the new dock is placed
         relative to (or tabbed into, with CenterDockWidgetArea) that panel's
-        dock area. Lets layouts build precise multi-column arrangements."""
+        dock area. Lets layouts build precise multi-column arrangements.
+
+        ``floating`` opens the panel as its own window instead of docking it,
+        and is only honoured for panels whose class sets ``FLOATABLE`` (see
+        panel.py). Docking a panel into a tuned layout costs every other panel
+        width; for something opened on demand and closed again that trade is
+        wrong."""
         meta = PanelRegistry.get(panel_id)
         if meta is None:
             return None
@@ -1205,10 +1324,13 @@ class MainWindow(QMainWindow):
         dock.setObjectName(instance_id)
         dock.setWidget(panel)
         dock.setFeature(QtAds.CDockWidget.DockWidgetDeleteOnClose, True)
-        # Movable (can be dragged to a new dock position) but NOT floatable —
-        # dragging a panel relocates and snaps it; it never becomes a window.
+        # Movable (can be dragged to a new dock position). Floatable only for
+        # panels that opt in via Panel.FLOATABLE — for everything else dragging
+        # relocates and snaps, and never produces a free window. Read from the
+        # class, not the call, so a restored layout gets the same feature bits.
+        can_float = bool(getattr(meta.cls, "FLOATABLE", False))
         dock.setFeature(QtAds.CDockWidget.DockWidgetMovable, True)
-        dock.setFeature(QtAds.CDockWidget.DockWidgetFloatable, False)
+        dock.setFeature(QtAds.CDockWidget.DockWidgetFloatable, can_float)
         # Let a panel be dragged down to a small size — size from the content's
         # own minimum (near-zero) rather than its full size hint.
         dock.setMinimumSizeHintMode(
@@ -1225,7 +1347,9 @@ class MainWindow(QMainWindow):
         self._maximize_actions[instance_id] = max_act
         dock.closed.connect(lambda iid=instance_id: self._on_dock_closed(iid))
         target = self._docks.get(target_instance) if target_instance else None
-        if target is not None:
+        if floating and can_float:
+            self._place_floating(self.dock_manager.addDockWidgetFloating(dock))
+        elif target is not None:
             self.dock_manager.addDockWidget(area, dock, target.dockAreaWidget())
         else:
             self.dock_manager.addDockWidget(area, dock)
@@ -1271,6 +1395,7 @@ class MainWindow(QMainWindow):
             "panels": panels,
             "ads_state": bytes(ads_state.toHex()).decode(),
             "symbols": SymbolContext.instance().to_json(),
+            "dates": DateContext.instance().to_json(),
         }
 
     def apply_layout(self, doc: dict) -> bool:
@@ -1303,6 +1428,7 @@ class MainWindow(QMainWindow):
         self._docks.clear()
         self._maximize_actions.clear()
         SymbolContext.instance().from_json(doc.get("symbols", {}))
+        DateContext.instance().from_json(doc.get("dates", {}))
         for spec in doc.get("panels", []):
             self.add_panel(
                 spec.get("panel_id", ""),

@@ -36,6 +36,11 @@ Per release, once that's done:
    - Another line…"
    git push origin v1.5.4
    ```
+   **Write flat one-line bullets.** `tools/ci_update_appcast.py` turns *every
+   non-empty line* of the tag message into its own `<li>`, stripping a leading
+   `-` or `*`. A prose paragraph therefore becomes a run of ugly
+   one-sentence bullets — in the GitHub release notes *and* in the update
+   dialog every user sees.
 3. Watch the **Actions** tab. `build-windows` and `build-macos` run in
    parallel (each builds, signs with the shared key, uploads its artifact);
    `publish` waits for both, verifies the tag matches `__version__`, creates
@@ -47,10 +52,10 @@ Per release, once that's done:
 
 If `publish` fails on the version check, you forgot step 1 — fix `main`,
 delete the tag (`git push --delete origin v1.5.4 && git tag -d v1.5.4`), and
-re-tag. This workflow is new and has not yet run for a real release — expect
-to debug the first run (see especially the Inno Setup `iscc` PATH step on
-Windows, and Gatekeeper/`xattr` on macOS if the published `.app` ever fails
-to relaunch after an update).
+re-tag. This workflow has run cleanly for both 1.6.0 and 1.6.1. If a run does
+fail, the two places it has historically been fragile are the Inno Setup
+`iscc` PATH step on Windows, and Gatekeeper/`xattr` on macOS if the published
+`.app` ever fails to relaunch after an update.
 
 ---
 

@@ -94,6 +94,17 @@ _SHORTCUTS_HTML = _page_css() + f"""
   {_row("“A” button (bottom-left)", "Auto-range: reset the view to fit the data")}
 </table>
 
+<h2>Day Brief — why did it move?</h2>
+<table>
+  {_row("Click a mark in the EVENTS lane", "Open the Day Brief on that date — the strip under the price marks days with something to explain")}
+  {_row(_kbd("D"), "Explain the day the crosshair is on (hover a bar first)")}
+  {_row("Right-click a bar", "“What happened on …?” — the menu names the exact date under your cursor")}
+  {_row("Right-click &#9656; Events lane", "Show or hide the marks strip")}
+  {_row("<code>/day 2026-03-14</code>", "Jump the Day Brief to a date — opens the panel if it isn’t already up")}
+  {_row("<code>/day 2026-03-09..2026-03-15</code>", "Same, for a span — it centres on the middle and widens the sweep")}
+  {_row("<code>AAPL 2026-03-14</code>", "Symbol and date in one entry, straight from the SYMBOL box")}
+</table>
+
 <h2>Tables</h2>
 <table>
   {_row("Filter box (above a table)", "Type to show only matching rows — live substring match")}
@@ -189,6 +200,33 @@ or remove it. The default colors are chosen to stay apart under red-green color
 blindness and to stay clear of the green/red/amber that mean gain, loss, and
 price, so an indicator is never mistaken for a signal. There are four; a chart
 with more indicators than that reuses them, and the chips tell them apart.</p>
+
+<h2>Day Brief — why did it move?</h2>
+<p>When a chart shows a spike or a gap, the <b>Day Brief</b> panel answers what
+happened that day. Under every price chart runs a thin <b>EVENTS</b> lane
+marking the days that have something to explain:
+<b>E</b>&nbsp;earnings, <b>D</b>&nbsp;ex-dividend, <b>S</b>&nbsp;split,
+<b>&#9650;/&#9660;</b>&nbsp;an analyst upgrade or downgrade, and
+<b>&#9679;</b>&nbsp;a session whose move was unusually large for that stock.
+Hover a mark to see its date, click it to open the brief. Nothing else on the
+chart opens a panel, so you can click around freely.</p>
+<p>You can also hover any bar and press <b>D</b>, right-click a bar (the menu
+names the date you are pointing at), or type <code>/day 2026-03-14</code> —
+or just <code>AAPL 2026-03-14</code> — in the SYMBOL box.</p>
+<p>The brief shows that session's open/high/low/close, its volume against the
+stock's own 30-day average, and — the useful part — the same day's move for the
+broad index and the stock's sector, with the <b>EXCESS</b> between them. That
+one line tells you whether the move was the company or the whole market, which
+the chart alone can never say. Below it are the corporate events that landed in
+the window and the headlines from it.</p>
+<p>The <b>1D / 3D / 1W / 1M</b> chips set how many days of events and news to
+gather, <i>centred on</i> the chosen day — <b>1W</b> is seven days, three either
+side, not a week in each direction. The day's own numbers never change, only how
+wide the sweep is, and the resolved dates and day count are always printed under
+the date box so you can see exactly what you are looking at. The default is
+<b>3D</b>, because news explaining a Monday gap often breaks over the weekend.
+If a date wasn't a trading day the panel snaps to the session before it and says
+so.</p>
 
 <h2>News</h2>
 <p>In a News or Topic News panel, <b>single-click</b> a headline for a quick
