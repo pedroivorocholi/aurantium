@@ -15,8 +15,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton
 
 from ..components import attach_suggestions
-from ..panel import Panel, register_panel
-from ..theme import ACCENT, BG, FG_DIM
+from ..panel import NULL_GLYPH, Panel, register_panel
+from ..theme import ACCENT, BG, FG, FG_DIM, series_color
 
 # label -> (period, interval) passed straight into history:SYM:PERIOD:INTERVAL
 PERIODS = [
@@ -28,7 +28,38 @@ PERIODS = [
 INTERVAL_OF = {label: interval for label, _, interval in PERIODS}
 
 DEFAULT_COMPARE = ["SPY", "QQQ"]
-COLORS = [ACCENT, "#4a90d9", "#7ed321", "#e91e63", "#9b59b6", "#1abc9c"]
+
+
+def _series_color(index: int) -> str:
+    """The pen colour for series ``index``.
+
+    Series 0 is the linked symbol — the subject the panel exists to show — so
+    it wears ACCENT, the same amber that means "this is the instrument"
+    everywhere else. The comparisons are genuine categorical identity and take
+    the shared series palette.
+
+    This replaced a hand-picked list, ``[ACCENT, "#4a90d9", "#7ed321",
+    "#e91e63", "#9b59b6", "#1abc9c"]``, which was theme-blind and failed the
+    project's own checks in both themes — ``#7ed321`` measured 1.87:1 against
+    the light theme's white canvas, which is a line you cannot see.
+    """
+    return ACCENT if index == 0 else series_color(index - 1)
+
+
+def _legend_html(symbol: str, color: str, last_pct: float | None) -> str:
+    """One legend entry: a colour swatch, then the symbol and its return.
+
+    The swatch carries identity; the text stays in the ordinary foreground. The
+    symbol name used to be painted in the series colour itself, which spends the
+    only channel that distinguishes the series on text that already says which
+    series it is — and drags legibility down to whatever the line colour happens
+    to measure against the panel background.
+    """
+    value = NULL_GLYPH if last_pct is None else f"{last_pct:+.2f}%"
+    return (
+        f'<span style="color:{color}">■</span> '
+        f'<span style="color:{FG}"><b>{symbol}</b>&nbsp;&nbsp;{value}</span>'
+    )
 
 
 def _dedupe(symbols: list[str]) -> list[str]:
@@ -51,6 +82,7 @@ class PerformancePanel(Panel):
         self._history: dict[str, Any] = {}     # symbol -> raw history dict
         self._curves: dict[str, pg.PlotDataItem] = {}
         self._legend_labels: dict[str, QLabel] = {}
+        self._legend_colors: dict[str, str] = {}
         self._period_buttons: dict[str, QPushButton] = {}
 
         # -- period selector ---------------------------------------------------
@@ -137,13 +169,15 @@ class PerformancePanel(Panel):
         self._clear_legend()
 
         for i, sym in enumerate(self._symbols):
-            color = COLORS[i % len(COLORS)]
+            color = _series_color(i)
             curve = pg.PlotDataItem(pen=pg.mkPen(color, width=2), antialias=True)
             self.plot_widget.addItem(curve)
             self._curves[sym] = curve
 
-            lbl = QLabel(f"{sym}  —", self)
-            lbl.setStyleSheet(f"color: {color}; font-weight: bold;")
+            lbl = QLabel(self)
+            lbl.setTextFormat(Qt.TextFormat.RichText)
+            self._legend_colors[sym] = color
+            lbl.setText(_legend_html(sym, color, None))
             self.legend_row.addWidget(lbl)
             self._legend_labels[sym] = lbl
         self.legend_row.addStretch(1)
@@ -168,6 +202,7 @@ class PerformancePanel(Panel):
             if widget is not None:
                 widget.deleteLater()
         self._legend_labels.clear()
+        self._legend_colors.clear()
 
     # -- data callbacks --------------------------------------------------------
 
@@ -204,12 +239,13 @@ class PerformancePanel(Panel):
         lbl = self._legend_labels.get(symbol)
         if lbl is None:
             return
-        if ys:
-            last_pct = ys[-1]
-            sign = "+" if last_pct >= 0 else ""
-            lbl.setText(f"{symbol}  {sign}{last_pct:.2f}%")
-        else:
-            lbl.setText(f"{symbol}  —")
+        lbl.setText(
+            _legend_html(
+                symbol,
+                self._legend_colors.get(symbol, ACCENT),
+                ys[-1] if ys else None,
+            )
+        )
 
     # -- persistence -------------------------------------------------------------
 
