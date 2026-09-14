@@ -228,7 +228,7 @@ class OptionsChainPanel(Panel):
         header_row.addWidget(self.expiry_combo)
         header_row.addStretch(1)
         self.spot_lbl = QLabel("Spot: -", self)
-        self.spot_lbl.setStyleSheet("font-weight: bold;")
+        self.spot_lbl.setStyleSheet("font-weight: 700;")
         header_row.addWidget(self.spot_lbl)
         self.content_layout.addLayout(header_row)
 

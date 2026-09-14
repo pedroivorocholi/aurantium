@@ -90,7 +90,7 @@ class _ChartCell(QWidget):
         layout.setSpacing(3)
 
         self.title_lbl = QLabel(symbol, self)
-        self.title_lbl.setStyleSheet(f"font-weight: bold; color: {ACCENT};")
+        self.title_lbl.setObjectName("statValue")
         layout.addWidget(self.title_lbl)
 
         self.plot_widget = pg.PlotWidget(self)
@@ -151,7 +151,7 @@ class _ChartCell(QWidget):
             chg_txt = f"{sign}{change_pct:.2f}%"
             color = UP if change_pct >= 0 else DOWN
         self.title_lbl.setText(f"{self.symbol}  {last}  {chg_txt}")
-        self.title_lbl.setStyleSheet(f"font-weight: bold; color: {color};")
+        self.title_lbl.setStyleSheet(f"font-weight: 700; color: {color};")
 
 
 @register_panel(id="chart_grid", title="Chart Grid", category="Markets")

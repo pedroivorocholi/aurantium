@@ -44,7 +44,7 @@ def _fmt_pct(value: Any) -> str:
 class EarningsPanel(Panel):
     def build(self) -> None:
         self.next_lbl = QLabel("Next earnings: -", self)
-        self.next_lbl.setStyleSheet(f"color: {ACCENT}; font-weight: bold; font-size: 13px;")
+        self.next_lbl.setObjectName("statValue")
         self.content_layout.addWidget(self.next_lbl)
 
         self.table = MarketTable(0, len(HEADERS), self)

@@ -62,7 +62,7 @@ class LanguageDialog(QDialog):
         self._main.currentIndexChanged.connect(self._sync_main)
         main_layout.addWidget(self._main)
         main_hint = QLabel("Headlines in this language are listed first.", main_box)
-        main_hint.setStyleSheet(f"color: {FG_DIM};")
+        main_hint.setObjectName("secondary")
         main_layout.addWidget(main_hint)
         root.addWidget(main_box)
 

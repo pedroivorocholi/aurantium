@@ -40,6 +40,7 @@ from ..panel import Panel, register_panel
 from ..theme import (
     ACCENT,
     ACCENT_DEEP,
+    FONT_TITLE,
     BG_HEADER,
     FG,
     FG_DIM,
@@ -421,7 +422,7 @@ class PortfolioPanel(Panel):
         )
         lay.addWidget(self._perf_plot, 1)
         self._perf_note = QLabel("Rebased to 100 at the window start.", w)
-        self._perf_note.setStyleSheet(f"color: {FG_DIM};")
+        self._perf_note.setObjectName("secondary")
         lay.addWidget(self._perf_note)
         return w
 
@@ -437,9 +438,9 @@ class PortfolioPanel(Panel):
         ]
         for i, (key, title) in enumerate(rows):
             k = QLabel(title, w)
-            k.setStyleSheet(f"color: {FG_DIM};")
+            k.setObjectName("secondary")
             v = QLabel("—", w)
-            v.setStyleSheet(f"color: {FG}; font-weight: bold; font-size: 14px;")
+            v.setStyleSheet(f"color: {FG}; font-weight: 700; font-size: {FONT_TITLE}px;")
             grid.addWidget(k, i, 0)
             grid.addWidget(v, i, 1)
             self._risk_labels[key] = v

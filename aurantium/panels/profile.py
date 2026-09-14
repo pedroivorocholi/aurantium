@@ -80,12 +80,12 @@ class ProfilePanel(Panel):
         outer.setSpacing(8)
 
         self.name_lbl = QLabel("—", body)
-        self.name_lbl.setStyleSheet(f"color: {ACCENT}; font-size: 16px; font-weight: bold;")
+        self.name_lbl.setObjectName("statValueLarge")
         self.name_lbl.setWordWrap(True)
         outer.addWidget(self.name_lbl)
 
         self.sector_lbl = QLabel("", body)
-        self.sector_lbl.setStyleSheet(f"color: {FG_DIM};")
+        self.sector_lbl.setObjectName("secondary")
         self.sector_lbl.setWordWrap(True)
         outer.addWidget(self.sector_lbl)
 
@@ -106,9 +106,9 @@ class ProfilePanel(Panel):
         for i, key in enumerate(stat_keys):
             row, col = divmod(i, 2)
             k_lbl = QLabel(key, body)
-            k_lbl.setStyleSheet(f"color: {FG_DIM};")
+            k_lbl.setObjectName("secondary")
             v_lbl = QLabel("-", body)
-            v_lbl.setStyleSheet("font-weight: bold;")
+            v_lbl.setStyleSheet("font-weight: 700;")
             v_lbl.setWordWrap(True)
             v_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             self.stats_grid.addWidget(k_lbl, row, col * 2)
@@ -117,7 +117,7 @@ class ProfilePanel(Panel):
         outer.addLayout(self.stats_grid)
 
         officers_hdr = QLabel("Officers", body)
-        officers_hdr.setStyleSheet(f"color: {FG_DIM}; font-weight: bold;")
+        officers_hdr.setStyleSheet(f"color: {FG_DIM}; font-weight: 700;")
         outer.addWidget(officers_hdr)
         self.officers_layout = QVBoxLayout()
         self.officers_layout.setSpacing(2)

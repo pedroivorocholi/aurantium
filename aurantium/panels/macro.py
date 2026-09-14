@@ -130,7 +130,7 @@ class MacroPanel(Panel):
 
         # -- (a) US Treasury yield curve ------------------------------------------
         curve_title = QLabel("US Treasury Yield Curve", self)
-        curve_title.setStyleSheet(f"color: {ACCENT}; font-weight: bold;")
+        curve_title.setObjectName("statValue")
         self.content_layout.addWidget(curve_title)
 
         self.curve_widget = pg.PlotWidget()
@@ -151,12 +151,12 @@ class MacroPanel(Panel):
         self.content_layout.addWidget(self.curve_widget, 2)
 
         self.spread_lbl = QLabel("", self)
-        self.spread_lbl.setStyleSheet(f"color: {FG_DIM};")
+        self.spread_lbl.setObjectName("secondary")
         self.content_layout.addWidget(self.spread_lbl)
 
         # -- (b) macro instrument monitor -------------------------------------------
         inst_title = QLabel("Macro Monitor", self)
-        inst_title.setStyleSheet(f"color: {ACCENT}; font-weight: bold;")
+        inst_title.setObjectName("statValue")
         self.content_layout.addWidget(inst_title)
 
         self.inst_table = MarketTable(0, len(INST_HEADERS), self)
@@ -172,7 +172,7 @@ class MacroPanel(Panel):
 
         # -- (c) CFTC positioning ---------------------------------------------------
         cftc_title = QLabel("Positioning (CFTC)", self)
-        cftc_title.setStyleSheet(f"color: {ACCENT}; font-weight: bold;")
+        cftc_title.setObjectName("statValue")
         cftc_title.setToolTip(
             "Net futures position of large speculative traders — weekly CFTC\n"
             "Commitments of Traders data. Click a row to drive linked panels."
@@ -318,12 +318,16 @@ class MacroPanel(Panel):
         name = f"{long[1]}–{short[1]} spread"
         if sy is None or ly is None:
             self.spread_lbl.setText(f"{name}: —")
-            self.spread_lbl.setStyleSheet(f"color: {FG_DIM};")
+            # Drop any inline tick colour from a previous update so the
+            # #secondary role applies again. setObjectName alone would not:
+            # a per-widget stylesheet outranks the global sheet, so the
+            # label would stay green or red while reading "—".
+            self.spread_lbl.setStyleSheet("")
             return
         spread_bp = (float(ly) - float(sy)) * 100.0
         color = DOWN if spread_bp < 0 else UP
         self.spread_lbl.setText(f"{name}: {spread_bp:+.0f} bp")
-        self.spread_lbl.setStyleSheet(f"color: {color}; font-weight: bold;")
+        self.spread_lbl.setStyleSheet(f"color: {color}; font-weight: 700;")
 
     # -- macro instrument monitor ----------------------------------------------------
 

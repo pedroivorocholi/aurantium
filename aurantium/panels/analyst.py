@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 
 from ..components import MarketTable, make_filter_edit
 from ..panel import Panel, register_panel
-from ..theme import DOWN, FG_DIM, UP
+from ..theme import DOWN, FG_DIM, FONT_TITLE, UP
 
 UPGRADE_HEADERS = ["Date", "Firm", "Action", "From", "To"]
 
@@ -49,7 +49,7 @@ class AnalystPanel(Panel):
 
         rec_row = QHBoxLayout()
         self.rec_lbl = QLabel("—", self)
-        self.rec_lbl.setStyleSheet("font-weight: bold; font-size: 14px;")
+        self.rec_lbl.setStyleSheet(f"font-weight: 700; font-size: {FONT_TITLE}px;")
         self.mean_lbl = QLabel("", self)
         self.count_lbl = QLabel("", self)
         rec_row.addWidget(self.rec_lbl)
@@ -63,7 +63,7 @@ class AnalystPanel(Panel):
         self.target_mean_lbl = QLabel("Mean: -", self)
         self.target_high_lbl = QLabel("High: -", self)
         for lbl in (self.target_low_lbl, self.target_mean_lbl, self.target_high_lbl):
-            lbl.setStyleSheet(f"color: {FG_DIM};")
+            lbl.setObjectName("secondary")
         target_row.addWidget(self.target_low_lbl)
         target_row.addWidget(self.target_mean_lbl)
         target_row.addWidget(self.target_high_lbl)
@@ -108,7 +108,7 @@ class AnalystPanel(Panel):
         count = data.get("analyst_count")
 
         self.rec_lbl.setText((rec_key or "—").replace("_", " ").upper())
-        self.rec_lbl.setStyleSheet(f"font-weight: bold; font-size: 14px; color: {_rec_color(rec_key)};")
+        self.rec_lbl.setStyleSheet(f"font-weight: 700; font-size: {FONT_TITLE}px; color: {_rec_color(rec_key)};")
         self.mean_lbl.setText(f"avg {rec_mean:.2f}" if isinstance(rec_mean, (int, float)) else "")
         self.count_lbl.setText(f"({count} analysts)" if count is not None else "")
 

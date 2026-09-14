@@ -41,6 +41,47 @@ else:
     UI_FONT = "Segoe UI"
     MONO_FONT = "Consolas"
 
+
+# -- type, spacing and radius scale ----------------------------------------
+#
+# Before this there were roughly fifteen rendered text sizes between 9px and
+# 20px, across two unit systems that did not line up: the QSS said
+# ``font-size: 11px`` while ``app.setFont`` said 9 *point* (~12px at 96 DPI), so
+# anything QSS did not reach — painted widgets, item delegates, native dialogs —
+# rendered a size nobody had chosen. Five of the steps sat within a pixel of
+# each other, which is below the threshold at which a size difference means
+# anything, so they multiplied maintenance without communicating.
+#
+# Six steps, in pixels, one unit. The core three (SM/MD/LG) were already the
+# intentional part of the old set; the rest replace one-off inline values.
+FONT_XS = 9        # link badge — the smallest text in the app
+FONT_SM = 10       # eyebrows, status, table headers, chart chips
+FONT_MD = 11       # body and tables — the default
+FONT_LG = 13       # command bar, section titles
+FONT_TITLE = 16    # a panel's headline value (recommendation, total, company)
+FONT_DISPLAY = 20  # the heatmap tile figure
+
+# Weight has three values and three mechanisms — QSS ``bold``, QSS numeric, and
+# ``QFont.setBold``. Numeric QSS is canonical: ``bold`` is 700, so a "600"
+# semibold and a "bold" heading were two different weights doing the same job.
+WEIGHT_MEDIUM = 600
+WEIGHT_BOLD = 700
+
+# Spacing: a 4/8 grid with a 6px dense step. 6 is not a compromise — it was
+# already the single most common value in the app, because terminal density
+# wants a tighter rhythm than 8 between related controls.
+SPACE_XS = 2
+SPACE_SM = 4
+SPACE_MD = 6
+SPACE_LG = 8
+SPACE_XL = 12
+
+# Two radii. There were five (2, 3, 7 in the sheet; 4 and 8 invented inline).
+RADIUS_SM = 2      # controls: buttons, inputs, chips
+RADIUS_MD = 3      # surfaces: menus, tooltips, tiles
+RADIUS_ROUND = 7   # the radio indicator, which is a circle — not a fourth size
+
+
 # -- palettes --------------------------------------------------------------
 # Dark is the original, byte-for-byte. Light is a clean paper variant that
 # keeps the amber identity (a deeper, readable burnt-amber on white).
@@ -316,11 +357,11 @@ def _build_stylesheet(p: dict) -> str:
 QAbstractItemView {{ outline: 0; }}
 QWidget {{
     background: {p['BG']}; color: {p['FG']};
-    font-family: "{UI_FONT}"; font-size: 11px;
+    font-family: "{UI_FONT}"; font-size: {FONT_MD}px;
 }}
 QToolTip {{
     background: {p['CHROME']}; color: {p['CHROME_TEXT']};
-    border: 1px solid {p['CHROME_BORDER']}; border-radius: 3px; padding: 5px 9px;
+    border: 1px solid {p['CHROME_BORDER']}; border-radius: {RADIUS_MD}px; padding: 5px 9px;
 }}
 
 /* -- panel header: a thin context strip under the title bar ---------------
@@ -332,15 +373,34 @@ QToolTip {{
 QWidget#panelHeader > QLabel {{ background: transparent; }}
 QLabel#panelSymbol {{
     background: transparent; color: {p['ACCENT']};
-    font-family: "{MONO_FONT}"; font-size: 11px; font-weight: 700;
+    font-family: "{MONO_FONT}"; font-size: {FONT_MD}px; font-weight: {WEIGHT_BOLD};
     letter-spacing: 0.5px;
 }}
+/* -- semantic label roles -------------------------------------------------
+   Two idioms were hand-written at ~30 call sites: ``color: FG_DIM`` for a
+   secondary label, and ``color: ACCENT; font-weight: bold`` for a stat value.
+   Every one of them was a per-widget stylesheet — a full parse, a bypass of the
+   design system, and a place for the two spellings to drift apart (some carried
+   a font-size, some did not; some said ``bold``, some said 700).
+
+   As object names they are one rule each, and a panel asks for a *role* rather
+   than restating a colour. */
+QLabel#secondary {{ background: transparent; color: {p['FG_DIM']}; }}
+QLabel#statValue {{
+    background: transparent; color: {p['ACCENT']};
+    font-weight: {WEIGHT_BOLD};
+}}
+QLabel#statValueLarge {{
+    background: transparent; color: {p['ACCENT']};
+    font-size: {FONT_TITLE}px; font-weight: {WEIGHT_BOLD};
+}}
+
 QLabel#panelEyebrow {{
-    color: {p['FG_MUTED']}; font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+    color: {p['FG_MUTED']}; font-size: {FONT_SM}px; font-weight: {WEIGHT_BOLD}; letter-spacing: 1.5px;
 }}
 QLabel#panelStatus {{
     background: transparent; color: {p['ACCENT_DEEP']};
-    font-size: 10px; font-family: "{MONO_FONT}";
+    font-size: {FONT_SM}px; font-family: "{MONO_FONT}";
 }}
 /* The state slot, beside the info slot. Separate label because one shared,
    un-prioritised slot meant a later write silently destroyed an earlier one —
@@ -349,7 +409,7 @@ QLabel#panelStatus {{
    header, because it is also the most frequent. */
 QLabel#panelState {{
     background: transparent; color: {p['FG_MUTED']};
-    font-size: 10px; font-family: "{MONO_FONT}";
+    font-size: {FONT_SM}px; font-family: "{MONO_FONT}";
 }}
 QLabel#panelState[severity="stale"] {{ color: {p['ACCENT']}; }}
 QLabel#panelState[severity="error"] {{ color: {p['DOWN']}; }}
@@ -366,7 +426,7 @@ QWidget#menuBarRow {{
 QMenuBar {{
     background: {p['CHROME']}; color: {p['CHROME_TEXT']}; padding: 3px 8px 3px 2px;
 }}
-QMenuBar::item {{ padding: 5px 10px; border-radius: 2px; color: {p['CHROME_TEXT_DIM']}; }}
+QMenuBar::item {{ padding: 5px 10px; border-radius: {RADIUS_SM}px; color: {p['CHROME_TEXT_DIM']}; }}
 QMenuBar::item:selected {{ background: {p['CHROME_HOVER']}; color: {p['CHROME_TEXT']}; }}
 /* The blanket QWidget rule above paints every plain widget BG (true black),
    which is visibly darker than CHROME — override it so the logo's transparent
@@ -375,11 +435,11 @@ QLabel#menuBarLogo {{ background: transparent; padding: 0px 0px 0px 14px; }}
 
 QWidget#commandBar {{ background: {p['BG']}; border-bottom: 1px solid {p['BORDER']}; }}
 QLabel#commandLabel {{
-    color: {p['ACCENT']}; font-size: 11px; font-weight: 700; letter-spacing: 2px;
+    color: {p['ACCENT']}; font-size: {FONT_MD}px; font-weight: {WEIGHT_BOLD}; letter-spacing: 2px;
 }}
 QLineEdit#commandInput {{
-    background: {p['BG']}; border: 1px solid {p['BORDER_STRONG']}; border-radius: 2px;
-    padding: 4px 10px; color: {p['ACCENT']}; font-family: "{MONO_FONT}"; font-size: 13px;
+    background: {p['BG']}; border: 1px solid {p['BORDER_STRONG']}; border-radius: {RADIUS_SM}px;
+    padding: 4px 10px; color: {p['ACCENT']}; font-family: "{MONO_FONT}"; font-size: {FONT_LG}px;
     selection-background-color: {p['ACCENT']}; selection-color: {p['ON_ACCENT']};
 }}
 QLineEdit#commandInput:focus {{ border-color: {p['ACCENT']}; }}
@@ -389,14 +449,14 @@ QTableWidget, QTableView {{
     background: {p['BG']}; alternate-background-color: {p['BG_ALT']};
     gridline-color: {p['BORDER']}; border: 1px solid transparent;
     selection-background-color: {p['SELECT_BLUE']}; selection-color: {p['CHROME_TEXT']};
-    font-family: "{MONO_FONT}"; font-size: 11px;
+    font-family: "{MONO_FONT}"; font-size: {FONT_MD}px;
 }}
 QTableView::item {{ padding: 1px 4px; }}
 QHeaderView {{ background: {p['HEADER_BLUE']}; }}
 QHeaderView::section {{
     background: {p['HEADER_BLUE']}; color: {p['CHROME_TEXT_DIM']}; border: 0;
     border-right: 1px solid {p['BORDER']}; border-bottom: 1px solid {p['BORDER']};
-    padding: 4px 6px; font-family: "{UI_FONT}"; font-size: 10px; font-weight: 700;
+    padding: 4px 6px; font-family: "{UI_FONT}"; font-size: {FONT_SM}px; font-weight: {WEIGHT_BOLD};
     letter-spacing: 0.4px;
 }}
 QHeaderView::section:hover {{ background: {p['CHROME_HOVER']}; color: {p['CHROME_TEXT']}; }}
@@ -406,7 +466,7 @@ QTableCornerButton::section {{ background: {p['HEADER_BLUE']}; border: 0; }}
 QListWidget {{
     background: {p['BG']}; alternate-background-color: {p['BG_ALT']};
     border: 1px solid transparent;
-    font-family: "{MONO_FONT}"; font-size: 11px;
+    font-family: "{MONO_FONT}"; font-size: {FONT_MD}px;
 }}
 QTableWidget[kbFocus="true"], QTableView[kbFocus="true"],
 QListWidget[kbFocus="true"] {{ border-color: {p['FOCUS']}; }}
@@ -423,7 +483,7 @@ QTabWidget::pane {{ border: 0; border-top: 1px solid {p['BORDER']}; }}
 QTabBar::tab {{
     background: transparent; color: {p['CHROME_TEXT_DIM']};
     padding: 5px 12px; border: 0; border-bottom: 2px solid transparent;
-    font-weight: 600;
+    font-weight: {WEIGHT_MEDIUM};
 }}
 QTabBar::tab:hover {{ color: {p['CHROME_TEXT']}; }}
 QTabBar::tab:selected {{ color: {p['CHROME_TEXT']}; border-bottom: 2px solid {p['ACCENT']}; }}
@@ -431,7 +491,7 @@ QTabBar::tab[kbFocus="true"] {{ color: {p['FOCUS']}; border-bottom-color: {p['FO
 
 /* -- inputs -------------------------------------------------------------- */
 QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {{
-    background: {p['BG']}; border: 1px solid {p['BORDER_STRONG']}; border-radius: 2px;
+    background: {p['BG']}; border: 1px solid {p['BORDER_STRONG']}; border-radius: {RADIUS_SM}px;
     padding: 4px 8px; color: {p['FG']};
     selection-background-color: {p['ACCENT']}; selection-color: {p['ON_ACCENT']};
 }}
@@ -451,7 +511,7 @@ QComboBox QAbstractItemView {{
 QListView#suggestPopup {{
     background: {p['CHROME']}; border: 1px solid {p['CHROME_BORDER']};
     color: {p['CHROME_TEXT']}; outline: 0; padding: 2px;
-    font-family: "{MONO_FONT}"; font-size: 11px;
+    font-family: "{MONO_FONT}"; font-size: {FONT_MD}px;
 }}
 QListView#suggestPopup::item {{ padding: 4px 8px; }}
 QListView#suggestPopup::item:selected {{
@@ -461,8 +521,8 @@ QListView#suggestPopup::item:selected {{
 /* -- buttons: flat tabs, amber when active ------------------------------- */
 QPushButton {{
     background: {p['BG_ELEV']}; color: {p['CHROME_TEXT_DIM']};
-    border: 1px solid {p['BORDER_STRONG']}; border-radius: 2px;
-    padding: 5px 13px; font-size: 11px; font-weight: 600;
+    border: 1px solid {p['BORDER_STRONG']}; border-radius: {RADIUS_SM}px;
+    padding: 5px 13px; font-size: {FONT_MD}px; font-weight: {WEIGHT_MEDIUM};
 }}
 QPushButton[kbFocus="true"] {{ border-color: {p['FOCUS']}; }}
 /* On an amber fill the neutral ring measures 1.62:1 and simply is not there;
@@ -473,7 +533,7 @@ QPushButton:hover {{
 }}
 QPushButton:pressed {{ background: {p['HEADER_BLUE']}; }}
 QPushButton:checked {{
-    background: {p['ACCENT']}; color: {p['ON_ACCENT']}; border-color: {p['ACCENT']}; font-weight: 700;
+    background: {p['ACCENT']}; color: {p['ON_ACCENT']}; border-color: {p['ACCENT']}; font-weight: {WEIGHT_BOLD};
 }}
 QPushButton:checked:hover {{ background: {p['ACCENT_DEEP']}; border-color: {p['ACCENT_DEEP']}; }}
 QPushButton:disabled {{ color: {p['FG_MUTED']}; border-color: {p['BORDER']}; background: {p['BG_ALT']}; }}
@@ -484,12 +544,12 @@ QPushButton:disabled {{ color: {p['FG_MUTED']}; border-color: {p['BORDER']}; bac
    speaking amber, two solid amber blocks per chart were spending the accent on
    a setting rather than on data. */
 QPushButton#chartChip {{
-    padding: 1px 7px; font-size: 10px; font-weight: 600;
-    min-height: 18px; max-height: 18px; border-radius: 2px;
+    padding: 1px 7px; font-size: {FONT_SM}px; font-weight: {WEIGHT_MEDIUM};
+    min-height: 18px; max-height: 18px; border-radius: {RADIUS_SM}px;
 }}
 QPushButton#chartChip:checked {{
     background: {p['BG_ELEV']}; color: {p['ACCENT']};
-    border-color: {p['ACCENT']}; font-weight: 700;
+    border-color: {p['ACCENT']}; font-weight: {WEIGHT_BOLD};
 }}
 QPushButton#chartChip:checked:hover {{
     background: {p['CHROME_HOVER']}; border-color: {p['ACCENT']};
@@ -497,7 +557,7 @@ QPushButton#chartChip:checked:hover {{
 QPushButton#chartChip[kbFocus="true"] {{ border-color: {p['FOCUS']}; }}
 
 QToolButton {{
-    background: transparent; border: 1px solid transparent; border-radius: 2px;
+    background: transparent; border: 1px solid transparent; border-radius: {RADIUS_SM}px;
     color: {p['CHROME_TEXT']}; padding: 2px;
 }}
 QToolButton:hover {{ background: rgba(128,128,128,0.18); }}
@@ -521,8 +581,8 @@ QCheckBox::indicator, QRadioButton::indicator {{
     background: {p['BG_ELEV']};
     border: 1px solid {p['BORDER_STRONG']};
 }}
-QCheckBox::indicator {{ border-radius: 2px; }}
-QRadioButton::indicator {{ border-radius: 7px; }}
+QCheckBox::indicator {{ border-radius: {RADIUS_SM}px; }}
+QRadioButton::indicator {{ border-radius: {RADIUS_ROUND}px; }}
 QCheckBox::indicator:hover, QRadioButton::indicator:hover {{
     border-color: {p['ACCENT']};
 }}
@@ -545,9 +605,9 @@ QCheckBox:disabled, QRadioButton:disabled {{ color: {p['FG_MUTED']}; }}
 /* -- menus --------------------------------------------------------------- */
 QMenu {{
     background: {p['CHROME']}; border: 1px solid {p['CHROME_BORDER']};
-    border-radius: 3px; padding: 4px;
+    border-radius: {RADIUS_MD}px; padding: 4px;
 }}
-QMenu::item {{ padding: 6px 24px 6px 12px; border-radius: 2px; color: {p['CHROME_TEXT']}; }}
+QMenu::item {{ padding: 6px 24px 6px 12px; border-radius: {RADIUS_SM}px; color: {p['CHROME_TEXT']}; }}
 QMenu::item:selected {{ background: {p['ACCENT']}; color: {p['ON_ACCENT']}; }}
 QMenu::item:disabled {{ color: {p['FG_MUTED']}; }}
 QMenu::separator {{ height: 1px; background: {p['CHROME_BORDER']}; margin: 5px 10px; }}
@@ -556,7 +616,7 @@ QMenu::separator {{ height: 1px; background: {p['CHROME_BORDER']}; margin: 5px 1
    near-black menu. */
 QMenu::indicator {{ width: 13px; height: 13px; margin-left: 4px; }}
 QMenu::indicator:checked {{
-    background: {p['ACCENT']}; border-radius: 2px;
+    background: {p['ACCENT']}; border-radius: {RADIUS_SM}px;
 }}
 QMenu::indicator:non-exclusive:checked, QMenu::indicator:exclusive:checked {{
     background: {p['ACCENT']};
@@ -565,12 +625,12 @@ QMenu::indicator:non-exclusive:checked, QMenu::indicator:exclusive:checked {{
 /* -- scrollbars ---------------------------------------------------------- */
 QScrollBar:vertical {{ background: transparent; width: 9px; margin: 0; }}
 QScrollBar::handle:vertical {{
-    background: {p['BORDER']}; border-radius: 3px; min-height: 28px; margin: 2px;
+    background: {p['BORDER']}; border-radius: {RADIUS_MD}px; min-height: 28px; margin: 2px;
 }}
 QScrollBar::handle:vertical:hover {{ background: {p['BORDER_STRONG']}; }}
 QScrollBar:horizontal {{ background: transparent; height: 9px; margin: 0; }}
 QScrollBar::handle:horizontal {{
-    background: {p['BORDER']}; border-radius: 3px; min-width: 28px; margin: 2px;
+    background: {p['BORDER']}; border-radius: {RADIUS_MD}px; min-width: 28px; margin: 2px;
 }}
 QScrollBar::handle:horizontal:hover {{ background: {p['BORDER_STRONG']}; }}
 QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; width: 0; }}
@@ -585,13 +645,13 @@ QScrollBar::add-page, QScrollBar::sub-page {{ background: transparent; }}
    upsell are built from. */
 QDialog {{ background: {p['BG']}; }}
 QGroupBox {{
-    border: 1px solid {p['BORDER_STRONG']}; border-radius: 2px;
+    border: 1px solid {p['BORDER_STRONG']}; border-radius: {RADIUS_SM}px;
     margin-top: 8px; padding-top: 8px;
 }}
 QGroupBox::title {{
     subcontrol-origin: margin; subcontrol-position: top left; left: 8px;
     padding: 0 4px; color: {p['FG_DIM']};
-    font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+    font-size: {FONT_SM}px; font-weight: {WEIGHT_BOLD}; letter-spacing: 1.5px;
 }}
 QTextBrowser {{
     background: {p['BG']}; color: {p['FG']};
@@ -616,7 +676,7 @@ QSpinBox:disabled, QDoubleSpinBox:disabled {{ color: {p['FG_MUTED']}; }}
 /* -- status bar ---------------------------------------------------------- */
 QStatusBar {{
     background: {p['CHROME']}; color: {p['CHROME_TEXT_DIM']};
-    border-top: 1px solid {p['CHROME_BORDER']}; font-size: 11px;
+    border-top: 1px solid {p['CHROME_BORDER']}; font-size: {FONT_MD}px;
 }}
 QStatusBar::item {{ border: 0; }}
 """
@@ -640,7 +700,7 @@ ads--CDockWidgetTab[activeTab="true"] {{
 }}
 ads--CDockWidgetTab QLabel {{
     background: transparent; color: {p['CHROME_TEXT_DIM']};
-    font-size: 11px; font-weight: 600;
+    font-size: {FONT_MD}px; font-weight: {WEIGHT_MEDIUM};
 }}
 ads--CDockWidgetTab[activeTab="true"] QLabel {{ color: {p['CHROME_TEXT']}; }}
 ads--CDockWidgetTab:hover QLabel {{ color: {p['CHROME_TEXT']}; }}
@@ -650,14 +710,14 @@ ads--CDockWidgetTab QPushButton, ads--CDockWidgetTab QToolButton {{
     qproperty-iconSize: 11px 11px;
 }}
 ads--CDockWidgetTab QPushButton:hover, ads--CDockWidgetTab QToolButton:hover {{
-    background: rgba(128,128,128,0.22); border-radius: 2px;
+    background: rgba(128,128,128,0.22); border-radius: {RADIUS_SM}px;
 }}
 /* the area's controls — small and quiet */
 ads--CTitleBarButton {{
     background: transparent; border: 0; padding: 1px;
     color: {p['CHROME_TEXT_DIM']}; qproperty-iconSize: 12px 12px;
 }}
-ads--CTitleBarButton:hover {{ background: rgba(128,128,128,0.22); border-radius: 2px; }}
+ads--CTitleBarButton:hover {{ background: rgba(128,128,128,0.22); border-radius: {RADIUS_SM}px; }}
 /* The focused dock area. F11 maximizes "the focused panel" and Ctrl+W closes
    it, but nothing on screen said which one that was. QtAds already sets the
    ``focused`` property on the active tab and title bar — CDockManager
@@ -688,7 +748,13 @@ ADS_STYLESHEET = _build_ads_stylesheet(_ACTIVE)
 def apply_theme(app: QApplication) -> None:
     p = _ACTIVE
     app.setStyle("Fusion")
-    app.setFont(QFont(UI_FONT, 9))
+    # Pixels, matching the stylesheet. This was ``QFont(UI_FONT, 9)`` — 9
+    # *point*, about 12px at 96 DPI — while the sheet said 11px, so painted
+    # widgets, item delegates and native dialogs rendered a size that appeared
+    # nowhere in the design. Same unit, same number, one scale.
+    base_font = QFont(UI_FONT)
+    base_font.setPixelSize(FONT_MD)
+    app.setFont(base_font)
     pal = QPalette()
     pal.setColor(QPalette.ColorRole.Window, QColor(p["BG"]))
     pal.setColor(QPalette.ColorRole.WindowText, QColor(p["FG"]))

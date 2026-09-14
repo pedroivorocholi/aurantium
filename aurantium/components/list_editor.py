@@ -221,7 +221,7 @@ class _Grip(QLabel):
     def __init__(self, row_widget: "_RowWidget", parent=None) -> None:
         super().__init__("⠿", parent)
         self._row_widget = row_widget
-        self.setStyleSheet(f"color: {FG_DIM};")
+        self.setObjectName("secondary")
         self.setCursor(Qt.CursorShape.SizeVerCursor)
         self.setToolTip("Drag to reorder")
 
@@ -425,7 +425,7 @@ class _SectionWidget(QWidget):
         if description:
             desc = QLabel(description, self)
             desc.setWordWrap(True)
-            desc.setStyleSheet(f"color: {FG_DIM};")
+            desc.setObjectName("secondary")
             layout.addWidget(desc)
 
         if section.presets:

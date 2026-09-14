@@ -949,13 +949,15 @@ class ChartPanel(Panel):
         btn.setFixedWidth(max(30, text_w + 18))
 
     def _eyebrow(self, text: str) -> QLabel:
-        # FG_MUTED, not a hardcoded grey: the literal that used to be here was
-        # picked for the dark theme and stayed put on the light one.
+        """A control-row label ("RANGE", "INTERVAL", "INDICATORS").
+
+        Defers to ``QLabel#panelEyebrow`` in theme.py. This used to restate the
+        same element inline at a *different* weight and tracking — 600/1px here
+        against the theme's 700/1.5px — so the two eyebrows in the app looked
+        subtly unlike each other for no reason anyone had chosen.
+        """
         lbl = QLabel(text, self)
-        lbl.setStyleSheet(
-            f"color: {FG_MUTED}; font-size: 10px; font-weight: 600;"
-            " letter-spacing: 1px;"
-        )
+        lbl.setObjectName("panelEyebrow")
         return lbl
 
     # -- range / interval selection ------------------------------------------
@@ -2177,7 +2179,7 @@ class ChartPanel(Panel):
             color = self._colors["up"] if change_pct >= 0 else self._colors["down"]
             sign = "+" if change_pct >= 0 else ""
             self.chg_lbl.setText(f"{sign}{change_pct:.2f}%")
-            self.chg_lbl.setStyleSheet(f"color: {color}; font-weight: bold;")
+            self.chg_lbl.setStyleSheet(f"color: {color}; font-weight: 700;")
 
     # -- persistence -------------------------------------------------------------
 

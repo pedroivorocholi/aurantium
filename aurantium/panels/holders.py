@@ -50,9 +50,9 @@ class HoldersPanel(Panel):
     def build(self) -> None:
         header_row = QHBoxLayout()
         self.insiders_lbl = QLabel("Insiders: -", self)
-        self.insiders_lbl.setStyleSheet(f"color: {ACCENT}; font-weight: bold;")
+        self.insiders_lbl.setObjectName("statValue")
         self.institutions_lbl = QLabel("Institutions: -", self)
-        self.institutions_lbl.setStyleSheet(f"color: {ACCENT}; font-weight: bold;")
+        self.institutions_lbl.setObjectName("statValue")
         header_row.addWidget(self.insiders_lbl)
         header_row.addSpacing(24)
         header_row.addWidget(self.institutions_lbl)

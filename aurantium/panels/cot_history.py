@@ -100,7 +100,7 @@ class CotHistoryPanel(Panel):
             self,
         )
         caption.setWordWrap(True)
-        caption.setStyleSheet(f"color: {FG_DIM};")
+        caption.setObjectName("secondary")
         self.content_layout.addWidget(caption)
 
         self._set_market(self._meta)
@@ -178,7 +178,7 @@ class CotHistoryPanel(Panel):
                 f"Latest: {net:+,.0f} contracts ({direction}) · report dated {report_date}"
             )
             self.latest_lbl.setStyleSheet(
-                f"color: {tick_color(net)}; font-weight: bold;"
+                f"color: {tick_color(net)}; font-weight: 700;"
             )
         self.set_status(f"{len(nets)} weekly reports")
 

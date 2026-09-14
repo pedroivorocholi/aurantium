@@ -51,9 +51,9 @@ class DividendsPanel(Panel):
         for i, key in enumerate(STAT_KEYS):
             row, col = divmod(i, 2)
             k_lbl = QLabel(key, self)
-            k_lbl.setStyleSheet(f"color: {FG_DIM};")
+            k_lbl.setObjectName("secondary")
             v_lbl = QLabel("-", self)
-            v_lbl.setStyleSheet(f"color: {ACCENT}; font-weight: bold;")
+            v_lbl.setObjectName("statValue")
             self.stats_grid.addWidget(k_lbl, row, col * 2)
             self.stats_grid.addWidget(v_lbl, row, col * 2 + 1)
             self._stat_labels[key] = v_lbl
