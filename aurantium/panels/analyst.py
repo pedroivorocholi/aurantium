@@ -74,6 +74,7 @@ class AnalystPanel(Panel):
 
         # -- upgrades table -------------------------------------------------
         self.table = MarketTable(0, len(UPGRADE_HEADERS), self)
+        self.register_state_target(self.table)
         self.table.setHorizontalHeaderLabels(UPGRADE_HEADERS)
         # Narrow panels give up columns instead of squeezing every one
         self.table.set_column_priority(keep=[0, 2], droppable=[3, 4, 1])
@@ -90,12 +91,15 @@ class AnalystPanel(Panel):
         self.content_layout.addWidget(self.table, 1)
 
     def on_symbol(self, symbol: str) -> None:
-        self.set_status("loading…")
+        self.set_loading(True)
         self.table.set_empty_text(f"No analyst actions for {symbol}", "")
         self.unsubscribe_all()
         self.subscribe(f"analyst:{symbol}", self._on_analyst)
 
     def _on_analyst(self, data: Any) -> None:
+        # The fetch resolved — clear the veil before deciding whether
+        # there is anything to show.
+        self.set_loading(False)
         if not isinstance(data, dict):
             return
 

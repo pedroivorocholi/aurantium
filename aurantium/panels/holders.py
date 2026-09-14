@@ -60,6 +60,7 @@ class HoldersPanel(Panel):
         self.content_layout.addLayout(header_row)
 
         self.table = MarketTable(0, len(HEADERS), self)
+        self.register_state_target(self.table)
         self.table.setHorizontalHeaderLabels(HEADERS)
         # Narrow panels give up columns instead of squeezing every one
         self.table.set_column_priority(keep=[0, 2], droppable=[3, 1])
@@ -76,7 +77,7 @@ class HoldersPanel(Panel):
         self.content_layout.addWidget(self.table, 1)
 
     def on_symbol(self, symbol: str) -> None:
-        self.set_status("loading…")
+        self.set_loading(True)
         self.table.set_empty_text(f"No holder data for {symbol}", "")
         self.insiders_lbl.setText("Insiders: -")
         self.institutions_lbl.setText("Institutions: -")
@@ -85,6 +86,9 @@ class HoldersPanel(Panel):
         self.subscribe(f"holders:{symbol}", self._on_holders)
 
     def _on_holders(self, data: Any) -> None:
+        # The fetch resolved — clear the veil before deciding whether
+        # there is anything to show.
+        self.set_loading(False)
         data = data if isinstance(data, dict) else {}
 
         self.insiders_lbl.setText(f"Insiders: {_fmt_pct(data.get('insiders_pct'))}")

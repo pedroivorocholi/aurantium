@@ -118,6 +118,7 @@ class FundamentalsPanel(Panel):
 
         # -- table -----------------------------------------------------------
         self.table = MarketTable(0, 1, self)
+        self.register_state_target(self.table)
         self.table.setHorizontalHeaderLabels(["Line Item"])
         self.table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
@@ -152,13 +153,16 @@ class FundamentalsPanel(Panel):
     # -- linked-symbol lifecycle ------------------------------------------------
 
     def on_symbol(self, symbol: str) -> None:
-        self.set_status("loading…")
+        self.set_loading(True)
         self._data = {}
         self.unsubscribe_all()
         self.subscribe(f"financials:{symbol}", self._on_financials)
         self._update_actions()
 
     def _on_financials(self, data: Any) -> None:
+        # The fetch resolved — clear the veil before deciding whether
+        # there is anything to show.
+        self.set_loading(False)
         self._data = data if isinstance(data, dict) else {}
         self._render()
 

@@ -48,6 +48,7 @@ class EarningsPanel(Panel):
         self.content_layout.addWidget(self.next_lbl)
 
         self.table = MarketTable(0, len(HEADERS), self)
+        self.register_state_target(self.table)
         self.table.setHorizontalHeaderLabels(HEADERS)
         # Narrow panels give up columns instead of squeezing every one
         self.table.set_column_priority(keep=[0, 2], droppable=[1, 3])
@@ -64,7 +65,7 @@ class EarningsPanel(Panel):
         self.content_layout.addWidget(self.table, 1)
 
     def on_symbol(self, symbol: str) -> None:
-        self.set_status("loading…")
+        self.set_loading(True)
         self.table.set_empty_text(f"No earnings history for {symbol}", "")
         self.next_lbl.setText("Next earnings: -")
         self.table.setRowCount(0)
@@ -72,6 +73,9 @@ class EarningsPanel(Panel):
         self.subscribe(f"earnings:{symbol}", self._on_earnings)
 
     def _on_earnings(self, data: Any) -> None:
+        # The fetch resolved — clear the veil before deciding whether
+        # there is anything to show.
+        self.set_loading(False)
         data = data if isinstance(data, dict) else {}
 
         next_date = data.get("next_date")

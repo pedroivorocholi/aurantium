@@ -79,6 +79,7 @@ class WorldIndicesPanel(Panel):
         self._row_of_symbol: dict[str, int] = {}
 
         self.table = MarketTable(0, len(HEADERS), self)
+        self.register_state_target(self.table)
         self.table.setHorizontalHeaderLabels(HEADERS)
         self.table.set_empty_text(
             "No index data",

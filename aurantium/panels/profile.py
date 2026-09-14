@@ -128,11 +128,14 @@ class ProfilePanel(Panel):
         self.content_layout.addWidget(scroll, 1)
 
     def on_symbol(self, symbol: str) -> None:
-        self.set_status("loading…")
+        self.set_loading(True)
         self.unsubscribe_all()
         self.subscribe(f"profile:{symbol}", self._on_profile)
 
     def _on_profile(self, data: Any) -> None:
+        # The fetch resolved — lower the veil before deciding whether
+        # there is anything to show.
+        self.set_loading(False)
         info = data if isinstance(data, dict) else {}
 
         name = info.get("name") or self.current_symbol or "—"

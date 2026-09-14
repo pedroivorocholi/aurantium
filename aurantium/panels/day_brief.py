@@ -401,7 +401,7 @@ class DayBriefPanel(Panel):
             return
         start, end = rng
         self._empty.set_text("Loading…", "")
-        self.set_status("loading…")
+        self.set_loading(True)
         self.unsubscribe_all()
         self.subscribe(f"daystat:{symbol}:{self._anchor}", self._on_daystat)
         self.subscribe(f"dayev:{symbol}:{start}..{end}", self._on_events)
@@ -417,6 +417,9 @@ class DayBriefPanel(Panel):
         self.news_table.setRowCount(0)
 
     def _on_daystat(self, data: Any) -> None:
+        # The fetch resolved — lower the veil before deciding whether
+        # there is anything to show.
+        self.set_loading(False)
         if not isinstance(data, dict):
             return
         if data.get("empty"):

@@ -160,6 +160,7 @@ class MacroPanel(Panel):
         self.content_layout.addWidget(inst_title)
 
         self.inst_table = MarketTable(0, len(INST_HEADERS), self)
+        self.register_state_target(self.inst_table)
         self.inst_table.setHorizontalHeaderLabels(INST_HEADERS)
         header = self.inst_table.horizontalHeader()
         header.setSectionResizeMode(INST_COL_NAME, QHeaderView.ResizeMode.ResizeToContents)
@@ -179,6 +180,7 @@ class MacroPanel(Panel):
         self.content_layout.addWidget(cftc_title)
 
         self.cftc_table = MarketTable(0, len(CFTC_HEADERS), self)
+        self.register_state_target(self.cftc_table)
         self.cftc_table.setHorizontalHeaderLabels(CFTC_HEADERS)
         header = self.cftc_table.horizontalHeader()
         header.setSectionResizeMode(CFTC_COL_MARKET, QHeaderView.ResizeMode.ResizeToContents)
@@ -195,7 +197,7 @@ class MacroPanel(Panel):
         edit_row.addWidget(edit_btn)
         self.content_layout.addLayout(edit_row)
 
-        self.set_status("loading…")
+        self.set_loading(True)
         self._rebuild()
 
     # -- (re)construction: rows, curve axis, subscriptions ------------------------
@@ -469,6 +471,7 @@ class MacroPanel(Panel):
         yields_loaded = sum(1 for v in self._yields.values() if v is not None)
         cftc_loaded = len(self._cftc_loaded)
         if yields_loaded == len(self._tenors) and cftc_loaded == len(self._cftc):
+            self.set_loading(False)
             self.set_status("ready")
         else:
             self.set_status(

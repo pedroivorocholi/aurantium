@@ -71,6 +71,7 @@ class MoversPanel(Panel):
         kind_row.addStretch(1)
 
         self.table = MarketTable(0, len(HEADERS), self)
+        self.register_state_target(self.table)
         self.table.setHorizontalHeaderLabels(HEADERS)
         self.table.set_empty_text(
             "No movers yet",

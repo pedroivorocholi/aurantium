@@ -61,6 +61,7 @@ class DividendsPanel(Panel):
 
         # -- history / splits table -------------------------------------------
         self.table = MarketTable(0, len(HEADERS), self)
+        self.register_state_target(self.table)
         self.table.setHorizontalHeaderLabels(HEADERS)
         self.table.set_empty_text(
             "No symbol selected",
@@ -70,7 +71,7 @@ class DividendsPanel(Panel):
         self.content_layout.addWidget(self.table, 1)
 
     def on_symbol(self, symbol: str) -> None:
-        self.set_status("loading…")
+        self.set_loading(True)
         self.table.set_empty_text(f"No dividend history for {symbol}", "")
         for lbl in self._stat_labels.values():
             lbl.setText("-")
@@ -79,6 +80,9 @@ class DividendsPanel(Panel):
         self.subscribe(f"dividends:{symbol}", self._on_dividends)
 
     def _on_dividends(self, data: Any) -> None:
+        # The fetch resolved — clear the veil before deciding whether
+        # there is anything to show.
+        self.set_loading(False)
         data = data if isinstance(data, dict) else {}
 
         self._stat_labels["Yield%"].setText(_fmt_pct(data.get("yield_pct")))
