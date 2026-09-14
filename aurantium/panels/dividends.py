@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..components import MarketTable
-from ..panel import Panel, register_panel
+from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, Panel, register_panel
 from ..theme import ACCENT, FG_DIM
 
 HEADERS = ["Date", "Amount"]
@@ -24,20 +24,20 @@ STAT_KEYS = ["Yield%", "Rate", "Ex-Date", "Payout Ratio"]
 
 def _fmt_money(value: Any) -> str:
     if value is None:
-        return "-"
+        return NULL_GLYPH
     try:
         return f"{float(value):,.4f}".rstrip("0").rstrip(".")
     except (TypeError, ValueError):
-        return "-"
+        return NULL_GLYPH
 
 
 def _fmt_pct(value: Any) -> str:
     if value is None:
-        return "-"
+        return NULL_GLYPH
     try:
         return f"{float(value):.2f}%"
     except (TypeError, ValueError):
-        return "-"
+        return NULL_GLYPH
 
 
 @register_panel(id="dividends", title="Dividends", category="Research")
@@ -51,9 +51,9 @@ class DividendsPanel(Panel):
         for i, key in enumerate(STAT_KEYS):
             row, col = divmod(i, 2)
             k_lbl = QLabel(key, self)
-            k_lbl.setStyleSheet(f"color: {FG_DIM};")
-            v_lbl = QLabel("-", self)
-            v_lbl.setStyleSheet(f"color: {ACCENT}; font-weight: bold;")
+            k_lbl.setObjectName("secondary")
+            v_lbl = QLabel(NULL_GLYPH, self)
+            v_lbl.setObjectName("statValue")
             self.stats_grid.addWidget(k_lbl, row, col * 2)
             self.stats_grid.addWidget(v_lbl, row, col * 2 + 1)
             self._stat_labels[key] = v_lbl
@@ -61,29 +61,33 @@ class DividendsPanel(Panel):
 
         # -- history / splits table -------------------------------------------
         self.table = MarketTable(0, len(HEADERS), self)
+        self.register_state_target(self.table)
         self.table.setHorizontalHeaderLabels(HEADERS)
         self.table.set_empty_text(
-            "No symbol selected",
-            "Click a ticker in any linked panel, or type one in the SYMBOL bar",
+            EMPTY_NO_SYMBOL,
+            EMPTY_NO_SYMBOL_HINT,
         )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.content_layout.addWidget(self.table, 1)
 
     def on_symbol(self, symbol: str) -> None:
-        self.set_status("loading…")
+        self.set_loading(True)
         self.table.set_empty_text(f"No dividend history for {symbol}", "")
         for lbl in self._stat_labels.values():
-            lbl.setText("-")
+            lbl.setText(NULL_GLYPH)
         self.table.setRowCount(0)
         self.unsubscribe_all()
         self.subscribe(f"dividends:{symbol}", self._on_dividends)
 
     def _on_dividends(self, data: Any) -> None:
+        # The fetch resolved — clear the veil before deciding whether
+        # there is anything to show.
+        self.set_loading(False)
         data = data if isinstance(data, dict) else {}
 
         self._stat_labels["Yield%"].setText(_fmt_pct(data.get("yield_pct")))
         self._stat_labels["Rate"].setText(_fmt_money(data.get("rate")))
-        self._stat_labels["Ex-Date"].setText(data.get("ex_date") or "-")
+        self._stat_labels["Ex-Date"].setText(data.get("ex_date") or NULL_GLYPH)
         self._stat_labels["Payout Ratio"].setText(_fmt_pct(data.get("payout_ratio")))
 
         history = data.get("history")
@@ -98,7 +102,7 @@ class DividendsPanel(Panel):
             date, amount = entry[0], entry[1]
             r = self.table.rowCount()
             self.table.insertRow(r)
-            self._set_ro_item(r, 0, str(date) if date is not None else "-")
+            self._set_ro_item(r, 0, str(date) if date is not None else NULL_GLYPH)
             self._set_ro_item(r, 1, _fmt_money(amount), align_right=True)
 
         if splits:
@@ -117,8 +121,8 @@ class DividendsPanel(Panel):
                 date, ratio = entry[0], entry[1]
                 r = self.table.rowCount()
                 self.table.insertRow(r)
-                self._set_ro_item(r, 0, str(date) if date is not None else "-")
-                self._set_ro_item(r, 1, str(ratio) if ratio is not None else "-", align_right=True)
+                self._set_ro_item(r, 0, str(date) if date is not None else NULL_GLYPH)
+                self._set_ro_item(r, 1, str(ratio) if ratio is not None else NULL_GLYPH, align_right=True)
 
         sym = self.current_symbol or "—"
         self.set_status(f"{len(history)} dividends · {len(splits)} splits")

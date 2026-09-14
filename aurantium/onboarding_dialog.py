@@ -162,6 +162,10 @@ interface — charts included — matches the theme you pick. <b>Settings &#9656
 Color-blind mode</b> swaps the green/red up-down colors for a deuteranopia-safe
 blue/orange pair and adds <b>▲ / ▼</b> direction marks to change values, so
 direction reads without relying on color; it also restarts to apply.</p>
+<p><b>Keyboard focus</b> is marked with a bright outline as you move through the
+interface with <b>Tab</b> / <b>Shift+Tab</b>, so you can always see which
+control will react to the next keystroke. The outline appears only for keyboard
+navigation — clicking with the mouse does not leave one behind.</p>
 
 <h2>Symbol search &amp; link groups</h2>
 <p>Each panel carries a colored <b>link badge</b> in its top-right corner. Panels

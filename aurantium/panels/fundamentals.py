@@ -23,8 +23,8 @@ from PySide6.QtWidgets import (
 )
 
 from ..components import MarketTable, make_filter_edit
-from ..panel import Panel, register_panel
-from ..theme import DOWN
+from ..panel import NULL_GLYPH, Panel, register_panel
+from ..theme import DOWN, palette_colors
 
 STATEMENTS = [("income", "Income"), ("balance", "Balance"), ("cashflow", "Cash Flow")]
 PERIODS = [("annual", "Annual"), ("quarterly", "Quarterly")]
@@ -33,17 +33,37 @@ PERIODS = [("annual", "Annual"), ("quarterly", "Quarterly")]
 _YF_SLUG = {"income": "financials", "balance": "balance-sheet", "cashflow": "cash-flow"}
 
 
+def _xl(color: str) -> str:
+    """A theme colour as openpyxl's RRGGBB (no leading #)."""
+    return color.lstrip("#").upper()
+
+
+# The exported workbook is a *document*, not a screenshot of the app: it gets
+# opened in Excel, printed and emailed. So it takes the light palette's values
+# regardless of which theme the app is running — a black-background spreadsheet
+# is unreadable on paper and startling in someone else's inbox.
+#
+# What it must not do is what it did: freeze a copy of the *dark* theme's hex
+# (1B2530 / 1A2129 / D7DDE3 / FFAB2E) and pair it with a *light* zebra stripe,
+# which is neither theme and follows nothing. Pulling from
+# ``palette_colors("light")`` keeps the amber identity, stays coherent, and
+# moves with the palette instead of drifting from it.
+_DOC = palette_colors("light")
+
+
+
+
 def _fmt_compact(value: Any) -> str:
     """Human-format a financial-statement value: T/B/M suffixes, plain for
     small magnitudes, negatives keep their sign."""
     if value is None:
-        return "-"
+        return NULL_GLYPH
     try:
         v = float(value)
     except (TypeError, ValueError):
-        return "-"
+        return NULL_GLYPH
     if v != v:  # NaN (pandas turns None into NaN)
-        return "-"
+        return NULL_GLYPH
     sign = "-" if v < 0 else ""
     av = abs(v)
     for suffix, div in (("T", 1e12), ("B", 1e9), ("M", 1e6)):
@@ -118,6 +138,7 @@ class FundamentalsPanel(Panel):
 
         # -- table -----------------------------------------------------------
         self.table = MarketTable(0, 1, self)
+        self.register_state_target(self.table)
         self.table.setHorizontalHeaderLabels(["Line Item"])
         self.table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
@@ -152,13 +173,20 @@ class FundamentalsPanel(Panel):
     # -- linked-symbol lifecycle ------------------------------------------------
 
     def on_symbol(self, symbol: str) -> None:
-        self.set_status("loading…")
+        self.set_loading(True)
+        # Blanking the payload was never enough on its own — the table still
+        # held the previous company's statement, rendered, under the new
+        # ticker. Clear what is on screen, not just what is in memory.
         self._data = {}
+        self.table.setRowCount(0)
         self.unsubscribe_all()
         self.subscribe(f"financials:{symbol}", self._on_financials)
         self._update_actions()
 
     def _on_financials(self, data: Any) -> None:
+        # The fetch resolved — clear the veil before deciding whether
+        # there is anything to show.
+        self.set_loading(False)
         self._data = data if isinstance(data, dict) else {}
         self._render()
 
@@ -190,7 +218,7 @@ class FundamentalsPanel(Panel):
             values = list(row_data[1:])
             r = self.table.rowCount()
             self.table.insertRow(r)
-            label_item = QTableWidgetItem(str(label) if label is not None else "-")
+            label_item = QTableWidgetItem(str(label) if label is not None else NULL_GLYPH)
             label_item.setFlags(label_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(r, 0, label_item)
             for col in range(len(columns)):
@@ -330,17 +358,17 @@ class FundamentalsPanel(Panel):
         # row 1: title band across the full table
         ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=n_cols)
         title = ws.cell(row=1, column=1, value=f"{sym} — {stmt_label} ({period_label})")
-        title.font = Font(bold=True, size=13, color="FFFFFF")
-        title.fill = PatternFill("solid", fgColor="1B2530")
+        title.font = Font(bold=True, size=13, color=_xl(_DOC["ON_ACCENT"]))
+        title.fill = PatternFill("solid", fgColor=_xl(_DOC["ACCENT"]))
         title.alignment = Alignment(vertical="center", indent=1)
         ws.row_dimensions[1].height = 24
 
         # row 2: column headers (Line Item + one column per period)
-        header_fill = PatternFill("solid", fgColor="1A2129")
-        header_border = Border(bottom=Side(style="medium", color="FFAB2E"))
+        header_fill = PatternFill("solid", fgColor=_xl(_DOC["BG_HEADER"]))
+        header_border = Border(bottom=Side(style="medium", color=_xl(_DOC["ACCENT"])))
         for col, name in enumerate(df.columns, start=1):
             cell = ws.cell(row=2, column=col, value=str(name))
-            cell.font = Font(bold=True, size=10, color="D7DDE3")
+            cell.font = Font(bold=True, size=10, color=_xl(_DOC["FG"]))
             cell.fill = header_fill
             cell.border = header_border
             cell.alignment = Alignment(
@@ -350,7 +378,7 @@ class FundamentalsPanel(Panel):
 
         # data: label column left, figures right with thousands separators;
         # small magnitudes (per-share items) keep decimals, negatives go red
-        zebra = PatternFill("solid", fgColor="F3F5F7")
+        zebra = PatternFill("solid", fgColor=_xl(_DOC["BG_ALT"]))
         for r, row in enumerate(df.itertuples(index=False), start=3):
             for c, value in enumerate(row, start=1):
                 cell = ws.cell(row=r, column=c, value=value)

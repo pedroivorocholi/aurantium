@@ -24,9 +24,12 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from ..components.fmt import integer as _fmt_int
+from ..components.fmt import num as _fmt_num
 from ..components import MarketTable
 from ..panel import Panel, register_panel
-from ..theme import BG_HEADER
+from ..color import delta_e, mix_oklab
+from ..theme import BG, BG_HEADER, DOWN, UP
 
 # calls: Vol | OI | IV% | Δ | Γ | Θ | Vega | Bid | Ask | Last | Strike
 CALL_HEADERS = ["Vol", "OI", "IV%", "Δ", "Γ", "Θ", "Vega", "Bid", "Ask", "Last", "Strike"]
@@ -45,8 +48,46 @@ PUT_GREEK_COLS = (PUT_COL_DELTA, PUT_COL_GAMMA, PUT_COL_THETA, PUT_COL_VEGA)
 # payload row layout: [strike, last, bid, ask, volume, open_interest, iv_pct]
 ROW_STRIKE, ROW_LAST, ROW_BID, ROW_ASK, ROW_VOLUME, ROW_OI, ROW_IV = range(7)
 
-_ITM_TINT_CALL = "#1c2b22"   # very subtle green tint
-_ITM_TINT_PUT = "#2b1c1c"    # very subtle red tint
+#: How far an in-the-money row should sit from the table surface, as a
+#: perceptual distance (OKLab ΔE) rather than a blend fraction.
+#:
+#: A fixed blend fraction cannot serve both themes. OKLab lightness is
+#: compressed near black, so mixing 12% of green into ``#000000`` moves ΔE 8.8
+#: while the same 12% into ``#ffffff`` moves 5.4 — and neither matches the look
+#: being replaced. Stating the distance and solving for the fraction is the only
+#: form of this that means the same thing on both surfaces.
+#:
+#: 16 is deliberately calmer than the dark theme's previous ΔE 27. That tint sat
+#: behind live figures all day and was closer to a fill than a band; the row
+#: only has to read as in-the-money, not announce itself.
+_ITM_TINT_DE = 16.0
+
+
+def _tint(end: str, target_de: float = _ITM_TINT_DE) -> str:
+    """The blend of ``BG`` toward ``end`` that lands ``target_de`` away from the
+    surface. Bisection — ΔE is monotone in the blend fraction, and this runs
+    twice at import."""
+    lo, hi = 0.0, 1.0
+    for _ in range(24):
+        mid = (lo + hi) / 2
+        if delta_e(mix_oklab(BG, end, mid), BG) < target_de:
+            lo = mid
+        else:
+            hi = mid
+    return mix_oklab(BG, end, hi)
+
+
+#: In-the-money row tints, derived per theme rather than hardcoded.
+#:
+#: These were literal ``#1c2b22`` / ``#2b1c1c`` — near-black greens and reds,
+#: correct on the dark theme and applied unconditionally. On the light theme
+#: they painted near-black blocks behind near-black text: measured, the chain's
+#: own foreground sat at **1.12:1** on the call tint and **1.01:1** on the put
+#: tint, so every in-the-money row in the panel was unreadable. Deriving from
+#: ``BG`` and the tick colours fixes that and picks up colour-blind mode for
+#: free, since ``UP``/``DOWN`` are already substituted by import time.
+_ITM_TINT_CALL = _tint(UP)
+_ITM_TINT_PUT = _tint(DOWN)
 
 _RISK_FREE = 0.04  # flat short-rate assumption for the Greeks
 
@@ -63,24 +104,6 @@ HEADER_TIPS = {
     "Ask": "Lowest price a seller is currently asking",
     "Strike": "Strike price — the price at which the option can be exercised",
 }
-
-
-def _fmt_num(value: Any, decimals: int = 2) -> str:
-    if value is None:
-        return "-"
-    try:
-        return f"{float(value):,.{decimals}f}"
-    except (TypeError, ValueError):
-        return "-"
-
-
-def _fmt_int(value: Any) -> str:
-    if value is None:
-        return "-"
-    try:
-        return f"{int(value):,}"
-    except (TypeError, ValueError):
-        return "-"
 
 
 def _row_field(row: Any, idx: int) -> Any:
@@ -189,7 +212,7 @@ class OptionsChainPanel(Panel):
         header_row.addWidget(self.expiry_combo)
         header_row.addStretch(1)
         self.spot_lbl = QLabel("Spot: -", self)
-        self.spot_lbl.setStyleSheet("font-weight: bold;")
+        self.spot_lbl.setStyleSheet("font-weight: 700;")
         header_row.addWidget(self.spot_lbl)
         self.content_layout.addLayout(header_row)
 
@@ -197,11 +220,13 @@ class OptionsChainPanel(Panel):
         tables_row = QHBoxLayout()
 
         self.calls_table = MarketTable(0, len(CALL_HEADERS), self)
+        self.register_state_target(self.calls_table)
         self.calls_table.setHorizontalHeaderLabels(CALL_HEADERS)
         self._configure_table(self.calls_table)
         tables_row.addWidget(self.calls_table, 1)
 
         self.puts_table = MarketTable(0, len(PUT_HEADERS), self)
+        self.register_state_target(self.puts_table)
         self.puts_table.setHorizontalHeaderLabels(PUT_HEADERS)
         self._configure_table(self.puts_table)
         tables_row.addWidget(self.puts_table, 1)
@@ -223,7 +248,7 @@ class OptionsChainPanel(Panel):
     # -- symbol / subscription lifecycle -------------------------------------
 
     def on_symbol(self, symbol: str) -> None:
-        self.set_status("loading…")
+        self.set_loading(True)
         self._expiries = []
         self._current_expiry = ""
         self._spot = None
@@ -247,6 +272,9 @@ class OptionsChainPanel(Panel):
     # -- data callback --------------------------------------------------------
 
     def _on_options(self, data: Any) -> None:
+        # The fetch resolved — clear the veil before deciding whether
+        # there is anything to show.
+        self.set_loading(False)
         if not isinstance(data, dict):
             return
         # Drop stale callbacks from a previous symbol. Switching tickers quickly

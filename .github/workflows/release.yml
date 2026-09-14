@@ -12,7 +12,31 @@ on:
       - "v*.*.*"
 
 jobs:
+  # Gate the whole release on the suite. The palette guard
+  # (tests/test_chart_palette.py) documents itself as re-running "on each
+  # release" — until this job existed, it did not, which is how colours the
+  # suite already condemns kept shipping. Runs before the expensive builds so a
+  # red test costs seconds, not a full PyInstaller cycle. On windows-latest
+  # rather than ubuntu because that is the platform the app ships on, and Qt's
+  # offscreen plugin needs no extra system libraries there; conftest.py sets
+  # QT_QPA_PLATFORM=offscreen itself, so no display is required.
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: pytest tests/ -q
+
   build-windows:
+    needs: test
     runs-on: windows-latest
     outputs:
       length: ${{ steps.sign.outputs.length }}
@@ -63,6 +87,7 @@ jobs:
           path: dist/aurantium-setup.exe
 
   build-macos:
+    needs: test
     runs-on: macos-latest
     outputs:
       length: ${{ steps.sign.outputs.length }}

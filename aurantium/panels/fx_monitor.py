@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from ..components.fmt import num as _fmt_num
 from ..components import (
     FX_ENTRIES,
     EditorColumn,
@@ -27,7 +28,7 @@ from ..components import (
     open_list_editor,
 )
 from ..undo import UndoStack
-from ..panel import Panel, register_panel
+from ..panel import NULL_GLYPH, Panel, register_panel
 from ..theme import ACCENT, BG_HEADER, FG_DIM, apply_tick
 
 DEFAULT_MAJORS = [
@@ -60,22 +61,13 @@ def _fmt_price(value: Any) -> str:
     when the price is small (typical of pairs quoted as USD fractions),
     otherwise 2 decimals (indices, BTC, etc.)."""
     if value is None:
-        return "-"
+        return NULL_GLYPH
     try:
         v = float(value)
     except (TypeError, ValueError):
-        return "-"
+        return NULL_GLYPH
     decimals = 4 if abs(v) < 10 else 2
     return f"{v:,.{decimals}f}"
-
-
-def _fmt_num(value: Any, decimals: int = 2) -> str:
-    if value is None:
-        return "-"
-    try:
-        return f"{float(value):,.{decimals}f}"
-    except (TypeError, ValueError):
-        return "-"
 
 
 @register_panel(id="fx", title="FX Monitor", category="Markets")
@@ -88,6 +80,7 @@ class FXMonitorPanel(Panel):
         self._row_of_symbol: dict[str, int] = {}
 
         self.table = MarketTable(0, len(HEADERS), self)
+        self.register_state_target(self.table)
         self.table.setHorizontalHeaderLabels(HEADERS)
         self.table.set_empty_text(
             "No FX pairs",
@@ -165,7 +158,7 @@ class FXMonitorPanel(Panel):
         name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         self.table.setItem(row, COL_NAME, name_item)
         for col in (COL_LAST, COL_CHG, COL_CHGPCT):
-            item = QTableWidgetItem("-")
+            item = QTableWidgetItem(NULL_GLYPH)
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self.table.setItem(row, col, item)
@@ -190,7 +183,7 @@ class FXMonitorPanel(Panel):
 
         last_item.setText(_fmt_price(price))
         chg_item.setText(_fmt_price(change))
-        pct_item.setText(f"{_fmt_num(change_pct)}%" if change_pct is not None else "-")
+        pct_item.setText(f"{_fmt_num(change_pct)}%" if change_pct is not None else NULL_GLYPH)
 
         if change is not None:
             apply_tick(chg_item, change, glyph=False)

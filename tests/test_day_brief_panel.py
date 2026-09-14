@@ -248,4 +248,9 @@ def test_restore_keeps_a_valid_pair(panel):
 
 def test_no_symbol_says_so(panel):
     panel._refresh()
-    assert "No symbol linked" in panel._empty.title
+    # The shared constant, not a phrasing. This panel used to say "No symbol
+    # linked" while six other panels said "No symbol selected" for the identical
+    # condition; asserting the constant is what stops them diverging again.
+    from aurantium.panel import EMPTY_NO_SYMBOL
+
+    assert panel._empty.title == EMPTY_NO_SYMBOL

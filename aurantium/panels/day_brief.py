@@ -53,7 +53,7 @@ from ..date_context import (
     parse_iso,
     window_range,
 )
-from ..panel import Panel, register_panel
+from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, Panel, register_panel
 from ..symbol_context import UNLINKED
 from ..theme import ACCENT, BORDER, FG, FG_DIM, FG_MUTED, MONO_FONT, tick_color
 from ._news_common import (
@@ -153,7 +153,7 @@ class DayBriefPanel(Panel):
         self._build_news()
 
         self._empty = EmptyState.attach(
-            self.news_table, "No symbol linked", "Click a ticker in any panel."
+            self.news_table, EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT
         )
         # a date may already be live on this group when the panel is created
         existing = self._date_ctx.date(self.link_group)
@@ -255,7 +255,7 @@ class DayBriefPanel(Panel):
 
             rest = QLabel("", line)
             rest.setFont(mono)
-            rest.setStyleSheet(f"color: {FG_DIM};")
+            rest.setObjectName("secondary")
 
             hl.addWidget(eyebrow)
             hl.addWidget(value)
@@ -387,7 +387,7 @@ class DayBriefPanel(Panel):
     def _refresh(self) -> None:
         symbol = self.current_symbol
         if not symbol:
-            self._empty.set_text("No symbol linked", "Click a ticker in any panel.")
+            self._empty.set_text(EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT)
             self._clear_all()
             return
         if not self._anchor:
@@ -401,7 +401,7 @@ class DayBriefPanel(Panel):
             return
         start, end = rng
         self._empty.set_text("Loading…", "")
-        self.set_status("loading…")
+        self.set_loading(True)
         self.unsubscribe_all()
         self.subscribe(f"daystat:{symbol}:{self._anchor}", self._on_daystat)
         self.subscribe(f"dayev:{symbol}:{start}..{end}", self._on_events)
@@ -410,13 +410,17 @@ class DayBriefPanel(Panel):
     def _clear_all(self) -> None:
         for key in _STAT_ROWS:
             _, value, rest = self._stat_labels[key]
-            value.setText("—")
-            value.setStyleSheet(f"color: {FG_DIM};")
+            value.setText(NULL_GLYPH)
+            # Clear any tick colour left by the last symbol.
+            value.setStyleSheet("")
             rest.setText("")
         self.events_table.setRowCount(0)
         self.news_table.setRowCount(0)
 
     def _on_daystat(self, data: Any) -> None:
+        # The fetch resolved — lower the veil before deciding whether
+        # there is anything to show.
+        self.set_loading(False)
         if not isinstance(data, dict):
             return
         if data.get("empty"):
@@ -443,15 +447,15 @@ class DayBriefPanel(Panel):
         bench, sector = data.get("bench_sym"), data.get("sector_sym")
         if bench:
             vs_v.setText(fmt_pct(data.get("bench_pct")))
-            vs_v.setStyleSheet(f"color: {FG_DIM};")
+            vs_v.setStyleSheet("")
             tail = f"{bench}"
             if sector:
                 tail += f"   ·   {sector} {fmt_pct(data.get('sector_pct'))}"
             vs_r.setText(tail)
         else:
             # no honest benchmark for this listing; say so instead of guessing
-            vs_v.setText("—")
-            vs_v.setStyleSheet(f"color: {FG_DIM};")
+            vs_v.setText(NULL_GLYPH)
+            vs_v.setStyleSheet("")
             vs_r.setText("no benchmark for this listing")
 
         exc = data.get("excess_pct")

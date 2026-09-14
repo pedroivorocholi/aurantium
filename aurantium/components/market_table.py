@@ -42,7 +42,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import motion
-from ..theme import ACCENT, tick_color
+from ..theme import ACCENT, BG, tick_color
 from .empty_state import EmptyState
 
 
@@ -120,9 +120,18 @@ class _LoadingOverlay(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.hide()
 
+    #: Veil opacity over the rows beneath, 0-255.
+    VEIL_ALPHA = 140
+
     def paintEvent(self, event) -> None:  # noqa: N802 (Qt override)
         p = QPainter(self)
-        p.fillRect(self.rect(), QColor(0, 0, 0, 140))  # dim the rows beneath
+        # The surface colour, not black. Hardcoded ``QColor(0, 0, 0, 140)``
+        # dims correctly on the dark theme and *darkens* the light one, so a
+        # loading table on white would grey over instead of fading out — the
+        # opposite of what a veil is for. Derived from BG it recedes on both.
+        veil = QColor(BG)
+        veil.setAlpha(self.VEIL_ALPHA)
+        p.fillRect(self.rect(), veil)
         f = self.font()
         f.setPointSizeF(max(f.pointSizeF() + 1.0, 10.0))
         f.setBold(True)

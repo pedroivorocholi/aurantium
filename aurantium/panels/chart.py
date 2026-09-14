@@ -40,7 +40,8 @@ from PySide6.QtWidgets import (
 
 from ..components.empty_state import EmptyState
 from ..date_context import DateContext
-from ..panel import COMPACT, Panel, register_panel
+from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, COMPACT, Panel, register_panel
+from ..color import contrast
 from ..symbol_context import DEFAULT_GROUP, UNLINKED
 from ..undo import UndoStack
 from ..theme import (
@@ -56,6 +57,8 @@ from ..theme import (
     UP,
     current_theme,
     palette_colors,
+    series_palette,
+    series_slot_of,
 )
 from ._events_lane import EventsLane, build_marks
 
@@ -118,17 +121,20 @@ RSI_WINDOW = 14
 # Every value is computed, not picked: see tests/test_chart_palette.py, which
 # re-runs the lightness, chroma, color-vision, contrast and reserved-color
 # checks on each release. Do not hand-edit these without re-running it.
-_INDICATOR_PALETTES = {
-    # blue · olive · violet · teal
-    "dark": ("#0c699a", "#6e6b03", "#7035f5", "#15957b"),
-    "light": ("#2745f6", "#3c5b07", "#791c8a", "#0fa4b0"),
-}
+#: Kept as a name because tests and older code reference it. The values now
+#: live in ``theme._SERIES_PALETTES`` — one categorical palette for the whole
+#: app rather than one per panel.
+_INDICATOR_PALETTES = {name: series_palette(name) for name in THEMES}
 
 
 def indicator_palette(theme: str | None = None) -> tuple[str, ...]:
-    """The indicator colors for a theme (defaults to the active one)."""
-    name = theme or current_theme()
-    return _INDICATOR_PALETTES.get(name, _INDICATOR_PALETTES["dark"])
+    """The indicator colors for a theme (defaults to the active one).
+
+    A thin alias for :func:`theme.series_palette`. Chart indicators were the
+    first consumer of a validated categorical palette and for a while the only
+    one; the colours are now shared with every other series in the app.
+    """
+    return series_palette(theme)
 
 
 def default_indicator_colors(theme: str | None = None) -> tuple[str, ...]:
@@ -196,10 +202,62 @@ _THEME_DEFAULT_VALUES = {
 
 def _mark_too_low_contrast(color: "QColor") -> bool:
     """True if a mark/indicator color would be illegible on the active canvas:
-    too light on the light theme's white, too dark on the dark theme's black."""
+    too light on the light theme's white, too dark on the dark theme's black.
+
+    A lightness heuristic against the *theme's* default canvas. Kept as-is for
+    the colour picker, where it runs interactively and the user sees the
+    rejection message; :func:`_illegible_on` is the measured version used when
+    restoring a saved layout, where nobody is watching.
+    """
     if current_theme() == "light":
         return color.lightness() > 210
     return color.lightness() < 60
+
+
+def _illegible_on(color_hex: str, bg_hex: str) -> bool:
+    """Whether a mark would fail the 3:1 mark-contrast floor on ``bg_hex``.
+
+    Measured WCAG contrast against the canvas actually in use, rather than a
+    lightness guess against the theme's default one — the canvas is
+    user-settable, so the two can differ.
+    """
+    try:
+        return contrast(color_hex, bg_hex) < 3.0
+    except Exception:
+        return False
+
+
+def _restored_indicator_color(saved: Any, position: int, bg_hex: str) -> tuple[str | None, bool]:
+    """The colour to actually use for a restored indicator, and whether it was
+    substituted.
+
+    Two failure modes, both of which shipped.
+
+    **A theme-default colour stays put.** ``colors`` (up/down/line/grid/bg) has
+    remapped across themes since the palette was made theme-aware; ``indicators``
+    never did. An indicator drawn in the dark palette's ``#0c699a`` stayed
+    ``#0c699a`` on the light theme, where that slot is ``#2745f6`` and where the
+    dark value was never validated. Recognised slots are remapped.
+
+    **A custom colour is never re-checked.** The picker only rejects a colour
+    against the canvas *at the time of picking*, so a colour chosen on black
+    sails through onto white years later. Measured on a real saved layout: SMA
+    200 at ``#f8e71c`` — 1.28:1 on white, the exact value this module's own
+    comment documents as rejected — and volume at ``#18d90a``, 1.91:1. Two of
+    four indicators were invisible. A custom colour that fails the floor on the
+    active canvas falls back to its slot rather than being drawn where it cannot
+    be seen; an invisible line is a worse betrayal of the user's choice than a
+    changed one, and the substitution is announced.
+    """
+    if not (isinstance(saved, str) and QColor(saved).isValid()):
+        return None, False
+    slot = series_slot_of(saved)
+    if slot is not None:
+        return indicator_palette()[slot], False
+    if _illegible_on(saved, bg_hex):
+        palette = indicator_palette()
+        return palette[position % len(palette)], True
+    return saved, False
 
 
 def _mark_reject_msg() -> str:
@@ -282,7 +340,7 @@ def _fmt_compact_num(value: Any) -> str:
     try:
         v = float(value)
     except (TypeError, ValueError):
-        return "-"
+        return NULL_GLYPH
     for suffix, div in (("B", 1e9), ("M", 1e6), ("K", 1e3)):
         if abs(v) >= div:
             return f"{v / div:.1f}{suffix}"
@@ -867,7 +925,7 @@ class ChartPanel(Panel):
                 )
             else:
                 self._empty.set_text(
-                    "No symbol selected",
+                    EMPTY_NO_SYMBOL,
                     "Click a ticker in any linked panel, or type one in the SYMBOL bar",
                 )
             self._empty.setGeometry(self.plot_widget.viewport().rect())
@@ -891,13 +949,15 @@ class ChartPanel(Panel):
         btn.setFixedWidth(max(30, text_w + 18))
 
     def _eyebrow(self, text: str) -> QLabel:
-        # FG_MUTED, not a hardcoded grey: the literal that used to be here was
-        # picked for the dark theme and stayed put on the light one.
+        """A control-row label ("RANGE", "INTERVAL", "INDICATORS").
+
+        Defers to ``QLabel#panelEyebrow`` in theme.py. This used to restate the
+        same element inline at a *different* weight and tracking — 600/1px here
+        against the theme's 700/1.5px — so the two eyebrows in the app looked
+        subtly unlike each other for no reason anyone had chosen.
+        """
         lbl = QLabel(text, self)
-        lbl.setStyleSheet(
-            f"color: {FG_MUTED}; font-size: 10px; font-weight: 600;"
-            " letter-spacing: 1px;"
-        )
+        lbl.setObjectName("panelEyebrow")
         return lbl
 
     # -- range / interval selection ------------------------------------------
@@ -1834,7 +1894,7 @@ class ChartPanel(Panel):
         if symbol != self._annotations_symbol:
             self._clear_drawings()
             self._annotations_symbol = symbol
-        self.set_status("loading…")
+        self.set_loading(True)
         self._hide_crosshair()
         self._last_quote = {}
         self._hist_t, self._hist_o, self._hist_c = [], [], []
@@ -2043,6 +2103,9 @@ class ChartPanel(Panel):
     # -- data callbacks ------------------------------------------------------
 
     def _on_history(self, data: Any) -> None:
+        # The fetch resolved — lower the veil before deciding whether
+        # there is anything to show.
+        self.set_loading(False)
         if not isinstance(data, dict):
             return
         t = data.get("t") or []
@@ -2116,7 +2179,7 @@ class ChartPanel(Panel):
             color = self._colors["up"] if change_pct >= 0 else self._colors["down"]
             sign = "+" if change_pct >= 0 else ""
             self.chg_lbl.setText(f"{sign}{change_pct:.2f}%")
-            self.chg_lbl.setStyleSheet(f"color: {color}; font-weight: bold;")
+            self.chg_lbl.setStyleSheet(f"color: {color}; font-weight: 700;")
 
     # -- persistence -------------------------------------------------------------
 
@@ -2193,16 +2256,28 @@ class ChartPanel(Panel):
         if isinstance(saved, list):
             for inst in list(self._indicators):
                 self._remove_indicator(inst)
-            for entry in saved:
+            substituted = 0
+            for position, entry in enumerate(saved):
                 if not isinstance(entry, dict) or entry.get("kind") not in INDICATOR_SPECS:
                     continue
                 params = entry.get("params")
+                color, swapped = _restored_indicator_color(
+                    entry.get("color"), position, self._colors["bg"]
+                )
+                substituted += swapped
                 self._add_indicator(
                     entry["kind"],
                     params if isinstance(params, dict) else {},
-                    color=entry.get("color"),
+                    color=color,
                     on=bool(entry.get("on", True)),
                     rebuild=False,
+                )
+            if substituted:
+                # Say so. Quietly repainting a colour the user chose is the kind
+                # of thing that reads as a bug when they notice it later.
+                self.set_status(
+                    f"⚠ {substituted} indicator colour(s) were invisible on this "
+                    "theme — reset to the palette"
                 )
 
         lane = settings.get("events_lane")

@@ -304,6 +304,15 @@ def main() -> int:
 
     apply_theme(app)
 
+    # Qt has no ``:focus-visible``. This filter supplies the equivalent by
+    # stamping a ``kbFocus`` property that the stylesheet selects on, so the
+    # focus ring appears for Tab/shortcut navigation and never for a mouse
+    # click. Kept on the app object: a garbage-collected event filter stops
+    # filtering silently, and the rings would simply never appear.
+    from . import focus
+
+    app._aurantium_focus_filter = focus.install(app)
+
     # Providers first (so panels' initial subscriptions resolve), then panels.
     _splash_message(splash, "LOADING · PROVIDERS")
     from .providers import register_all_providers

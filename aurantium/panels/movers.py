@@ -19,8 +19,9 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from ..components.fmt import num as _fmt_num
 from ..components import MarketTable, NumericTableWidgetItem, make_filter_edit
-from ..panel import Panel, register_panel
+from ..panel import NULL_GLYPH, Panel, register_panel
 from ..theme import apply_tick
 
 KINDS = [("Gainers", "gainers"), ("Losers", "losers"), ("Most Active", "actives")]
@@ -30,22 +31,13 @@ COL_SYMBOL, COL_NAME, COL_LAST, COL_CHGPCT, COL_VOLUME = range(5)
 HEADERS = ["Symbol", "Name", "Last", "Chg%", "Volume"]
 
 
-def _fmt_num(value: Any, decimals: int = 2) -> str:
-    if value is None:
-        return "-"
-    try:
-        return f"{float(value):,.{decimals}f}"
-    except (TypeError, ValueError):
-        return "-"
-
-
 def _fmt_volume(value: Any) -> str:
     if value is None:
-        return "-"
+        return NULL_GLYPH
     try:
         v = float(value)
     except (TypeError, ValueError):
-        return "-"
+        return NULL_GLYPH
     for suffix, div in (("B", 1e9), ("M", 1e6), ("K", 1e3)):
         if abs(v) >= div:
             return f"{v / div:.1f}{suffix}"
@@ -71,6 +63,7 @@ class MoversPanel(Panel):
         kind_row.addStretch(1)
 
         self.table = MarketTable(0, len(HEADERS), self)
+        self.register_state_target(self.table)
         self.table.setHorizontalHeaderLabels(HEADERS)
         self.table.set_empty_text(
             "No movers yet",
@@ -127,17 +120,17 @@ class MoversPanel(Panel):
                 row = self.table.rowCount()
                 self.table.insertRow(row)
 
-                sym_item = QTableWidgetItem(str(symbol) if symbol is not None else "-")
+                sym_item = QTableWidgetItem(str(symbol) if symbol is not None else NULL_GLYPH)
                 sym_item.setFlags(sym_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self.table.setItem(row, COL_SYMBOL, sym_item)
 
-                name_item = QTableWidgetItem(str(name) if name is not None else "-")
+                name_item = QTableWidgetItem(str(name) if name is not None else NULL_GLYPH)
                 name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self.table.setItem(row, COL_NAME, name_item)
 
                 last_item = NumericTableWidgetItem(_fmt_num(price))
                 chg_item = NumericTableWidgetItem(
-                    f"{_fmt_num(chg_pct)}%" if chg_pct is not None else "-"
+                    f"{_fmt_num(chg_pct)}%" if chg_pct is not None else NULL_GLYPH
                 )
                 vol_item = NumericTableWidgetItem(_fmt_volume(volume))
                 for item in (last_item, chg_item, vol_item):

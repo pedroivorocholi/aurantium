@@ -18,12 +18,15 @@ class NewsPanel(NewsPanelBase):
         self._build_news_ui()
 
     def on_symbol(self, symbol: str) -> None:
-        self.set_status("loading…")
+        self.set_loading(True)
         self.set_news_empty_text(f"No recent headlines for {symbol}")
         self.unsubscribe_all()
         self.subscribe(f"news:{symbol}", self._on_news)
 
     def _on_news(self, data: Any) -> None:
+        # The fetch resolved — lower the veil before deciding whether
+        # there is anything to show.
+        self.set_loading(False)
         count = self._render_news(data)
         suffix = f"{count} headlines" if count else "no news"
         self.set_status(suffix)

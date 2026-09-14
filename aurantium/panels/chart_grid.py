@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..components.fmt import num as _fmt_num
 from ..components import (
     FX_ENTRIES,
     INDEX_ENTRIES,
@@ -29,7 +30,7 @@ from ..components import (
     open_add_picker,
     open_list_editor,
 )
-from ..panel import Panel, register_panel
+from ..panel import NULL_GLYPH, Panel, register_panel
 from ..undo import UndoStack
 from ..theme import ACCENT, BG, BORDER_STRONG, DOWN, FG_DIM, UP
 
@@ -42,15 +43,6 @@ COLUMNS = 3
 HISTORY_PERIOD = "6mo"
 HISTORY_INTERVAL = "1d"
 MA_MUTED = "#c9a24a"  # muted gold moving-average line on the mini charts
-
-
-def _fmt_num(value: Any, decimals: int = 2) -> str:
-    if value is None:
-        return "-"
-    try:
-        return f"{float(value):,.{decimals}f}"
-    except (TypeError, ValueError):
-        return "-"
 
 
 def _sma(values: list, window: int) -> Optional[list]:
@@ -90,7 +82,7 @@ class _ChartCell(QWidget):
         layout.setSpacing(3)
 
         self.title_lbl = QLabel(symbol, self)
-        self.title_lbl.setStyleSheet(f"font-weight: bold; color: {ACCENT};")
+        self.title_lbl.setObjectName("statValue")
         layout.addWidget(self.title_lbl)
 
         self.plot_widget = pg.PlotWidget(self)
@@ -144,14 +136,14 @@ class _ChartCell(QWidget):
         change_pct = data.get("change_pct")
         last = _fmt_num(price)
         if change_pct is None:
-            chg_txt = "-"
+            chg_txt = NULL_GLYPH
             color = FG_DIM
         else:
             sign = "+" if change_pct >= 0 else ""
             chg_txt = f"{sign}{change_pct:.2f}%"
             color = UP if change_pct >= 0 else DOWN
         self.title_lbl.setText(f"{self.symbol}  {last}  {chg_txt}")
-        self.title_lbl.setStyleSheet(f"font-weight: bold; color: {color};")
+        self.title_lbl.setStyleSheet(f"font-weight: 700; color: {color};")
 
 
 @register_panel(id="chart_grid", title="Chart Grid", category="Markets")

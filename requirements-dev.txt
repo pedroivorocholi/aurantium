@@ -2,5 +2,6 @@
 -r requirements.txt
 pyinstaller>=6.0
 pillow>=10.0  # only used to (re)generate aurantium.icns for the macOS build
+pytest>=8.0  # the test suite, incl. the palette guard the release workflow gates on
 # cryptography is in requirements.txt (needed at runtime by updater_mac.py);
 # tools/sign_update.py and tools/gen_keys.py reuse that same install.

@@ -13,9 +13,10 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ..components.fmt import num as _fmt_price
 from ..components import MarketTable, make_filter_edit
-from ..panel import Panel, register_panel
-from ..theme import DOWN, FG_DIM, UP
+from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, Panel, register_panel
+from ..theme import DOWN, FG_DIM, FONT_TITLE, UP
 
 UPGRADE_HEADERS = ["Date", "Firm", "Action", "From", "To"]
 
@@ -32,15 +33,6 @@ def _rec_color(key: str) -> str:
     return FG_DIM
 
 
-def _fmt_price(v: Any) -> str:
-    if v is None:
-        return "-"
-    try:
-        return f"{float(v):,.2f}"
-    except (TypeError, ValueError):
-        return "-"
-
-
 @register_panel(id="analyst", title="Analyst Recs", category="Research")
 class AnalystPanel(Panel):
     def build(self) -> None:
@@ -49,7 +41,7 @@ class AnalystPanel(Panel):
 
         rec_row = QHBoxLayout()
         self.rec_lbl = QLabel("—", self)
-        self.rec_lbl.setStyleSheet("font-weight: bold; font-size: 14px;")
+        self.rec_lbl.setStyleSheet(f"font-weight: 700; font-size: {FONT_TITLE}px;")
         self.mean_lbl = QLabel("", self)
         self.count_lbl = QLabel("", self)
         rec_row.addWidget(self.rec_lbl)
@@ -63,7 +55,7 @@ class AnalystPanel(Panel):
         self.target_mean_lbl = QLabel("Mean: -", self)
         self.target_high_lbl = QLabel("High: -", self)
         for lbl in (self.target_low_lbl, self.target_mean_lbl, self.target_high_lbl):
-            lbl.setStyleSheet(f"color: {FG_DIM};")
+            lbl.setObjectName("secondary")
         target_row.addWidget(self.target_low_lbl)
         target_row.addWidget(self.target_mean_lbl)
         target_row.addWidget(self.target_high_lbl)
@@ -74,12 +66,13 @@ class AnalystPanel(Panel):
 
         # -- upgrades table -------------------------------------------------
         self.table = MarketTable(0, len(UPGRADE_HEADERS), self)
+        self.register_state_target(self.table)
         self.table.setHorizontalHeaderLabels(UPGRADE_HEADERS)
         # Narrow panels give up columns instead of squeezing every one
         self.table.set_column_priority(keep=[0, 2], droppable=[3, 4, 1])
         self.table.set_empty_text(
-            "No symbol selected",
-            "Click a ticker in any linked panel, or type one in the SYMBOL bar",
+            EMPTY_NO_SYMBOL,
+            EMPTY_NO_SYMBOL_HINT,
         )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.enable_sorting()
@@ -90,12 +83,34 @@ class AnalystPanel(Panel):
         self.content_layout.addWidget(self.table, 1)
 
     def on_symbol(self, symbol: str) -> None:
-        self.set_status("loading…")
+        self.set_loading(True)
+        self._clear()
         self.table.set_empty_text(f"No analyst actions for {symbol}", "")
         self.unsubscribe_all()
         self.subscribe(f"analyst:{symbol}", self._on_analyst)
 
+    def _clear(self) -> None:
+        """Drop the previous symbol's figures before the next fetch lands.
+
+        Without this the summary strip kept the *old* company's recommendation
+        and price targets under the *new* company's ticker for as long as the
+        request took. Stale-but-labelled-wrong is the one presentation a market
+        panel must never offer: an empty field says "not yet", a wrong field
+        says nothing at all.
+        """
+        self.rec_lbl.setText(NULL_GLYPH)
+        self.rec_lbl.setStyleSheet(f"font-weight: 700; font-size: {FONT_TITLE}px;")
+        self.mean_lbl.setText("")
+        self.count_lbl.setText("")
+        self.target_low_lbl.setText(f"Low: {NULL_GLYPH}")
+        self.target_mean_lbl.setText(f"Mean: {NULL_GLYPH}")
+        self.target_high_lbl.setText(f"High: {NULL_GLYPH}")
+        self.table.setRowCount(0)
+
     def _on_analyst(self, data: Any) -> None:
+        # The fetch resolved — clear the veil before deciding whether
+        # there is anything to show.
+        self.set_loading(False)
         if not isinstance(data, dict):
             return
 
@@ -104,7 +119,7 @@ class AnalystPanel(Panel):
         count = data.get("analyst_count")
 
         self.rec_lbl.setText((rec_key or "—").replace("_", " ").upper())
-        self.rec_lbl.setStyleSheet(f"font-weight: bold; font-size: 14px; color: {_rec_color(rec_key)};")
+        self.rec_lbl.setStyleSheet(f"font-weight: 700; font-size: {FONT_TITLE}px; color: {_rec_color(rec_key)};")
         self.mean_lbl.setText(f"avg {rec_mean:.2f}" if isinstance(rec_mean, (int, float)) else "")
         self.count_lbl.setText(f"({count} analysts)" if count is not None else "")
 
@@ -121,11 +136,11 @@ class AnalystPanel(Panel):
                 row = self.table.rowCount()
                 self.table.insertRow(row)
                 values = [
-                    entry.get("date") or "-",
-                    entry.get("firm") or "-",
-                    entry.get("action") or "-",
-                    entry.get("from_grade") or "-",
-                    entry.get("to_grade") or "-",
+                    entry.get("date") or NULL_GLYPH,
+                    entry.get("firm") or NULL_GLYPH,
+                    entry.get("action") or NULL_GLYPH,
+                    entry.get("from_grade") or NULL_GLYPH,
+                    entry.get("to_grade") or NULL_GLYPH,
                 ]
                 for col, value in enumerate(values):
                     item = QTableWidgetItem(str(value))

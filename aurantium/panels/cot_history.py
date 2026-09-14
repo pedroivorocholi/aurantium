@@ -100,7 +100,7 @@ class CotHistoryPanel(Panel):
             self,
         )
         caption.setWordWrap(True)
-        caption.setStyleSheet(f"color: {FG_DIM};")
+        caption.setObjectName("secondary")
         self.content_layout.addWidget(caption)
 
         self._set_market(self._meta)
@@ -135,12 +135,15 @@ class CotHistoryPanel(Panel):
         self._times, self._nets, self._dates = [], [], []
         self.latest_lbl.setText("")
         self.plot_widget.setTitle(meta.label, color=FG_DIM, size="9pt")
-        self.set_status("loading…")
+        self.set_loading(True)
         self.subscribe(f"cftc:{meta.cftc_market}", self._on_cftc)
 
     # -- data ------------------------------------------------------------------
 
     def _on_cftc(self, data: Any) -> None:
+        # The fetch resolved — lower the veil before deciding whether
+        # there is anything to show.
+        self.set_loading(False)
         if not isinstance(data, dict) or data.get("market") != self._meta.cftc_market:
             return
         history = data.get("history") or []
@@ -175,7 +178,7 @@ class CotHistoryPanel(Panel):
                 f"Latest: {net:+,.0f} contracts ({direction}) · report dated {report_date}"
             )
             self.latest_lbl.setStyleSheet(
-                f"color: {tick_color(net)}; font-weight: bold;"
+                f"color: {tick_color(net)}; font-weight: 700;"
             )
         self.set_status(f"{len(nets)} weekly reports")
 

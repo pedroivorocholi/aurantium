@@ -16,7 +16,7 @@ from datetime import date, datetime
 from typing import Any, Optional
 
 import pyqtgraph as pg
-from PySide6.QtCore import QDate, Qt
+from PySide6.QtCore import QDate, QSize, Qt
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -36,19 +36,22 @@ from PySide6.QtWidgets import (
 )
 
 from ..components import attach_suggestions
-from ..panel import Panel, register_panel
-from ..theme import ACCENT, BG_HEADER, FG, FG_DIM, apply_tick
+from ..panel import NULL_GLYPH, Panel, register_panel
+from ..theme import (
+    ACCENT,
+    ACCENT_DEEP,
+    FONT_TITLE,
+    BG_HEADER,
+    FG,
+    FG_DIM,
+    FG_MUTED,
+    apply_tick,
+)
 from ..undo import UndoStack
 
 (COL_SYMBOL, COL_QTY, COL_COST, COL_DATE, COL_LAST, COL_MKTVAL, COL_PNL,
  COL_PNLPCT) = range(8)
 HEADERS = ["Symbol", "Qty", "Cost", "Date", "Last", "Mkt Value", "P&L", "P&L%"]
-
-# distinct slice colors for the allocation pie (cycled)
-PIE_COLORS = [
-    "#4a90d9", "#e91e63", "#f8e71c", "#7ed321", "#9c27b0",
-    "#00bcd4", "#ff7043", "#8bc34a", "#ffca28", "#26a69a",
-]
 
 _BENCH = "SPY"          # performance benchmark
 _HIST_TOPIC = "1y:1d"   # history window used by the analytics tabs
@@ -56,11 +59,11 @@ _HIST_TOPIC = "1y:1d"   # history window used by the analytics tabs
 
 def _fmt(value: Any, decimals: int = 2) -> str:
     if value is None:
-        return "-"
+        return NULL_GLYPH
     try:
         return f"{float(value):,.{decimals}f}"
     except (TypeError, ValueError):
-        return "-"
+        return NULL_GLYPH
 
 
 # -- pure analytics helpers (unit-tested) -----------------------------------
@@ -175,38 +178,129 @@ def _normalize_to_100(values: list) -> list:
 
 # -- allocation pie widget --------------------------------------------------
 
-class _PieChart(QWidget):
-    """A minimal painted pie of (label, value, color) slices."""
+class _AllocationBars(QWidget):
+    """Sector allocation as a ranked horizontal bar list.
+
+    This replaced a hand-painted pie of up to eleven slices, and the reason is
+    not taste. A pie needs one distinguishable colour per slice, and eleven do
+    not exist here: five hues are already reserved for price and direction, and
+    the shared series palette tops out at four. The list it used was invented
+    rather than derived, and it showed — ``#8bc34a`` and ``#7ed321`` sat ΔE 5.8
+    apart under *normal* vision (indistinguishable), ``#ffca28`` and ``#7ed321``
+    ΔE 2.1 under protanopia, and ``#f8e71c`` measured 1.28:1 on the light
+    theme's white. Slices were also assigned by rank, so adding one position
+    reordered the sectors and repainted every one of them; a reader who had
+    learned "energy is the yellow one" was simply wrong after the next trade.
+
+    A ranked bar needs **no categorical colour at all**: position encodes rank,
+    length encodes magnitude, and each row carries its own name. That removes
+    the constraint instead of trying to satisfy it, which is why the whole
+    problem disappears rather than moving somewhere else.
+    """
+
+    ROW_H = 18
+    ROW_GAP = 4
+    PAD = 4
+    #: Rows past this fold into a single "Other" row. Part-to-whole stops being
+    #: readable at a glance well before eleven bars.
+    MAX_ROWS = 6
+
+    #: The label of the folded remainder. Kept last by convention even when it
+    #: outweighs rows above it — it is a residual, not a sector — and drawn in a
+    #: neutral so the broken descent reads as "this is a bucket" rather than as
+    #: a sorting bug.
+    OTHER = "Other"
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self._slices: list[tuple[str, float, str]] = []
-        self.setMinimumHeight(180)
+        self._rows: list[tuple[str, float]] = []
+        self.setMinimumHeight(self.ROW_H * 3)
 
-    def set_slices(self, slices: list) -> None:
-        self._slices = list(slices)
+    def set_rows(self, rows: list[tuple[str, float]]) -> None:
+        """``rows`` is (label, value), any order; sorted and folded here."""
+        ordered = sorted(rows, key=lambda kv: kv[1], reverse=True)
+        if len(ordered) > self.MAX_ROWS:
+            head = ordered[: self.MAX_ROWS - 1]
+            tail = sum(v for _l, v in ordered[self.MAX_ROWS - 1:])
+            ordered = head + [(self.OTHER, tail)]
+        self._rows = ordered
+        self.updateGeometry()
         self.update()
 
+    def sizeHint(self):  # noqa: N802 (Qt override)
+        n = max(len(self._rows), 3)
+        return QSize(240, n * (self.ROW_H + self.ROW_GAP) + self.PAD * 2)
+
+    minimumSizeHint = sizeHint
+
     def paintEvent(self, event) -> None:  # noqa: N802 (Qt override)
-        total = sum(v for _lbl, v, _c in self._slices)
+        """Name gutter, then bar, then value — no text on the fill.
+
+        The first version of this drew the sector name *inside* the bar, which
+        put ``FG`` on ``ACCENT`` at **1.24:1** on the dark theme: the exact
+        failure being fixed everywhere else in this pass, reintroduced by the
+        fix. Text on a mark inherits the mark's contrast, and a mark coloured
+        for emphasis is the worst possible surface for it. Both label and value
+        now sit on the panel background, where they measure 13.8:1 and the bar
+        is free to be as saturated as it likes.
+        """
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        side = min(self.width(), self.height()) - 8
-        if total <= 0 or side <= 0:
+        if not self._rows:
             p.setPen(QColor(FG_DIM))
-            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No priced positions")
+            p.drawText(
+                self.rect(), Qt.AlignmentFlag.AlignCenter, "No priced positions"
+            )
             p.end()
             return
-        rect = self.rect()
-        x = rect.left() + 4
-        y = rect.top() + (rect.height() - side) // 2
-        start = 90 * 16  # start at 12 o'clock
-        for _lbl, val, color in self._slices:
-            span = int(-val / total * 360 * 16)
-            p.setBrush(QColor(color))
-            p.setPen(QColor(BG_HEADER))
-            p.drawPie(x, y, side, side, start, span)
-            start += span
+
+        total = sum(v for _l, v in self._rows) or 1.0
+        biggest = max(v for _l, v in self._rows) or 1.0
+
+        metrics = p.fontMetrics()
+        # Gutter fits the longest name, but never eats the plot: past 45% the
+        # bars stop being comparable, which is the only thing they are for.
+        names_w = max(metrics.horizontalAdvance(l) for l, _v in self._rows)
+        value_w = metrics.horizontalAdvance("100.0%")
+        avail = self.width() - self.PAD * 2
+        gutter = min(names_w + 10, int(avail * 0.45))
+        track = max(10, avail - gutter - value_w - 10)
+
+        y = self.PAD
+        font = p.font()
+        for i, (label, value) in enumerate(self._rows):
+            pct = value / total * 100.0
+            bar_w = max(2, round(track * (value / biggest)))
+
+            font.setBold(i == 0)
+            p.setFont(font)
+
+            p.setPen(QColor(FG_DIM if label == self.OTHER else FG))
+            p.drawText(
+                self.PAD, y, gutter - 6, self.ROW_H,
+                Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+                metrics.elidedText(label, Qt.TextElideMode.ElideRight, gutter - 6),
+            )
+
+            # The largest holding is the concentration-risk number and takes the
+            # accent; the rest share one recessive shade. One hue, two weights —
+            # emphasis, not identity, so no categorical palette is needed.
+            residual = label == self.OTHER
+            p.setBrush(
+                QColor(FG_MUTED if residual else (ACCENT if i == 0 else ACCENT_DEEP))
+            )
+            p.setPen(Qt.PenStyle.NoPen)
+            p.drawRoundedRect(
+                self.PAD + gutter, y + 3, bar_w, self.ROW_H - 6, 2, 2
+            )
+
+            p.setPen(QColor(FG if i == 0 else FG_DIM))
+            p.drawText(
+                self.PAD + gutter + track + 4, y, value_w + 6, self.ROW_H,
+                Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight,
+                f"{pct:.1f}%",
+            )
+            y += self.ROW_H + self.ROW_GAP
         p.end()
 
 
@@ -300,16 +394,14 @@ class PortfolioPanel(Panel):
         return w
 
     def _build_allocation_tab(self) -> QWidget:
+        """The bars label their own rows, so the colour legend that used to sit
+        beside the pie has nothing left to explain and is gone."""
         w = QWidget(self)
-        lay = QHBoxLayout(w)
-        self._pie = _PieChart(w)
-        lay.addWidget(self._pie, 1)
-        self._alloc_legend = QLabel("Open to compute sector allocation.", w)
-        self._alloc_legend.setAlignment(
-            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft
-        )
-        self._alloc_legend.setTextFormat(Qt.TextFormat.RichText)
-        lay.addWidget(self._alloc_legend, 1)
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(0, 0, 0, 0)
+        self._alloc_bars = _AllocationBars(w)
+        lay.addWidget(self._alloc_bars)
+        lay.addStretch(1)
         return w
 
     def _build_performance_tab(self) -> QWidget:
@@ -330,7 +422,7 @@ class PortfolioPanel(Panel):
         )
         lay.addWidget(self._perf_plot, 1)
         self._perf_note = QLabel("Rebased to 100 at the window start.", w)
-        self._perf_note.setStyleSheet(f"color: {FG_DIM};")
+        self._perf_note.setObjectName("secondary")
         lay.addWidget(self._perf_note)
         return w
 
@@ -346,9 +438,9 @@ class PortfolioPanel(Panel):
         ]
         for i, (key, title) in enumerate(rows):
             k = QLabel(title, w)
-            k.setStyleSheet(f"color: {FG_DIM};")
+            k.setObjectName("secondary")
             v = QLabel("—", w)
-            v.setStyleSheet(f"color: {FG}; font-weight: bold; font-size: 14px;")
+            v.setStyleSheet(f"color: {FG}; font-weight: 700; font-size: {FONT_TITLE}px;")
             grid.addWidget(k, i, 0)
             grid.addWidget(v, i, 1)
             self._risk_labels[key] = v
@@ -432,7 +524,7 @@ class PortfolioPanel(Panel):
         self.table.setItem(row, COL_QTY, qty_item)
         self.table.setItem(row, COL_COST, cost_item)
 
-        date_text = pos.get("date") or "-"
+        date_text = pos.get("date") or NULL_GLYPH
         if sold:
             date_text = f"{date_text} → {pos.get('sell_date')}"
         date_item = QTableWidgetItem(date_text)
@@ -442,7 +534,7 @@ class PortfolioPanel(Panel):
         self.table.setItem(row, COL_DATE, date_item)
 
         for col in (COL_LAST, COL_MKTVAL, COL_PNL, COL_PNLPCT):
-            item = QTableWidgetItem("-")
+            item = QTableWidgetItem(NULL_GLYPH)
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self.table.setItem(row, col, item)
@@ -459,7 +551,7 @@ class PortfolioPanel(Panel):
         label_item.setBackground(QColor(BG_HEADER))
         self.table.setItem(row, COL_SYMBOL, label_item)
         for col in (COL_QTY, COL_COST, COL_LAST, COL_MKTVAL, COL_PNL, COL_PNLPCT):
-            item = QTableWidgetItem("-")
+            item = QTableWidgetItem(NULL_GLYPH)
             item.setFlags(Qt.ItemFlag.ItemIsEnabled)
             item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             bold_font = item.font()
@@ -538,7 +630,7 @@ class PortfolioPanel(Panel):
         last_item.setText(_fmt(last))
         mktval_item.setText(_fmt(mkt_val))
         pnl_item.setText(_fmt(pnl))
-        pnlpct_item.setText(f"{_fmt(pnl_pct)}%" if pnl_pct is not None else "-")
+        pnlpct_item.setText(f"{_fmt(pnl_pct)}%" if pnl_pct is not None else NULL_GLYPH)
         if pnl is not None:
             apply_tick(pnl_item, pnl, glyph=False)
             apply_tick(pnlpct_item, pnl)
@@ -567,14 +659,14 @@ class PortfolioPanel(Panel):
         if not (mktval_item and pnl_item and pnlpct_item):
             return
         if not any_data:
-            mktval_item.setText("-")
-            pnl_item.setText("-")
-            pnlpct_item.setText("-")
+            mktval_item.setText(NULL_GLYPH)
+            pnl_item.setText(NULL_GLYPH)
+            pnlpct_item.setText(NULL_GLYPH)
             return
         mktval_item.setText(_fmt(total_mkt))
         pnl_item.setText(_fmt(total_pnl))
         pnl_pct = (total_pnl / total_cost * 100.0) if total_cost else None
-        pnlpct_item.setText(f"{_fmt(pnl_pct)}%" if pnl_pct is not None else "-")
+        pnlpct_item.setText(f"{_fmt(pnl_pct)}%" if pnl_pct is not None else NULL_GLYPH)
         apply_tick(pnl_item, total_pnl, glyph=False)
         apply_tick(pnlpct_item, total_pnl)
 
@@ -602,28 +694,9 @@ class PortfolioPanel(Panel):
 
     def _render_allocation(self) -> None:
         weights = sector_weights(self._current_positions(), self._last_price, self._sectors)
-        if not weights:
-            self._pie.set_slices([])
-            self._alloc_legend.setText(
-                "<i>Waiting for prices / sector data…</i>"
-            )
-            return
-        total = sum(weights.values())
-        ordered = sorted(weights.items(), key=lambda kv: kv[1], reverse=True)
-        slices = []
-        rows = []
-        for i, (sec, val) in enumerate(ordered):
-            color = PIE_COLORS[i % len(PIE_COLORS)]
-            slices.append((sec, val, color))
-            pct = val / total * 100.0 if total else 0.0
-            rows.append(
-                f'<tr><td>■</td><td style="color:{color}">&nbsp;{sec}</td>'
-                f'<td align="right">&nbsp;{pct:.1f}%</td></tr>'
-            )
-        self._pie.set_slices(slices)
-        self._alloc_legend.setText(
-            "<table>" + "".join(rows) + "</table>"
-        )
+        # Sorting and the "Other" fold both live in the widget, so every caller
+        # gets the same treatment.
+        self._alloc_bars.set_rows(list(weights.items()))
 
     def _render_performance(self) -> None:
         ts, values = portfolio_series(self._perf_positions(), self._histories)

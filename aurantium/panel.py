@@ -219,6 +219,42 @@ def size_class_for(width: int) -> str:
 
 
 # --------------------------------------------------------------------------
+# Shared display vocabulary
+# --------------------------------------------------------------------------
+
+#: The one glyph for "no value here".
+#:
+#: An em dash, not the ASCII hyphen the panels grew into using in ~77 places.
+#: In a right-aligned monospaced numeric column — which is most of this app — a
+#: hyphen sits exactly where a minus sign would, at the same width, in the same
+#: ink. "-" and "-1.2%" begin identically, and a reader scanning a column of
+#: losses has to stop and check whether a row is negative or absent. The em dash
+#: cannot be mistaken for an operator, which is the whole reason typographers
+#: use it for elision.
+#:
+#: Panels are migrated onto this incrementally; ``"-"`` survives in files not
+#: yet converted.
+NULL_GLYPH = "—"
+
+#: The one spelling of "fetching".
+#:
+#: There were six — ``"loading…"``, ``"Loading…"``, ``f"loading {kind}…"``,
+#: ``"Waiting for contract prices…"``, an HTML-italic variant, and
+#: ``"Loading preview…"``. ``day_brief`` managed two of them on adjacent lines.
+LOADING = "loading…"
+
+#: Prefix for an error in the state slot. Four panels hand-rolled this glyph.
+WARN_GLYPH = "⚠"
+
+#: Empty-state titles that more than one panel needs. Panel-specific ones stay
+#: in their panel — the point is one phrasing per *condition*, not a registry of
+#: every string. "No symbol selected" and "No symbol linked" were both in use
+#: for the identical condition, in six and two places respectively.
+EMPTY_NO_SYMBOL = "No symbol selected"
+EMPTY_NO_SYMBOL_HINT = "Click a ticker in any linked panel"
+
+
+# --------------------------------------------------------------------------
 # Panel header strip
 # --------------------------------------------------------------------------
 
@@ -386,6 +422,19 @@ class Panel(QWidget):
         self._symbol_lbl.setObjectName("panelSymbol")
         self._status_lbl = QLabel("", header)
         self._status_lbl.setObjectName("panelStatus")
+        # A second, separate slot for *state* (loading / stale / error).
+        #
+        # These used to share the status label, and sharing one un-prioritised
+        # slot between four writers means a later write silently destroys an
+        # earlier one. ``profile`` demonstrated it exactly: every successful
+        # load ended with ``set_status(sector or "")``, which blanked any error
+        # posted a moment before. Two slots with disjoint writers make that
+        # structurally impossible, and leave ``set_status`` — and its ~70 call
+        # sites — untouched.
+        self._state_lbl = QLabel("", header)
+        self._state_lbl.setObjectName("panelState")
+        self._state_lbl.setVisible(False)
+        self._state_targets: list = []
         self._badge = QToolButton(header)
         self._badge.setObjectName("groupBadge")
         self._badge.setToolTip(
@@ -400,6 +449,7 @@ class Panel(QWidget):
         self._badge.setMenu(menu)
         hl.addWidget(self._symbol_lbl)
         hl.addWidget(self._status_lbl)
+        hl.addWidget(self._state_lbl)
         hl.addStretch(1)
         hl.addWidget(self._badge)
         outer.addWidget(header)
@@ -516,7 +566,92 @@ class Panel(QWidget):
         self._apply_symbol(symbol.strip().upper())
 
     def set_status(self, text: str) -> None:
+        """The *info* slot: counts, "as of 16:02", undo receipts.
+
+        Panel-owned and freely overwritten. Deliberately unchanged — every
+        existing caller keeps working, and nothing it writes can clobber a
+        loading or error state, because those live in their own label now.
+        """
         self._status_lbl.setText(text)
+
+    # -- panel state -----------------------------------------------------------
+    #
+    # ``Panel`` previously offered ``set_status`` and nothing else, so every
+    # panel invented its own vocabulary: six spellings of "loading", seventeen
+    # ways to say a table was empty, and nine panels that said nothing at all.
+    # These five methods are the shared vocabulary; ``LOADING`` and friends
+    # above are the shared strings.
+
+    def register_state_target(self, widget) -> None:
+        """Opt a widget into this panel's loading / empty state.
+
+        Called once in ``build()``. Opt-in rather than ``findChildren`` magic:
+        a panel with two tables should choose which one speaks for it, and a
+        panel that registers nothing still gets header-level state instead of
+        breaking.
+        """
+        if widget is not None and widget not in self._state_targets:
+            self._state_targets.append(widget)
+
+    def _set_state(self, text: str, severity: str = "") -> None:
+        self._state_lbl.setText(text)
+        self._state_lbl.setVisible(bool(text))
+        self._state_lbl.setProperty("severity", severity or None)
+        # A dynamic property does not re-run the stylesheet on its own.
+        style = self._state_lbl.style()
+        if style is not None:
+            style.unpolish(self._state_lbl)
+            style.polish(self._state_lbl)
+
+    def set_loading(self, on: bool = True) -> None:
+        """Mark the panel as fetching.
+
+        Forwards to any registered target that can show a veil —
+        ``MarketTable`` has had a built, motion-budgeted loading overlay since
+        it was written and not one panel ever called it.
+        """
+        self._set_state(LOADING if on else "", "loading" if on else "")
+        for target in self._state_targets:
+            setter = getattr(target, "set_loading", None)
+            if callable(setter):
+                setter(on)
+
+    def set_empty(self, title: str, hint: str = "") -> None:
+        """Say what is missing, and what to do about it."""
+        for target in self._state_targets:
+            setter = getattr(target, "set_empty_text", None)
+            if callable(setter):
+                setter(title, hint)
+
+    def set_stale(self, label: str = "") -> None:
+        """Mark the shown data as older than it should be.
+
+        ``datahub`` serves stale and disk-cached values deliberately
+        ("stale-is-better-than-blank"), and until now said so nowhere: a price
+        cached last Tuesday looked exactly like a live tick.
+        """
+        self._set_state(label, "stale" if label else "")
+
+    def set_error(self, message: str) -> None:
+        """Report a failure, and stop showing the fetch as in flight.
+
+        Clearing the veil here is not cosmetic: an error is how a fetch most
+        often ends, and a panel that failed while still dimmed under "loading…"
+        tells the user to keep waiting for something that is never coming.
+        """
+        for target in self._state_targets:
+            setter = getattr(target, "set_loading", None)
+            if callable(setter):
+                setter(False)
+        self._set_state(f"{WARN_GLYPH} {message}", "error")
+
+    def clear_state(self) -> None:
+        """Back to nothing to report. Does not touch the info slot."""
+        self._set_state("")
+        for target in self._state_targets:
+            setter = getattr(target, "set_loading", None)
+            if callable(setter):
+                setter(False)
 
     @property
     def current_symbol(self) -> str:
@@ -557,7 +692,12 @@ class Panel(QWidget):
             traceback.print_exc()
 
     def _show_error(self, error: str) -> None:
-        self.set_status(f"⚠ {error}")
+        """Default ``on_error`` for every subscription (see :meth:`subscribe`).
+
+        Writes to the state slot, not the status slot, so a panel reporting a
+        successful row count a moment later cannot erase it.
+        """
+        self.set_error(error)
 
     def _update_badge(self) -> None:
         """Paint the link-group badge.
