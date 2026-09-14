@@ -21,13 +21,14 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from ..components.fmt import num as _fmt_num
 from ..components import (
     MarketTable,
     NumericTableWidgetItem,
     attach_suggestions,
     make_filter_edit,
 )
-from ..panel import Panel, register_panel
+from ..panel import NULL_GLYPH, Panel, register_panel
 from ..undo import UndoStack
 from ..theme import ACCENT, apply_tick
 
@@ -40,22 +41,13 @@ COL_SYMBOL, COL_LAST, COL_CHG, COL_CHGPCT, COL_VOLUME = range(5)
 HEADERS = ["Symbol", "Last", "Chg", "Chg%", "Volume"]
 
 
-def _fmt_num(value: Any, decimals: int = 2) -> str:
-    if value is None:
-        return "-"
-    try:
-        return f"{float(value):,.{decimals}f}"
-    except (TypeError, ValueError):
-        return "-"
-
-
 def _fmt_volume(value: Any) -> str:
     if value is None:
-        return "-"
+        return NULL_GLYPH
     try:
         v = float(value)
     except (TypeError, ValueError):
-        return "-"
+        return NULL_GLYPH
     for suffix, div in (("B", 1e9), ("M", 1e6), ("K", 1e3)):
         if abs(v) >= div:
             return f"{v / div:.1f}{suffix}"
@@ -155,7 +147,7 @@ class WatchlistPanel(Panel):
             ("pct", COL_CHGPCT),
             ("vol", COL_VOLUME),
         ):
-            item = NumericTableWidgetItem("-")
+            item = NumericTableWidgetItem(NULL_GLYPH)
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self.table.setItem(row, col, item)
@@ -188,7 +180,7 @@ class WatchlistPanel(Panel):
         with self.table.bulk_update():
             cells["last"].setText(_fmt_num(price))
             cells["chg"].setText(_fmt_num(change))
-            cells["pct"].setText(f"{_fmt_num(change_pct)}%" if change_pct is not None else "-")
+            cells["pct"].setText(f"{_fmt_num(change_pct)}%" if change_pct is not None else NULL_GLYPH)
             cells["vol"].setText(_fmt_volume(volume))
             if change is not None:
                 apply_tick(cells["chg"], change, glyph=False)

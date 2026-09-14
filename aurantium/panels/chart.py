@@ -40,7 +40,7 @@ from PySide6.QtWidgets import (
 
 from ..components.empty_state import EmptyState
 from ..date_context import DateContext
-from ..panel import COMPACT, Panel, register_panel
+from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, COMPACT, Panel, register_panel
 from ..color import contrast
 from ..symbol_context import DEFAULT_GROUP, UNLINKED
 from ..undo import UndoStack
@@ -340,7 +340,7 @@ def _fmt_compact_num(value: Any) -> str:
     try:
         v = float(value)
     except (TypeError, ValueError):
-        return "-"
+        return NULL_GLYPH
     for suffix, div in (("B", 1e9), ("M", 1e6), ("K", 1e3)):
         if abs(v) >= div:
             return f"{v / div:.1f}{suffix}"
@@ -925,7 +925,7 @@ class ChartPanel(Panel):
                 )
             else:
                 self._empty.set_text(
-                    "No symbol selected",
+                    EMPTY_NO_SYMBOL,
                     "Click a ticker in any linked panel, or type one in the SYMBOL bar",
                 )
             self._empty.setGeometry(self.plot_widget.viewport().rect())

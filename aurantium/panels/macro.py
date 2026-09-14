@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from ..components.fmt import num as _fmt_num
 from ..commodities_meta import COMMODITIES, by_cftc_market, by_symbol
 from ..components import (
     FRED_ENTRIES,
@@ -38,7 +39,7 @@ from ..components import (
     open_add_picker,
     open_list_editor,
 )
-from ..panel import Panel, register_panel
+from ..panel import NULL_GLYPH, Panel, register_panel
 from ..undo import UndoStack
 from ..theme import ACCENT, BG, DOWN, FG, FG_DIM, UP, apply_tick
 
@@ -70,15 +71,6 @@ INST_HEADERS = ["Instrument", "Last", "Chg", "Chg%"]
 
 CFTC_COL_MARKET, CFTC_COL_NETSPEC, CFTC_COL_WOW, CFTC_COL_BIAS = range(4)
 CFTC_HEADERS = ["Market", "Net Spec", "W/W Chg", "Bias"]
-
-
-def _fmt_num(value: Any, decimals: int = 2) -> str:
-    if value is None:
-        return "-"
-    try:
-        return f"{float(value):,.{decimals}f}"
-    except (TypeError, ValueError):
-        return "-"
 
 
 #: choices for the positioning Market dropdown: every commodity the app knows
@@ -222,7 +214,7 @@ class MacroPanel(Panel):
             name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.inst_table.setItem(row, INST_COL_NAME, name_item)
             for col in (INST_COL_LAST, INST_COL_CHG, INST_COL_CHGPCT):
-                item = QTableWidgetItem("-")
+                item = QTableWidgetItem(NULL_GLYPH)
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 self.inst_table.setItem(row, col, item)
@@ -237,7 +229,7 @@ class MacroPanel(Panel):
             name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.cftc_table.setItem(row, CFTC_COL_MARKET, name_item)
             for col in (CFTC_COL_NETSPEC, CFTC_COL_WOW, CFTC_COL_BIAS):
-                item = QTableWidgetItem("-")
+                item = QTableWidgetItem(NULL_GLYPH)
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 self.cftc_table.setItem(row, col, item)
@@ -351,7 +343,7 @@ class MacroPanel(Panel):
         last_item.setToolTip("")
         chg_item.setText(_fmt_num(change))
         change_pct = data.get("change_pct")
-        pct_item.setText(f"{_fmt_num(change_pct)}%" if change_pct is not None else "-")
+        pct_item.setText(f"{_fmt_num(change_pct)}%" if change_pct is not None else NULL_GLYPH)
         if change is not None:
             apply_tick(chg_item, change, glyph=False)
             apply_tick(pct_item, change)
@@ -374,7 +366,7 @@ class MacroPanel(Panel):
         change = (last - prev) if (last is not None and prev is not None) else None
         chg_item.setText(_fmt_num(change))
         pct = (change / prev * 100.0) if (change is not None and prev) else None
-        pct_item.setText(f"{_fmt_num(pct)}%" if pct is not None else "-")
+        pct_item.setText(f"{_fmt_num(pct)}%" if pct is not None else NULL_GLYPH)
         if change is not None:
             apply_tick(chg_item, change, glyph=False)
             apply_tick(pct_item, change)
@@ -384,9 +376,9 @@ class MacroPanel(Panel):
         if items is None:
             return
         last_item = items[0]
-        if last_item.text() not in ("-", "no key"):
+        if last_item.text() not in (NULL_GLYPH, "no key"):
             return  # keep last-known data over an error message
-        last_item.setText("no key" if "API_KEY" in error else "-")
+        last_item.setText("no key" if "API_KEY" in error else NULL_GLYPH)
         last_item.setForeground(QColor(FG_DIM))
         last_item.setToolTip(error)
 
@@ -420,10 +412,10 @@ class MacroPanel(Panel):
         if wow is not None:
             apply_tick(wow_item, wow, text=f"{wow:+,.0f}")
         else:
-            wow_item.setText("-")
+            wow_item.setText(NULL_GLYPH)
             wow_item.setForeground(QColor(FG_DIM))
         bias = data.get("bias")
-        bias_text = str(bias) if bias is not None else "-"
+        bias_text = str(bias) if bias is not None else NULL_GLYPH
         bias_item.setText(bias_text)
         low = bias_text.lower()
         if "bull" in low:

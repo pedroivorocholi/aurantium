@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from ..components.fmt import num as _fmt_num
 from ..components import (
     EditorColumn,
     EditorSection,
@@ -25,7 +26,7 @@ from ..components import (
     open_add_picker,
     open_list_editor,
 )
-from ..panel import Panel, register_panel
+from ..panel import NULL_GLYPH, Panel, register_panel
 from ..undo import UndoStack
 from ..theme import ACCENT, BG_HEADER, FG_DIM, apply_tick
 
@@ -65,18 +66,9 @@ ROW_KIND_HEADER = "header"
 ROW_KIND_DATA = "data"
 
 
-def _fmt_num(value: Any, decimals: int = 2) -> str:
-    if value is None:
-        return "-"
-    try:
-        return f"{float(value):,.{decimals}f}"
-    except (TypeError, ValueError):
-        return "-"
-
-
 def _fmt_range(low: Any, high: Any) -> str:
     if low is None and high is None:
-        return "-"
+        return NULL_GLYPH
     return f"{_fmt_num(low)} – {_fmt_num(high)}"
 
 
@@ -170,7 +162,7 @@ class CommoditiesPanel(Panel):
         name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         self.table.setItem(row, COL_NAME, name_item)
         for col in (COL_LAST, COL_CHG, COL_CHGPCT, COL_RANGE):
-            item = QTableWidgetItem("-")
+            item = QTableWidgetItem(NULL_GLYPH)
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self.table.setItem(row, col, item)
@@ -198,7 +190,7 @@ class CommoditiesPanel(Panel):
 
         last_item.setText(_fmt_num(price))
         chg_item.setText(_fmt_num(change))
-        pct_item.setText(f"{_fmt_num(change_pct)}%" if change_pct is not None else "-")
+        pct_item.setText(f"{_fmt_num(change_pct)}%" if change_pct is not None else NULL_GLYPH)
         range_item.setText(_fmt_range(day_low, day_high))
 
         if change is not None:

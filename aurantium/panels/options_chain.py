@@ -24,6 +24,8 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from ..components.fmt import integer as _fmt_int
+from ..components.fmt import num as _fmt_num
 from ..components import MarketTable
 from ..panel import Panel, register_panel
 from ..color import delta_e, mix_oklab
@@ -102,24 +104,6 @@ HEADER_TIPS = {
     "Ask": "Lowest price a seller is currently asking",
     "Strike": "Strike price — the price at which the option can be exercised",
 }
-
-
-def _fmt_num(value: Any, decimals: int = 2) -> str:
-    if value is None:
-        return "-"
-    try:
-        return f"{float(value):,.{decimals}f}"
-    except (TypeError, ValueError):
-        return "-"
-
-
-def _fmt_int(value: Any) -> str:
-    if value is None:
-        return "-"
-    try:
-        return f"{int(value):,}"
-    except (TypeError, ValueError):
-        return "-"
 
 
 def _row_field(row: Any, idx: int) -> Any:

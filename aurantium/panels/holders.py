@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..components import MarketTable, NumericTableWidgetItem, make_filter_edit
-from ..panel import Panel, register_panel
+from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, Panel, register_panel
 from ..theme import ACCENT
 
 HEADERS = ["Holder", "Shares", "% Held", "Value"]
@@ -23,11 +23,11 @@ HEADERS = ["Holder", "Shares", "% Held", "Value"]
 def _fmt_compact(value: Any) -> str:
     """Human-format a large number: T/B/M/K suffixes, plain otherwise."""
     if value is None:
-        return "-"
+        return NULL_GLYPH
     try:
         v = float(value)
     except (TypeError, ValueError):
-        return "-"
+        return NULL_GLYPH
     sign = "-" if v < 0 else ""
     av = abs(v)
     for suffix, div in (("T", 1e12), ("B", 1e9), ("M", 1e6), ("K", 1e3)):
@@ -38,11 +38,11 @@ def _fmt_compact(value: Any) -> str:
 
 def _fmt_pct(value: Any) -> str:
     if value is None:
-        return "-"
+        return NULL_GLYPH
     try:
         return f"{float(value):.2f}%"
     except (TypeError, ValueError):
-        return "-"
+        return NULL_GLYPH
 
 
 @register_panel(id="holders", title="Holders", category="Research")
@@ -65,8 +65,8 @@ class HoldersPanel(Panel):
         # Narrow panels give up columns instead of squeezing every one
         self.table.set_column_priority(keep=[0, 2], droppable=[3, 1])
         self.table.set_empty_text(
-            "No symbol selected",
-            "Click a ticker in any linked panel, or type one in the SYMBOL bar",
+            EMPTY_NO_SYMBOL,
+            EMPTY_NO_SYMBOL_HINT,
         )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.enable_sorting()
@@ -105,7 +105,7 @@ class HoldersPanel(Panel):
                 r = self.table.rowCount()
                 self.table.insertRow(r)
 
-                holder_item = QTableWidgetItem(str(holder) if holder is not None else "-")
+                holder_item = QTableWidgetItem(str(holder) if holder is not None else NULL_GLYPH)
                 holder_item.setFlags(holder_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self.table.setItem(r, 0, holder_item)
 

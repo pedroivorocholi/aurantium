@@ -36,7 +36,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..components import attach_suggestions
-from ..panel import Panel, register_panel
+from ..panel import NULL_GLYPH, Panel, register_panel
 from ..theme import (
     ACCENT,
     ACCENT_DEEP,
@@ -59,11 +59,11 @@ _HIST_TOPIC = "1y:1d"   # history window used by the analytics tabs
 
 def _fmt(value: Any, decimals: int = 2) -> str:
     if value is None:
-        return "-"
+        return NULL_GLYPH
     try:
         return f"{float(value):,.{decimals}f}"
     except (TypeError, ValueError):
-        return "-"
+        return NULL_GLYPH
 
 
 # -- pure analytics helpers (unit-tested) -----------------------------------
@@ -524,7 +524,7 @@ class PortfolioPanel(Panel):
         self.table.setItem(row, COL_QTY, qty_item)
         self.table.setItem(row, COL_COST, cost_item)
 
-        date_text = pos.get("date") or "-"
+        date_text = pos.get("date") or NULL_GLYPH
         if sold:
             date_text = f"{date_text} → {pos.get('sell_date')}"
         date_item = QTableWidgetItem(date_text)
@@ -534,7 +534,7 @@ class PortfolioPanel(Panel):
         self.table.setItem(row, COL_DATE, date_item)
 
         for col in (COL_LAST, COL_MKTVAL, COL_PNL, COL_PNLPCT):
-            item = QTableWidgetItem("-")
+            item = QTableWidgetItem(NULL_GLYPH)
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self.table.setItem(row, col, item)
@@ -551,7 +551,7 @@ class PortfolioPanel(Panel):
         label_item.setBackground(QColor(BG_HEADER))
         self.table.setItem(row, COL_SYMBOL, label_item)
         for col in (COL_QTY, COL_COST, COL_LAST, COL_MKTVAL, COL_PNL, COL_PNLPCT):
-            item = QTableWidgetItem("-")
+            item = QTableWidgetItem(NULL_GLYPH)
             item.setFlags(Qt.ItemFlag.ItemIsEnabled)
             item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             bold_font = item.font()
@@ -630,7 +630,7 @@ class PortfolioPanel(Panel):
         last_item.setText(_fmt(last))
         mktval_item.setText(_fmt(mkt_val))
         pnl_item.setText(_fmt(pnl))
-        pnlpct_item.setText(f"{_fmt(pnl_pct)}%" if pnl_pct is not None else "-")
+        pnlpct_item.setText(f"{_fmt(pnl_pct)}%" if pnl_pct is not None else NULL_GLYPH)
         if pnl is not None:
             apply_tick(pnl_item, pnl, glyph=False)
             apply_tick(pnlpct_item, pnl)
@@ -659,14 +659,14 @@ class PortfolioPanel(Panel):
         if not (mktval_item and pnl_item and pnlpct_item):
             return
         if not any_data:
-            mktval_item.setText("-")
-            pnl_item.setText("-")
-            pnlpct_item.setText("-")
+            mktval_item.setText(NULL_GLYPH)
+            pnl_item.setText(NULL_GLYPH)
+            pnlpct_item.setText(NULL_GLYPH)
             return
         mktval_item.setText(_fmt(total_mkt))
         pnl_item.setText(_fmt(total_pnl))
         pnl_pct = (total_pnl / total_cost * 100.0) if total_cost else None
-        pnlpct_item.setText(f"{_fmt(pnl_pct)}%" if pnl_pct is not None else "-")
+        pnlpct_item.setText(f"{_fmt(pnl_pct)}%" if pnl_pct is not None else NULL_GLYPH)
         apply_tick(pnl_item, total_pnl, glyph=False)
         apply_tick(pnlpct_item, total_pnl)
 

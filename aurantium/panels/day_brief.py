@@ -53,7 +53,7 @@ from ..date_context import (
     parse_iso,
     window_range,
 )
-from ..panel import NULL_GLYPH, Panel, register_panel
+from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, Panel, register_panel
 from ..symbol_context import UNLINKED
 from ..theme import ACCENT, BORDER, FG, FG_DIM, FG_MUTED, MONO_FONT, tick_color
 from ._news_common import (
@@ -153,7 +153,7 @@ class DayBriefPanel(Panel):
         self._build_news()
 
         self._empty = EmptyState.attach(
-            self.news_table, "No symbol linked", "Click a ticker in any panel."
+            self.news_table, EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT
         )
         # a date may already be live on this group when the panel is created
         existing = self._date_ctx.date(self.link_group)
@@ -387,7 +387,7 @@ class DayBriefPanel(Panel):
     def _refresh(self) -> None:
         symbol = self.current_symbol
         if not symbol:
-            self._empty.set_text("No symbol linked", "Click a ticker in any panel.")
+            self._empty.set_text(EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT)
             self._clear_all()
             return
         if not self._anchor:

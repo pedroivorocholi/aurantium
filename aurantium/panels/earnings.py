@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..components import MarketTable, NumericTableWidgetItem, make_filter_edit
-from ..panel import Panel, register_panel
+from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, Panel, register_panel
 from ..theme import ACCENT, FG_DIM, UP, apply_tick
 
 HEADERS = ["Date", "EPS Est", "EPS Actual", "Surprise%"]
@@ -22,20 +22,20 @@ HEADERS = ["Date", "EPS Est", "EPS Actual", "Surprise%"]
 
 def _fmt_eps(value: Any) -> str:
     if value is None:
-        return "-"
+        return NULL_GLYPH
     try:
         return f"{float(value):,.2f}"
     except (TypeError, ValueError):
-        return "-"
+        return NULL_GLYPH
 
 
 def _fmt_pct(value: Any) -> str:
     if value is None:
-        return "-"
+        return NULL_GLYPH
     try:
         v = float(value)
     except (TypeError, ValueError):
-        return "-"
+        return NULL_GLYPH
     sign = "+" if v >= 0 else ""
     return f"{sign}{v:.2f}%"
 
@@ -53,8 +53,8 @@ class EarningsPanel(Panel):
         # Narrow panels give up columns instead of squeezing every one
         self.table.set_column_priority(keep=[0, 2], droppable=[1, 3])
         self.table.set_empty_text(
-            "No symbol selected",
-            "Click a ticker in any linked panel, or type one in the SYMBOL bar",
+            EMPTY_NO_SYMBOL,
+            EMPTY_NO_SYMBOL_HINT,
         )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.enable_sorting()
@@ -92,7 +92,7 @@ class EarningsPanel(Panel):
                 r = self.table.rowCount()
                 self.table.insertRow(r)
 
-                date_item = QTableWidgetItem(str(date) if date is not None else "-")
+                date_item = QTableWidgetItem(str(date) if date is not None else NULL_GLYPH)
                 date_item.setFlags(date_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 date_item.setForeground(QColor(FG_DIM))
                 self.table.setItem(r, 0, date_item)

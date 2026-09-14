@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
 
 from ..components.empty_state import EmptyState
 from ..languages import main_language
-from ..panel import Panel
+from ..panel import EMPTY_NO_SYMBOL, Panel
 from ..symbol_context import GROUPS, SymbolContext
 from ..theme import ACCENT, FG_DIM
 
@@ -268,7 +268,7 @@ class NewsPanelBase(Panel):
         # This is a plain QTableWidget rather than a MarketTable, so it needs
         # the empty state attached by hand — without it a news panel with no
         # symbol yet was an unexplained blank rectangle.
-        self._news_empty_title = "No symbol selected"
+        self._news_empty_title = EMPTY_NO_SYMBOL
         self._news_empty_hint = (
             "Click a ticker in any linked panel, or type one in the SYMBOL bar"
         )

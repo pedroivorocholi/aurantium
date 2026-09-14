@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..components import MarketTable, make_filter_edit
-from ..panel import Panel, register_panel
+from ..panel import NULL_GLYPH, Panel, register_panel
 from ..theme import DOWN, palette_colors
 
 STATEMENTS = [("income", "Income"), ("balance", "Balance"), ("cashflow", "Cash Flow")]
@@ -57,13 +57,13 @@ def _fmt_compact(value: Any) -> str:
     """Human-format a financial-statement value: T/B/M suffixes, plain for
     small magnitudes, negatives keep their sign."""
     if value is None:
-        return "-"
+        return NULL_GLYPH
     try:
         v = float(value)
     except (TypeError, ValueError):
-        return "-"
+        return NULL_GLYPH
     if v != v:  # NaN (pandas turns None into NaN)
-        return "-"
+        return NULL_GLYPH
     sign = "-" if v < 0 else ""
     av = abs(v)
     for suffix, div in (("T", 1e12), ("B", 1e9), ("M", 1e6)):
@@ -174,7 +174,11 @@ class FundamentalsPanel(Panel):
 
     def on_symbol(self, symbol: str) -> None:
         self.set_loading(True)
+        # Blanking the payload was never enough on its own — the table still
+        # held the previous company's statement, rendered, under the new
+        # ticker. Clear what is on screen, not just what is in memory.
         self._data = {}
+        self.table.setRowCount(0)
         self.unsubscribe_all()
         self.subscribe(f"financials:{symbol}", self._on_financials)
         self._update_actions()
@@ -214,7 +218,7 @@ class FundamentalsPanel(Panel):
             values = list(row_data[1:])
             r = self.table.rowCount()
             self.table.insertRow(r)
-            label_item = QTableWidgetItem(str(label) if label is not None else "-")
+            label_item = QTableWidgetItem(str(label) if label is not None else NULL_GLYPH)
             label_item.setFlags(label_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(r, 0, label_item)
             for col in range(len(columns)):
