@@ -70,6 +70,16 @@ hiddenimports += [
 hiddenimports += [
     "aurantium.components",
     "aurantium.components.market_table",
+    "aurantium.components.fmt",
+    # Pure-maths colour module: OKLab, CVD and contrast. Imported normally by
+    # theme.py and several panels, so static analysis should find it — listed
+    # anyway, because everything else in this block is.
+    "aurantium.color",
+    # Keyboard-focus filter. Imported *inside* __main__.main() as
+    # ``from . import focus``, which is the same lazy-import shape that put
+    # onboarding_dialog in this list. Without it a frozen build loses the focus
+    # ring, or fails at startup.
+    "aurantium.focus",
     "aurantium.onboarding_dialog",
     "aurantium.language_dialog",
     "aurantium.languages",
