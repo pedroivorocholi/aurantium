@@ -33,6 +33,27 @@ def panel(qapp):
     SymbolContext._inst = None
 
 
+@pytest.fixture
+def motion_on(monkeypatch):
+    """Pin OS animation policy ON for tests that assert the flash travels.
+
+    ``motion.animations_enabled()`` reads a real accessibility setting —
+    ``SPI_GETCLIENTAREAANIMATION`` on Windows — so whether a flash has any
+    amplitude at all depends on the machine the suite runs on. A headless CI
+    runner reports client-area animations *off*, ``motion.duration()`` returns
+    0, and ``pulse()`` correctly lands on 0.0 with nothing to decay.
+
+    That is right behaviour and wrong test isolation: these tests are about the
+    flash mechanism, not about the OS policy, and the policy has its own tests
+    below. Left unpinned they pass on a developer desktop and fail in CI with
+    ``assert 0.0 > 0.0``, which is exactly what happened the first time the
+    release workflow's test gate ever ran.
+    """
+    from aurantium import motion
+
+    monkeypatch.setattr(motion, "animations_enabled", lambda: True)
+
+
 def test_header_starts_with_no_symbol(panel):
     assert panel._symbol_lbl.text() == ""
 
@@ -42,7 +63,7 @@ def test_header_prints_the_active_symbol(panel):
     assert panel._symbol_lbl.text() == "AAPL"
 
 
-def test_a_symbol_from_the_link_group_flashes_the_header(panel):
+def test_a_symbol_from_the_link_group_flashes_the_header(panel, motion_on):
     from aurantium.symbol_context import SymbolContext
 
     SymbolContext.instance().set_symbol(DEFAULT_GROUP, "MSFT", source=None)
@@ -95,7 +116,7 @@ def test_the_badge_has_no_hardcoded_colors_when_unlinked(panel):
     assert BORDER_STRONG in sheet
 
 
-def test_a_second_flash_survives_the_first_animation_being_collected(panel):
+def test_a_second_flash_survives_the_first_animation_being_collected(panel, motion_on):
     """Same DeleteWhenStopped defect as the notifier: pulsing twice called
     .stop() on an animation Qt had already destroyed, so the second and every
     later propagated symbol raised instead of flashing."""
