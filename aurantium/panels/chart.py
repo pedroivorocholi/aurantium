@@ -53,6 +53,7 @@ from ..theme import (
     FG_DIM,
     FG_MUTED,
     MONO_FONT,
+    RADIUS_SM,
     THEMES,
     UP,
     current_theme,
@@ -1145,7 +1146,7 @@ class ChartPanel(Panel):
         if inst.on:
             inst.chip.setStyleSheet(
                 f"QPushButton {{ background: {BG_ELEV}; color: {inst.color};"
-                f" border: 1px solid {inst.color}; border-radius: 4px;"
+                f" border: 1px solid {inst.color}; border-radius: {RADIUS_SM}px;"
                 " padding: 4px 11px; font-size: 11px; font-weight: 600; }"
             )
         else:

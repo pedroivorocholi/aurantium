@@ -76,10 +76,37 @@ SPACE_MD = 6
 SPACE_LG = 8
 SPACE_XL = 12
 
-# Two radii. There were five (2, 3, 7 in the sheet; 4 and 8 invented inline).
-RADIUS_SM = 2      # controls: buttons, inputs, chips
-RADIUS_MD = 3      # surfaces: menus, tooltips, tiles
-RADIUS_ROUND = 7   # the radio indicator, which is a circle — not a fourth size
+# Radii. There were five (2, 3, 7 in the sheet; 4 and 8 invented inline), which
+# collapsed to two plus a circle. What follows is the same set, re-derived as a
+# *ratio* rather than as two absolute numbers.
+#
+# A corner radius reads as a proportion of the thing it is rounding, not as an
+# absolute size: 2px on a 27px button and 2px on a 12px checkbox are nowhere
+# near the same shape. Measured against the controls this app actually builds —
+# QPushButton 27px, QLineEdit/QComboBox 27px, QToolButton 24px, the chart chip
+# 22px, the check/radio indicator 12px — the old flat 2px was 7-9% on the
+# buttons and 17% on the indicator. So the buttons were the outlier, and the
+# indicator was already sitting where it wanted to be.
+#
+# ~22% is the ratio — inside the 20-25% band small Apple controls sit in, which
+# for a 27px button is 5.4 to 6.8px.
+#
+# This landed at 4px (~15%) first, on the argument that a terminal should stay
+# *under* that band because density is the product. Put on screen at 100% next
+# to the 2px it replaced, 4px was invisible: a two-device-pixel change on each
+# corner that the owner could not see and therefore was not worth making. The
+# band was right and the hedge was wrong. 6px is what the cited rule actually
+# prescribes, and at 8px (~30%) a dense row of chips does start reading as a web
+# app rather than instrument panel — that ceiling was checked on screen too, and
+# is why this is 6 and not more.
+#
+# Two control rungs, not one, is the price of making it proportional. It is
+# still a scale and not the five ad-hoc values it replaced: one ratio, applied
+# at the two control sizes this app has.
+RADIUS_XS = 3      # 12px indicators: the check and menu-tick squares
+RADIUS_SM = 6      # controls: buttons, inputs, chips, tabs
+RADIUS_MD = 7      # surfaces: menus, tooltips, tiles, cards
+RADIUS_ROUND = 8   # the radio indicator, which is a circle — not a fourth size
 
 
 # -- palettes --------------------------------------------------------------
@@ -96,6 +123,8 @@ _DARK = {
     "CHROME_HOVER": "#242c35", # hover / active tab (a subtle lift)
     "BG_HEADER": "#222d39",    # section rows inside panels
     "CHROME_BORDER": "#0c1015",# thin outline between chrome and black
+    "CHROME_LOW": "#141a22",   # the panel header plane: chrome, one step down
+    "CHROME_EDGE": "#2a333e",  # the lit top edge of a raised chrome surface
     "CHROME_TEXT": "#d7dde3",  # light text on chrome
     "CHROME_TEXT_DIM": "#828c97",
     "HEADER_BLUE": "#1a2129",  # table column-header band
@@ -127,6 +156,8 @@ _LIGHT = {
     "CHROME_HOVER": "#dcdfe3", # hover / active tab
     "BG_HEADER": "#dbe1ea",    # section rows inside panels
     "CHROME_BORDER": "#c9ced4",# outline between chrome and surface
+    "CHROME_LOW": "#eef0f3",   # the panel header plane: chrome, one step down
+    "CHROME_EDGE": "#ffffff",  # the lit top edge of a raised chrome surface
     "CHROME_TEXT": "#1b2028",  # dark text on light chrome
     "CHROME_TEXT_DIM": "#4c545e",  # darker so small chrome text stays readable
     "HEADER_BLUE": "#d4dde9",  # table column-header band (light) — a clear blue-gray band
@@ -142,6 +173,27 @@ _LIGHT = {
 }
 
 _PALETTES = {"dark": _DARK, "light": _LIGHT}
+
+# -- press scrim strength ---------------------------------------------------
+#
+# How dark a control goes at the bottom of a press. The cue itself — a shadow
+# eased in over the control on mouse-down — lives in ``press.py``; this is the
+# one number that decides how deep it goes.
+#
+# Per theme because the same alpha is not the same perceptual step over black
+# and over white. On dark the pressed fill has to clear BG_ELEV (#1b2530) going
+# down while hover (#242c35) goes up, and there is plenty of room below. On
+# light the resting fill (#eceef1) and the hover fill (#dcdfe3) are only ~14
+# levels apart, so a pressed control has to land clearly below #dcdfe3 without
+# turning a button into a grey slab: 0.28 lands it at #9fa1a4 (measured off the
+# rendered control, not computed — the scrim composites over whatever the
+# stylesheet drew, which for a pressed button is the hover fill, not the
+# resting one). Dark at 0.45 lands at #14181d the same way.
+#
+# Both numbers were raised a step after the first pass was looked at on a real
+# screen: the press was correct but too quiet to notice at arm's length, which
+# for a feedback cue is the same as not being there.
+_PRESS_ALPHA = {"dark": 0.45, "light": 0.28}
 
 
 #: The application's QSettings scope, named explicitly rather than inherited
@@ -335,6 +387,8 @@ globals().update(_ACTIVE)
 # kept for import stability (referenced by name elsewhere / historically)
 CHROME_HI = _ACTIVE["CHROME_HOVER"]
 CHROME_LO = _ACTIVE["CHROME"]
+#: Peak alpha of the press shadow for the active theme (see ``press.py``).
+PRESS_ALPHA = _PRESS_ALPHA[_active_name]
 
 
 def _build_stylesheet(p: dict) -> str:
@@ -428,14 +482,39 @@ QMenuBar {{
 }}
 QMenuBar::item {{ padding: 5px 10px; border-radius: {RADIUS_SM}px; color: {p['CHROME_TEXT_DIM']}; }}
 QMenuBar::item:selected {{ background: {p['CHROME_HOVER']}; color: {p['CHROME_TEXT']}; }}
+QMenuBar::item:pressed {{ background: {p['CHROME_BORDER']}; color: {p['CHROME_TEXT']}; }}
+QMenuBar::item:disabled {{ color: {p['FG_MUTED']}; }}
 /* The blanket QWidget rule above paints every plain widget BG (true black),
    which is visibly darker than CHROME — override it so the logo's transparent
    PNG shows the same chrome grey as the rest of the row, not a black box. */
 QLabel#menuBarLogo {{ background: transparent; padding: 0px 0px 0px 14px; }}
 
-QWidget#commandBar {{ background: {p['BG']}; border-bottom: 1px solid {p['BORDER']}; }}
+/* -- depth: chrome above, data below --------------------------------------
+   The app was flat. The menu row, the command bar, every panel header strip
+   and every data surface all sat on one plane, told apart only by fill — and
+   the command bar was literally painted BG, the same true black as the table
+   underneath it, so the one control the user types into had no edge at all.
+
+   The rule now is one rule, applied everywhere chrome meets data: a raised
+   surface has a lit top edge (CHROME_EDGE) and a dark bottom edge
+   (CHROME_BORDER). That is the oldest depth cue there is and it costs two
+   hairlines; it is also the only one available, since QSS has no box-shadow
+   and a QGraphicsDropShadowEffect would make Qt render the widget to an
+   offscreen pixmap on every paint for the rest of its life (see motion.py).
+
+   Deliberately quiet. The data is the subject; chrome that announces itself is
+   a regression. */
+QWidget#commandBar {{
+    background: {p['CHROME']};
+    border-top: 1px solid {p['CHROME_EDGE']};
+    border-bottom: 1px solid {p['CHROME_BORDER']};
+}}
+/* The blanket QWidget rule paints every plain widget BG, which on the chrome
+   bar is a black box around the label — the same trap QLabel#menuBarLogo
+   documents. */
 QLabel#commandLabel {{
-    color: {p['ACCENT']}; font-size: {FONT_MD}px; font-weight: {WEIGHT_BOLD}; letter-spacing: 2px;
+    background: transparent; color: {p['ACCENT']};
+    font-size: {FONT_MD}px; font-weight: {WEIGHT_BOLD}; letter-spacing: 2px;
 }}
 QLineEdit#commandInput {{
     background: {p['BG']}; border: 1px solid {p['BORDER_STRONG']}; border-radius: {RADIUS_SM}px;
@@ -452,6 +531,13 @@ QTableWidget, QTableView {{
     font-family: "{MONO_FONT}"; font-size: {FONT_MD}px;
 }}
 QTableView::item {{ padding: 1px 4px; }}
+/* Rows are the most-clicked thing in the app — clicking one re-centers every
+   linked panel, which is the product's differentiator — and they were the one
+   clickable surface with no hover state at all. Deliberately a fill one step
+   above the surface rather than anything accent-coloured: amber already means
+   "this is data" in every table, and a hover that borrowed it would read as a
+   value changing. */
+QTableView::item:hover {{ background: {p['CHROME_LOW']}; }}
 QHeaderView {{ background: {p['HEADER_BLUE']}; }}
 QHeaderView::section {{
     background: {p['HEADER_BLUE']}; color: {p['CHROME_TEXT_DIM']}; border: 0;
@@ -460,6 +546,10 @@ QHeaderView::section {{
     letter-spacing: 0.4px;
 }}
 QHeaderView::section:hover {{ background: {p['CHROME_HOVER']}; color: {p['CHROME_TEXT']}; }}
+/* Clicking a column header sorts by it, so it is a control and gets the full
+   set. Sub-control, so the press snaps — see the QTabBar note. */
+QHeaderView::section:pressed {{ background: {p['CHROME_BORDER']}; color: {p['CHROME_TEXT']}; }}
+QHeaderView::section:disabled {{ color: {p['FG_MUTED']}; }}
 QHeaderView::section[kbFocus="true"] {{ border: 1px solid {p['FOCUS']}; }}
 QHeaderView::section:last {{ border-right: 0; }}
 QTableCornerButton::section {{ background: {p['HEADER_BLUE']}; border: 0; }}
@@ -476,6 +566,7 @@ QTableView::item:selected:!active, QListWidget::item:selected:!active {{
     background: {p['SELECT_BLUE']}; color: {p['CHROME_TEXT']};
 }}
 QListWidget::item {{ padding: 2px 4px; }}
+QListWidget::item:hover {{ background: {p['CHROME_LOW']}; }}
 QListWidget::item:selected {{ background: {p['SELECT_BLUE']}; color: {p['CHROME_TEXT']}; }}
 
 /* -- inner tab widgets (e.g. Portfolio) — amber underline like the docks -- */
@@ -485,8 +576,15 @@ QTabBar::tab {{
     padding: 5px 12px; border: 0; border-bottom: 2px solid transparent;
     font-weight: {WEIGHT_MEDIUM};
 }}
-QTabBar::tab:hover {{ color: {p['CHROME_TEXT']}; }}
+QTabBar::tab:hover {{ background: {p['CHROME_LOW']}; color: {p['CHROME_TEXT']}; }}
+/* A tab is a *sub-control*, not a widget, so it cannot carry the animated
+   press scrim the way a QPushButton does — there is no child to attach to.
+   Sub-controls therefore get their press as a stylesheet fill, which snaps
+   rather than eases. Same sink direction as everything else, just without the
+   travel; that limitation is Qt's, and it is confined to this group. */
+QTabBar::tab:pressed {{ background: {p['CHROME_BORDER']}; color: {p['CHROME_TEXT']}; }}
 QTabBar::tab:selected {{ color: {p['CHROME_TEXT']}; border-bottom: 2px solid {p['ACCENT']}; }}
+QTabBar::tab:disabled {{ color: {p['FG_MUTED']}; }}
 QTabBar::tab[kbFocus="true"] {{ color: {p['FOCUS']}; border-bottom-color: {p['FOCUS']}; }}
 
 /* -- inputs -------------------------------------------------------------- */
@@ -500,6 +598,7 @@ QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {{
 }}
 QLineEdit:hover, QComboBox:hover {{ border-color: {p['CHROME_HOVER']}; }}
 QLineEdit:disabled, QComboBox:disabled {{ color: {p['FG_MUTED']}; }}
+QComboBox:pressed {{ border-color: {p['ACCENT']}; background: {p['CHROME_LOW']}; }}
 QComboBox::drop-down {{ border: 0; width: 18px; }}
 QComboBox QAbstractItemView {{
     background: {p['CHROME']}; border: 1px solid {p['CHROME_BORDER']};
@@ -514,6 +613,7 @@ QListView#suggestPopup {{
     font-family: "{MONO_FONT}"; font-size: {FONT_MD}px;
 }}
 QListView#suggestPopup::item {{ padding: 4px 8px; }}
+QListView#suggestPopup::item:hover {{ background: {p['CHROME_HOVER']}; }}
 QListView#suggestPopup::item:selected {{
     background: {p['ACCENT']}; color: {p['ON_ACCENT']};
 }}
@@ -531,7 +631,31 @@ QPushButton:checked[kbFocus="true"] {{ border-color: {p['ON_ACCENT']}; }}
 QPushButton:hover {{
     background: {p['CHROME_HOVER']}; color: {p['CHROME_TEXT']}; border-color: {p['BORDER_STRONG']};
 }}
-QPushButton:pressed {{ background: {p['HEADER_BLUE']}; }}
+/* -- pressed is not a colour swap ----------------------------------------
+   Measured, the old rule set HEADER_BLUE (#1a2129) against a *resting* fill of
+   BG_ELEV (#1b2530): one level, four and seven. On screen that is the same
+   colour, so pressing a button looked exactly like not pressing it — and the
+   press had to be told apart from the hover state it was replacing, which sat
+   ten levels away in the other direction.
+
+   The fix is not a different colour — it is motion, which QSS cannot express.
+   ``press.py`` eases an animated shadow over the control on mouse-*down*, so
+   the control sinks below its own resting tone while hover lifts it above.
+   These ``:pressed`` rules therefore only hold the fill steady at the hover
+   tone: swapping it would land on the first frame and the eased sink
+   underneath would be invisible — a snap wearing an animation.
+
+   A press with no mouse in it (Space on a focused button) fires no scrim, so
+   here the hover tone is the whole feedback. That is intended: the motion
+   budget in motion.py says keyboard-triggered actions do not animate. */
+QPushButton:pressed {{
+    background: {p['CHROME_HOVER']}; color: {p['CHROME_TEXT']};
+    border-color: {p['BORDER_STRONG']};
+}}
+QPushButton:checked:pressed {{
+    background: {p['ACCENT_DEEP']}; color: {p['ON_ACCENT']};
+    border-color: {p['ACCENT_DEEP']};
+}}
 QPushButton:checked {{
     background: {p['ACCENT']}; color: {p['ON_ACCENT']}; border-color: {p['ACCENT']}; font-weight: {WEIGHT_BOLD};
 }}
@@ -551,8 +675,8 @@ QPushButton#chartChip:checked {{
     background: {p['BG_ELEV']}; color: {p['ACCENT']};
     border-color: {p['ACCENT']}; font-weight: {WEIGHT_BOLD};
 }}
-QPushButton#chartChip:checked:hover {{
-    background: {p['CHROME_HOVER']}; border-color: {p['ACCENT']};
+QPushButton#chartChip:checked:hover, QPushButton#chartChip:checked:pressed {{
+    background: {p['CHROME_HOVER']}; color: {p['ACCENT']}; border-color: {p['ACCENT']};
 }}
 QPushButton#chartChip[kbFocus="true"] {{ border-color: {p['FOCUS']}; }}
 
@@ -561,13 +685,20 @@ QToolButton {{
     color: {p['CHROME_TEXT']}; padding: 2px;
 }}
 QToolButton:hover {{ background: rgba(128,128,128,0.18); }}
-QToolButton:pressed {{ background: rgba(128,128,128,0.30); }}
+/* Held at the hover tone, not raised past it — see the QPushButton note above.
+   The old rule went to 0.30, i.e. *lighter* than hover, which made a pressed
+   tool button read as "more hovered" rather than as pushed in. */
+QToolButton:pressed {{ background: rgba(128,128,128,0.18); }}
+QToolButton:checked:pressed {{
+    background: {p['BG_ELEV']}; color: {p['ACCENT']}; border-color: {p['ACCENT']};
+}}
 /* A checkable QToolButton rendered identically on and off, which is why the
    panel link badge hand-writes its own stylesheet in Python (panel.py). */
 QToolButton:checked {{
     background: {p['BG_ELEV']}; color: {p['ACCENT']}; border-color: {p['ACCENT']};
 }}
 QToolButton[kbFocus="true"] {{ border-color: {p['FOCUS']}; }}
+QToolButton:disabled {{ color: {p['FG_MUTED']}; background: transparent; }}
 
 /* -- checkboxes / radios ------------------------------------------------- */
 /* The indicator needs explicit borders: unstyled, Qt draws a dark native box
@@ -581,10 +712,13 @@ QCheckBox::indicator, QRadioButton::indicator {{
     background: {p['BG_ELEV']};
     border: 1px solid {p['BORDER_STRONG']};
 }}
-QCheckBox::indicator {{ border-radius: {RADIUS_SM}px; }}
+QCheckBox::indicator {{ border-radius: {RADIUS_XS}px; }}
 QRadioButton::indicator {{ border-radius: {RADIUS_ROUND}px; }}
 QCheckBox::indicator:hover, QRadioButton::indicator:hover {{
     border-color: {p['ACCENT']};
+}}
+QCheckBox::indicator:pressed, QRadioButton::indicator:pressed {{
+    border-color: {p['ACCENT']}; background: {p['CHROME_BORDER']};
 }}
 QCheckBox::indicator:checked, QRadioButton::indicator:checked {{
     background: {p['ACCENT']}; border-color: {p['ACCENT']};
@@ -616,7 +750,7 @@ QMenu::separator {{ height: 1px; background: {p['CHROME_BORDER']}; margin: 5px 1
    near-black menu. */
 QMenu::indicator {{ width: 13px; height: 13px; margin-left: 4px; }}
 QMenu::indicator:checked {{
-    background: {p['ACCENT']}; border-radius: {RADIUS_SM}px;
+    background: {p['ACCENT']}; border-radius: {RADIUS_XS}px;
 }}
 QMenu::indicator:non-exclusive:checked, QMenu::indicator:exclusive:checked {{
     background: {p['ACCENT']};
@@ -628,11 +762,16 @@ QScrollBar::handle:vertical {{
     background: {p['BORDER']}; border-radius: {RADIUS_MD}px; min-height: 28px; margin: 2px;
 }}
 QScrollBar::handle:vertical:hover {{ background: {p['BORDER_STRONG']}; }}
+/* Scrollbar handles are the one control that gets *brighter* under the
+   pointer's grip instead of sinking. A dragged handle should feel held, not
+   pushed away, and it is the only control the user moves rather than actuates. */
+QScrollBar::handle:vertical:pressed {{ background: {p['FG_MUTED']}; }}
 QScrollBar:horizontal {{ background: transparent; height: 9px; margin: 0; }}
 QScrollBar::handle:horizontal {{
     background: {p['BORDER']}; border-radius: {RADIUS_MD}px; min-width: 28px; margin: 2px;
 }}
 QScrollBar::handle:horizontal:hover {{ background: {p['BORDER_STRONG']}; }}
+QScrollBar::handle:horizontal:pressed {{ background: {p['FG_MUTED']}; }}
 QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; width: 0; }}
 QScrollBar::add-page, QScrollBar::sub-page {{ background: transparent; }}
 
@@ -686,8 +825,13 @@ def _build_ads_stylesheet(p: dict) -> str:
     return f"""
 ads--CDockContainerWidget {{ background: {p['BORDER']}; }}
 ads--CDockAreaWidget {{ background: {p['BG']}; border: 0; }}
+/* Raised, the same way the command bar is: lit top edge, dark bottom edge.
+   A dock title bar sits directly on the data surface of the panel below it, so
+   this is where the chrome/data boundary is most visible. */
 ads--CDockAreaTitleBar {{
-    background: {p['CHROME']}; border: 0; border-bottom: 1px solid {p['CHROME_BORDER']};
+    background: {p['CHROME']}; border: 0;
+    border-top: 1px solid {p['CHROME_EDGE']};
+    border-bottom: 1px solid {p['CHROME_BORDER']};
     padding: 0 2px;
 }}
 ads--CDockWidgetTab {{
@@ -695,6 +839,11 @@ ads--CDockWidgetTab {{
     border-bottom: 2px solid transparent; padding: 4px 12px;
 }}
 ads--CDockWidgetTab:hover {{ background: {p['CHROME_HOVER']}; }}
+/* A dock tab IS a widget, not a sub-control, so it carries the animated press
+   scrim like a button does (press.corner_radius matches it by class name, at
+   radius 0 because this theme draws tabs square). This rule only holds the
+   fill steady underneath it — same contract as QPushButton:pressed. */
+ads--CDockWidgetTab:pressed {{ background: {p['CHROME_HOVER']}; }}
 ads--CDockWidgetTab[activeTab="true"] {{
     background: {p['CHROME_HOVER']}; border-bottom: 2px solid {p['ACCENT']};
 }}
@@ -712,12 +861,25 @@ ads--CDockWidgetTab QPushButton, ads--CDockWidgetTab QToolButton {{
 ads--CDockWidgetTab QPushButton:hover, ads--CDockWidgetTab QToolButton:hover {{
     background: rgba(128,128,128,0.22); border-radius: {RADIUS_SM}px;
 }}
+/* The per-tab close button. A QToolButton, so the scrim reaches it too. */
+ads--CDockWidgetTab QPushButton:pressed, ads--CDockWidgetTab QToolButton:pressed {{
+    background: rgba(128,128,128,0.22); border-radius: {RADIUS_SM}px;
+}}
+ads--CDockWidgetTab QPushButton[kbFocus="true"],
+ads--CDockWidgetTab QToolButton[kbFocus="true"] {{
+    border: 1px solid {p['FOCUS']}; border-radius: {RADIUS_SM}px;
+}}
 /* the area's controls — small and quiet */
 ads--CTitleBarButton {{
     background: transparent; border: 0; padding: 1px;
     color: {p['CHROME_TEXT_DIM']}; qproperty-iconSize: 12px 12px;
 }}
 ads--CTitleBarButton:hover {{ background: rgba(128,128,128,0.22); border-radius: {RADIUS_SM}px; }}
+ads--CTitleBarButton:pressed {{ background: rgba(128,128,128,0.22); border-radius: {RADIUS_SM}px; }}
+ads--CTitleBarButton[kbFocus="true"] {{
+    border: 1px solid {p['FOCUS']}; border-radius: {RADIUS_SM}px;
+}}
+ads--CTitleBarButton:disabled {{ color: {p['FG_MUTED']}; }}
 /* The focused dock area. F11 maximizes "the focused panel" and Ctrl+W closes
    it, but nothing on screen said which one that was. QtAds already sets the
    ``focused`` property on the active tab and title bar — CDockManager
@@ -735,6 +897,8 @@ ads--CDockSplitter::handle {{ background: {p['BORDER']}; }}
 ads--CDockSplitter::handle:horizontal {{ width: 2px; }}
 ads--CDockSplitter::handle:vertical {{ height: 2px; }}
 ads--CDockSplitter::handle:hover {{ background: {p['ACCENT']}; }}
+/* Held, not pushed — a splitter is dragged, like a scrollbar handle. */
+ads--CDockSplitter::handle:pressed {{ background: {p['ACCENT_DEEP']}; }}
 """
 
 

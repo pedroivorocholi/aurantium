@@ -313,6 +313,16 @@ def main() -> int:
 
     app._aurantium_focus_filter = focus.install(app)
 
+    # QSS cannot animate, so a pressed control could only ever snap to another
+    # colour — and the colour it snapped to was two levels off the hover fill,
+    # i.e. invisible. This filter eases a shadow over any button on mouse-down
+    # so a press has a physical answer. Kept on the app object for the same
+    # reason as the focus filter: a collected event filter stops filtering in
+    # silence.
+    from . import press
+
+    app._aurantium_press_filter = press.install(app)
+
     # Providers first (so panels' initial subscriptions resolve), then panels.
     _splash_message(splash, "LOADING · PROVIDERS")
     from .providers import register_all_providers

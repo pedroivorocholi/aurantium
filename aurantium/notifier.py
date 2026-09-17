@@ -39,7 +39,14 @@ from PySide6.QtWidgets import (
 )
 
 from . import motion
-from .theme import ACCENT, CHROME, CHROME_BORDER, CHROME_TEXT, MONO_FONT
+from .theme import (
+    ACCENT,
+    CHROME,
+    CHROME_BORDER,
+    CHROME_TEXT,
+    MONO_FONT,
+    RADIUS_MD,
+)
 
 #: Distance from the window's bottom-right corner, in logical pixels.
 MARGIN = 18
@@ -192,7 +199,7 @@ class Notifier(QWidget):
         accent = ACCENT if level == "warn" else CHROME_TEXT
         self.setStyleSheet(
             f"QWidget#notifier {{ background: {CHROME};"
-            f" border: 1px solid {CHROME_BORDER}; border-radius: 3px; }}"
+            f" border: 1px solid {CHROME_BORDER}; border-radius: {RADIUS_MD}px; }}"
             f"QLabel#notifierText {{ background: transparent; color: {accent};"
             f' font-family: "{MONO_FONT}"; font-size: 11px; }}'
         )

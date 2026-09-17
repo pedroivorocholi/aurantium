@@ -78,6 +78,17 @@ def animations_enabled() -> bool:
     return True
 
 
+#: Control press feedback — how long a button takes to sink under the pointer.
+#:
+#: Two numbers, not one, because press and release are not symmetric events.
+#: The press is the moment the user is watching and has to answer immediately,
+#: so it sits at the fast end of the budget. The release is not watched at all —
+#: the eye has already moved on to whatever the click did — so it gets a longer
+#: decay, which also means a very fast click (down and up inside 40ms) still
+#: leaves something visible on its way out instead of blinking.
+PRESS_IN_MS = 90
+PRESS_OUT_MS = 160
+
 #: Overlay crossfades — an empty state arriving, a loading veil retiring.
 OVERLAY_MS = 160
 #: A panel's first appearance. Once per panel, so it can afford a beat more.

@@ -42,7 +42,19 @@ from PySide6.QtWidgets import (
 
 from . import motion
 from .datahub import DataHub
-from .theme import BG, BORDER, BORDER_STRONG, CHROME_TEXT_DIM, FG_MUTED
+from .theme import (
+    BG,
+    BORDER,
+    BORDER_STRONG,
+    CHROME_EDGE,
+    CHROME_LOW,
+    CHROME_TEXT_DIM,
+    FG_MUTED,
+    FOCUS,
+    FONT_XS,
+    RADIUS_SM,
+    WEIGHT_BOLD,
+)
 from .symbol_context import (
     DEFAULT_GROUP,
     GROUP_COLORS,
@@ -277,6 +289,16 @@ class _HeaderStrip(QWidget):
     simply refreshed on its own. The tint says *this changed because of
     something you did over there*. It never moves or resizes anything, so it
     can't disturb a value being read.
+
+    **Depth.** The strip used to paint ``BG`` — the identical true black as the
+    table directly beneath it — so a panel was one undifferentiated plane from
+    its title bar all the way down, and the symbol, status and link badge read
+    as the first row of the data rather than as the panel's own chrome. It now
+    paints ``CHROME_LOW``: chrome, one step down from the dock title bar above
+    it, so the two together form a single cap over the data. The lit top edge
+    and dark bottom hairline are the same two-hairline raised treatment the
+    command bar and the dock title bars use, painted here rather than styled
+    because this widget already owns its own paint.
     """
 
     def __init__(self, parent: QWidget) -> None:
@@ -332,7 +354,7 @@ class _HeaderStrip(QWidget):
 
     def paintEvent(self, event) -> None:  # noqa: N802 (Qt override)
         p = QPainter(self)
-        base = QColor(BG)
+        base = QColor(CHROME_LOW)
         if self._flash > 0.0:
             # Cap the mix well below the tint's full strength — this sits under
             # live data all day, and a saturated band would read as an alert.
@@ -343,6 +365,13 @@ class _HeaderStrip(QWidget):
                 round(base.blue() + (self._tint.blue() - base.blue()) * t),
             )
         p.fillRect(self.rect(), base)
+        # Lit top edge, dark bottom edge: the raised-surface treatment shared
+        # with the command bar and the dock title bars. The top edge is skipped
+        # while the strip is tinted, because a highlight over a coloured flash
+        # reads as a second, competing signal.
+        if self._flash <= 0.0:
+            p.setPen(QColor(CHROME_EDGE))
+            p.drawLine(0, 0, self.width(), 0)
         p.setPen(QColor(BORDER))
         p.drawLine(0, self.height() - 1, self.width(), self.height() - 1)
         p.end()
@@ -711,22 +740,46 @@ class Panel(QWidget):
 
         Both states derive from the palette (the unlinked colors used to be
         hardcoded dark-theme greys, which were wrong on the light theme).
+
+        A per-widget stylesheet outranks the app sheet on every property it
+        names, and ``QToolButton#groupBadge`` is an id selector, so the global
+        ``QToolButton[kbFocus="true"]`` focus rule lost to it and the badge was
+        the one control in the app that could be tabbed to and show nothing.
+        The full state set is therefore spelled out here: hover fills, pressed
+        holds that fill while ``press.py`` eases the shadow over it, and
+        keyboard focus takes the neutral ring — ON_ACCENT on the filled hover
+        state, where the neutral ring would not be readable.
+
+        Sizes and radii come from the scale in ``theme.py``; they used to be
+        three inline literals that drifted out of step with it.
         """
         linked = self._link_group != UNLINKED
         color = QColor(GROUP_COLORS.get(self._link_group, FG_MUTED)).name()
         self._badge.setText(self._link_group if linked else "—")
+        base = (
+            f" font-size: {FONT_XS}px; font-weight: {WEIGHT_BOLD};"
+            f" border-radius: {RADIUS_SM}px; padding: 1px 6px;"
+        )
         if linked:
             self._badge.setStyleSheet(
                 f"QToolButton#groupBadge {{ background: transparent; color: {color};"
-                " font-size: 9px; font-weight: 700;"
-                f" border: 1px solid {color}; border-radius: 3px; padding: 1px 6px; }}"
-                f"QToolButton#groupBadge:hover {{ background: {color}; color: {BG}; }}"
+                f"{base} border: 1px solid {color}; }}"
+                f"QToolButton#groupBadge:hover, QToolButton#groupBadge:pressed"
+                f" {{ background: {color}; color: {BG}; }}"
+                f'QToolButton#groupBadge[kbFocus="true"]'
+                f" {{ border-color: {FOCUS}; }}"
+                f"QToolButton#groupBadge:disabled"
+                f" {{ color: {FG_MUTED}; border-color: {BORDER}; }}"
             )
         else:
             self._badge.setStyleSheet(
                 "QToolButton#groupBadge { background: transparent;"
-                f" color: {FG_MUTED}; font-size: 9px; font-weight: 700;"
-                f" border: 1px solid {BORDER_STRONG}; border-radius: 3px;"
-                " padding: 1px 6px; }"
-                f"QToolButton#groupBadge:hover {{ color: {CHROME_TEXT_DIM}; }}"
+                f" color: {FG_MUTED};{base}"
+                f" border: 1px solid {BORDER_STRONG}; }}"
+                f"QToolButton#groupBadge:hover, QToolButton#groupBadge:pressed"
+                f" {{ color: {CHROME_TEXT_DIM}; border-color: {CHROME_TEXT_DIM}; }}"
+                f'QToolButton#groupBadge[kbFocus="true"]'
+                f" {{ border-color: {FOCUS}; }}"
+                f"QToolButton#groupBadge:disabled"
+                f" {{ color: {FG_MUTED}; border-color: {BORDER}; }}"
             )

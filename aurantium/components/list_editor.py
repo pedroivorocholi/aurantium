@@ -3,7 +3,7 @@
 Panels describe their editable lists declaratively (sections → typed columns →
 rows) and get a consistent, themed editor. Rows render as a clean list —
 drag-grip to reorder, inline editors per column, live validation status, a
-hover ✕ to delete — instead of spreadsheet cells. New rows come from a
+hover-to-delete affordance — instead of spreadsheet cells. New rows come from a
 type-ahead picker over a curated :mod:`symbol_catalog` slice (plain-English
 search, free-text fallback), and per-section preset chips add common setups
 in one click. Each section explains what it feeds in one plain sentence.
@@ -35,7 +35,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
-from PySide6.QtCore import QMimeData, Qt, Signal
+from PySide6.QtCore import QMimeData, QSize, Qt, Signal
 from PySide6.QtGui import QDrag, QFont
 from PySide6.QtWidgets import (
     QComboBox,
@@ -54,8 +54,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .. import icons
 from ..datahub import DataHub
-from ..theme import ACCENT, CHROME_LO, DOWN, FG_DIM, MONO_FONT, UP
+from ..theme import ACCENT, CHROME_LO, DOWN, FG_DIM, MONO_FONT, RADIUS_SM, UP
 from .symbol_catalog import CatalogEntry, search_catalog
 
 _ROW_MIME = "application/x-aurantium-editor-row"
@@ -216,12 +217,19 @@ def open_add_picker(
 # --------------------------------------------------------------------------
 
 class _Grip(QLabel):
-    """Drag handle — starts an internal row drag; the list reorders on drop."""
+    """Drag handle — starts an internal row drag; the list reorders on drop.
+
+    Painted, not typed. This was the character ``⠿``, which Windows resolves
+    from whatever font happens to carry the braille block — a different stroke
+    weight and a different optical size from the painted panel-chrome icons two
+    inches up the same dialog. ``icons.grip`` puts it on the family's own grid.
+    """
 
     def __init__(self, row_widget: "_RowWidget", parent=None) -> None:
-        super().__init__("⠿", parent)
+        super().__init__(parent)
         self._row_widget = row_widget
         self.setObjectName("secondary")
+        self.setPixmap(icons.pixmap("grip", FG_DIM, icons.device_pixel_ratio(self)))
         self.setCursor(Qt.CursorShape.SizeVerCursor)
         self.setToolTip("Drag to reorder")
 
@@ -299,13 +307,17 @@ class _RowWidget(QWidget):
         layout.addWidget(self.status)
 
         delete = QToolButton(self)
-        delete.setText("✕")
+        # Painted rather than the character ``✕`` — same reason as _Grip above.
+        # QSS can recolour text on :hover but not an icon, so the grey→loss-red
+        # hover lives in the icon's own Active mode instead of the stylesheet.
+        delete.setIcon(
+            icons.two_tone_icon(
+                "close", FG_DIM, DOWN, icons.device_pixel_ratio(self)
+            )
+        )
+        delete.setIconSize(QSize(icons.SIZE, icons.SIZE))  # the family's one size
         delete.setToolTip("Remove this row")
         delete.setAutoRaise(True)
-        delete.setStyleSheet(
-            f"QToolButton {{ color: {FG_DIM}; border: none; }}"
-            f"QToolButton:hover {{ color: {DOWN}; }}"
-        )
         delete.clicked.connect(lambda: self.delete_requested.emit(self))
         layout.addWidget(delete)
 
@@ -435,9 +447,11 @@ class _SectionWidget(QWidget):
                 chip = QPushButton(label, self)
                 chip.setToolTip("Add this preset's rows")
                 chip.setStyleSheet(
-                    f"QPushButton {{ border: 1px solid {CHROME_LO}; border-radius: 8px;"
+                    f"QPushButton {{ border: 1px solid {CHROME_LO};"
+                    f" border-radius: {RADIUS_SM}px;"
                     f" padding: 2px 10px; color: {FG_DIM}; background: transparent; }}"
-                    f"QPushButton:hover {{ color: {ACCENT}; border-color: {ACCENT}; }}"
+                    f"QPushButton:hover, QPushButton:pressed"
+                    f" {{ color: {ACCENT}; border-color: {ACCENT}; }}"
                 )
                 chip.clicked.connect(lambda _=False, idx=i: self.apply_preset(idx))
                 chips.addWidget(chip)

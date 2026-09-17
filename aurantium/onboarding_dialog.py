@@ -11,7 +11,8 @@ PyQtGraph default chart controls; nothing aspirational.
 
 from __future__ import annotations
 
-from PySide6.QtCore import QSettings
+from PySide6.QtCore import QSettings, QUrl
+from PySide6.QtGui import QTextDocument
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -22,10 +23,28 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .theme import ACCENT, BG_ELEV, CHROME_TEXT, FG, FG_DIM
+from .theme import ACCENT, BG_ELEV, CHROME_TEXT, FG, FG_DIM, RADIUS_SM
 
 #: bump the suffix if the content changes enough to warrant re-showing everyone
 _SETTINGS_KEY = "has_seen_onboarding_v1"
+
+#: URL scheme the guide's inline affordance icons are registered under. Any
+#: scheme QTextBrowser will not try to fetch from the network does; naming it
+#: after the app keeps it obvious in the HTML that it resolves locally.
+_GLYPH_SCHEME = "aurantium-glyph"
+
+
+def _glyph(kind: str) -> str:
+    """One painted affordance icon, inline in the guide's prose.
+
+    Sized to the surrounding 13px text rather than to the family's 16px grid:
+    here the icon is a word in a sentence, so it takes the sentence's optical
+    size the way a character would have.
+    """
+    return (
+        f'<img src="{_GLYPH_SCHEME}:{kind}" width="13" height="13"'
+        ' style="vertical-align: middle;">'
+    )
 
 
 def _page_css() -> str:
@@ -39,7 +58,7 @@ def _page_css() -> str:
       td.k {{ white-space: nowrap; width: 34%; }}
       kbd {{
         background: {BG_ELEV}; color: {CHROME_TEXT};
-        border-radius: 3px; padding: 1px 6px; font-family: monospace;
+        border-radius: {RADIUS_SM}px; padding: 1px 6px; font-family: monospace;
       }}
       td.d {{ color: {FG}; }}
     </style>
@@ -121,7 +140,9 @@ _SHORTCUTS_HTML = _page_css() + f"""
 """
 
 
-_GUIDE_HTML = _page_css() + """
+# f-string only so the two inline affordance icons below can be interpolated;
+# the guide's prose contains no other braces.
+_GUIDE_HTML = _page_css() + f"""
 <body>
 <h2>Getting started</h2>
 <p>Type a ticker (e.g. <b>AAPL</b>, <b>MSFT</b>, <b>ES=F</b>) in the SYMBOL box
@@ -259,7 +280,8 @@ quitting (off by default, so ✕ quits as usual).</p>
 <h2>Customizing panels</h2>
 <p>Configurable panels (Commodities, FX, World Indices, Sector Heatmap, Chart
 Grid, Macro/Rates) share one <b>Edit…</b> dialog: rows drag to reorder by the
-<b>⠿</b> grip, ✕ removes one, and <b>+ Add…</b> opens a search — type a plain
+{_glyph("grip")} grip, {_glyph("close")} removes one, and <b>+ Add…</b> opens
+a search — type a plain
 name ("10 year", "cattle", "euro") and pick the instrument, no ticker
 memorization needed (free-text symbols still work and are verified live).
 Preset chips add common setups in one click. Quicker still:
@@ -374,8 +396,35 @@ class OnboardingDialog(QDialog):
     def _browser(self, html: str) -> QTextBrowser:
         browser = QTextBrowser(self)
         browser.setOpenExternalLinks(True)
+        self._register_glyphs(browser)
         browser.setHtml(html)
         return browser
+
+    def _register_glyphs(self, browser: QTextBrowser) -> None:
+        """Make the painted affordance icons available to the page as images.
+
+        The guide describes two controls by drawing them inline — the row grip
+        and the row-delete mark. Those used to be the characters ``⠿`` and
+        ``✕``, which is fine while the dialog they describe also uses
+        characters. It stopped being fine when the dialog started painting
+        them: the cheat sheet would have shown a braille-fallback glyph beside
+        a sentence about a mark that no longer looks like that.
+
+        A QTextDocument resolves ``<img src="…">`` through its own resource
+        table, so the guide can embed the real icon rather than an
+        approximation of it, and it stays correct automatically the next time
+        the family is redrawn.
+        """
+        from . import icons
+
+        dpr = icons.device_pixel_ratio(self)
+        document = browser.document()
+        for kind in ("grip", "close"):
+            document.addResource(
+                QTextDocument.ResourceType.ImageResource,
+                QUrl(f"{_GLYPH_SCHEME}:{kind}"),
+                icons.pixmap(kind, FG, dpr),
+            )
 
     def done(self, result: int) -> None:  # noqa: N802 (Qt override)
         """Persist the auto-show preference on any close (OK / Close / Esc)."""

@@ -80,6 +80,15 @@ hiddenimports += [
     # onboarding_dialog in this list. Without it a frozen build loses the focus
     # ring, or fails at startup.
     "aurantium.focus",
+    # Press feedback filter. Imported the same lazy way as ``focus`` above,
+    # from inside __main__.main(), so static analysis never sees it — without
+    # this line a frozen build silently loses every button's press response.
+    "aurantium.press",
+    # The painted icon family. Reached lazily from app.py's _chrome_icon and
+    # from the onboarding dialog, so static analysis sees only the list
+    # editor's import of it — listed anyway, on the same rule as everything
+    # else in this block.
+    "aurantium.icons",
     "aurantium.onboarding_dialog",
     "aurantium.language_dialog",
     "aurantium.languages",

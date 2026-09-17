@@ -437,52 +437,23 @@ class MainWindow(QMainWindow):
         self.notify(f"Refreshing {len(topics)} feeds…", 2500)
 
     def _chrome_icon(self, kind: str, color: str | None = None):
-        """The panel-chrome icon set — close, maximize, restore, menu, pin —
-        drawn in one consistent style (antialiased, 1.4px round-cap strokes,
-        device-pixel-ratio aware) so every title-bar glyph reads as one family
-        and stays hairline-sharp on HiDPI displays. `restore` keeps the amber
-        tint as a 'panel is maximized' state cue."""
-        from PySide6.QtCore import QPointF, QRectF
-        from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
+        """One glyph from the painted icon family, tinted for this window.
 
+        The painting itself moved to ``icons.py`` when the family grew past the
+        panel chrome — the list editor's row grip and delete affordance are
+        drawn from the same six-glyph set now, and a private method on
+        MainWindow is not somewhere a dialog can reach. What stays here is the
+        part that is genuinely this window's business: the default colour per
+        kind, and painting for *this window's* screen rather than the primary
+        one, which matters on a multi-monitor desk with mixed scaling.
+
+        ``restore`` keeps the amber tint as a "panel is maximized" state cue.
+        """
+        from . import icons
         from .theme import ACCENT, CHROME_TEXT_DIM
 
         col = color or (ACCENT if kind == "restore" else CHROME_TEXT_DIM)
-        dpr = self.devicePixelRatioF() or 1.0
-        px = QPixmap(round(16 * dpr), round(16 * dpr))
-        px.setDevicePixelRatio(dpr)
-        px.fill(Qt.GlobalColor.transparent)
-        p = QPainter(px)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        pen = QPen(QColor(col))
-        pen.setWidthF(1.4)
-        pen.setCosmetic(True)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-        p.setPen(pen)
-        if kind == "close":
-            p.drawLine(QPointF(5, 5), QPointF(11, 11))
-            p.drawLine(QPointF(11, 5), QPointF(5, 11))
-        elif kind == "expand":  # diagonal arrows to opposite corners → fill window
-            p.drawLine(QPointF(7, 7), QPointF(4, 4))
-            p.drawLine(QPointF(4, 4), QPointF(4, 7))
-            p.drawLine(QPointF(4, 4), QPointF(7, 4))
-            p.drawLine(QPointF(9, 9), QPointF(12, 12))
-            p.drawLine(QPointF(12, 12), QPointF(12, 9))
-            p.drawLine(QPointF(12, 12), QPointF(9, 12))
-        elif kind == "maximize":
-            p.drawRect(4, 4, 8, 8)
-        elif kind == "restore":
-            p.drawRect(QRectF(5.5, 3.5, 6, 6))  # back square (upper-right)
-            p.drawRect(QRectF(3.5, 5.5, 6, 6))  # front square (lower-left)
-        elif kind == "menu":
-            for y in (5, 8, 11):
-                p.drawLine(QPointF(4, y), QPointF(12, y))
-        elif kind == "pin":
-            p.drawEllipse(QPointF(8, 6), 2.6, 2.6)
-            p.drawLine(QPointF(8, 8.6), QPointF(8, 12.5))
-        p.end()
-        return QIcon(px)
+        return icons.icon(kind, col, icons.device_pixel_ratio(self))
 
     def _register_dock_icons(self) -> None:
         """Replace QtAds' default title-bar icons (tab close, area close, area

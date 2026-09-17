@@ -68,9 +68,71 @@ def test_the_stylesheet_only_uses_scale_sizes():
 
 
 def test_the_stylesheet_only_uses_scale_radii():
-    allowed = {theme.RADIUS_SM, theme.RADIUS_MD, theme.RADIUS_ROUND}
+    allowed = {
+        theme.RADIUS_XS,
+        theme.RADIUS_SM,
+        theme.RADIUS_MD,
+        theme.RADIUS_ROUND,
+    }
     used = {int(n) for n in re.findall(r"border-radius: (\d+)px", rules_only(theme.STYLESHEET))}
     assert used <= allowed, f"off-scale radii: {used - allowed}"
+
+
+def test_the_radius_scale_is_a_ratio_not_four_numbers():
+    """A corner radius reads as a proportion of what it rounds, which is why
+    there are two control rungs: the 12px check indicator and the 27px button
+    both want ~17%, and one flat value cannot give them both that.
+
+    The ordering is the contract — a bigger surface never gets a tighter corner
+    than a smaller control sitting on it.
+    """
+    assert theme.RADIUS_XS < theme.RADIUS_SM < theme.RADIUS_MD < theme.RADIUS_ROUND
+
+
+def test_the_control_radius_sits_in_the_band(qapp):
+    """Apple's small controls sit near 20-25% of control height; measured, this
+    app's buttons are 27px, so that band is 5.4-6.8px.
+
+    This first asserted the radius stayed *under* the band, on the argument that
+    a terminal should read squarer than a consumer app. On screen at 100% that
+    produced a two-device-pixel change nobody could see — which for a design
+    change is the same as not making it — so the hedge was dropped and the cited
+    rule applied as written. The upper bound is the one that still matters: past
+    roughly 30% a dense row of chips reads as a web app, which was also checked
+    on screen.
+
+    The height is a recorded constant, not a live measurement, and that is
+    deliberate. ``conftest`` runs the suite under ``QT_QPA_PLATFORM=offscreen``,
+    whose font database has no Segoe UI — it falls back to something smaller and
+    a QPushButton reports 23px there against 27px on the real platform. A test
+    that measured the widget would be pinning the ratio to a font-fallback
+    artifact, and would drift the moment the fallback changed.
+    """
+    # Measured on Windows with the real platform plugin, at 96 DPI, via
+    # sizeHint() after adjustSize(): QPushButton / QLineEdit / QComboBox 27,
+    # QToolButton 24, chart chip 22, check and radio indicator 12.
+    BUTTON_HEIGHT = 27
+    assert theme.RADIUS_SM >= BUTTON_HEIGHT * 0.20, "too square to read as a change"
+    assert theme.RADIUS_SM <= BUTTON_HEIGHT * 0.25, "past the band — reads as a web app"
+    # The indicator is the other rung, and it has to stay proportional too.
+    assert theme.RADIUS_XS <= 12 * 0.25
+
+
+def test_no_radius_is_hardcoded_outside_the_scale():
+    """Four call sites had invented their own — 8px on a preset chip, 4px on a
+    chart indicator chip, 3px twice. A radius chosen at a call site is a radius
+    that cannot be changed from ``theme.py``."""
+    import pathlib
+
+    source = pathlib.Path(theme.__file__).parent
+    offenders = [
+        f"{path.relative_to(source)}:{n}: {line.strip()}"
+        for path in source.rglob("*.py")
+        if "__pycache__" not in path.parts
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+        if re.search(r"border-radius:\s*\d", line)
+    ]
+    assert not offenders, "radii hardcoded at a call site: " + "; ".join(offenders)
 
 
 def test_weight_has_one_mechanism():
