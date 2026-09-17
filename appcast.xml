@@ -20,6 +20,67 @@
     <language>en</language>
 
     <item>
+      <title>Aurantium 1.9.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.9.0</h3>
+        <ul>
+          <li>Buttons, chips, tabs and panel controls now respond to a click: the control sinks into shadow the moment you press it, and eases back when you let go.</li>
+          <li>Every clickable surface has a full set of states - hover, pressed, selected, keyboard focus and disabled - including panel tabs, column headers, dropdowns and scrollbars.</li>
+          <li>Table rows now highlight under the pointer, so it is clear what a click will re-centre the workspace on.</li>
+          <li>Panel chrome now sits visibly above the data: the SYMBOL bar and each panel&#x27;s header strip read as a layer rather than merging into the black.</li>
+          <li>Softer corners on buttons, inputs and chips, proportioned to each control&#x27;s size.</li>
+          <li>The drag grip and remove mark in every Edit... dialog are now drawn to match the panel icons instead of borrowed from a system font.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Thu, 17 Sep 2026 15:29:49 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.9.0/aurantium-setup.exe"
+        sparkle:version="1.9.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75278003"
+        sparkle:edSignature="M3dBUVoi/edzRJrvMFv0QcfUUFhJQvTgXZVknG8sRd69oN4CCpcOC9B8axw/Oil/Nvo0Cz24TIDdOZmX+cvbAg=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.9.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.9.0</h3>
+        <ul>
+          <li>Buttons, chips, tabs and panel controls now respond to a click: the control sinks into shadow the moment you press it, and eases back when you let go.</li>
+          <li>Every clickable surface has a full set of states - hover, pressed, selected, keyboard focus and disabled - including panel tabs, column headers, dropdowns and scrollbars.</li>
+          <li>Table rows now highlight under the pointer, so it is clear what a click will re-centre the workspace on.</li>
+          <li>Panel chrome now sits visibly above the data: the SYMBOL bar and each panel&#x27;s header strip read as a layer rather than merging into the black.</li>
+          <li>Softer corners on buttons, inputs and chips, proportioned to each control&#x27;s size.</li>
+          <li>The drag grip and remove mark in every Edit... dialog are now drawn to match the panel icons instead of borrowed from a system font.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Thu, 17 Sep 2026 15:29:49 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.9.0/aurantium-mac.zip"
+        sparkle:version="1.9.0"
+        sparkle:os="macos"
+        length="291635292"
+        sparkle:edSignature="m4xrKjk0PvVPGpzKsQzyOAgzkzs+iAVBd6DxaxlpPBuUa6JW//ZgBYZ1Vq3mUvQDEZ3K12c5qtnZNaNGVcB/BA=="
+        type="application/zip" />
+    </item>
+    <item>
       <title>Aurantium 1.7.0</title>
       <description><![CDATA[
         <style>
