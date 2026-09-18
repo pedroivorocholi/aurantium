@@ -339,12 +339,15 @@ class DataHub(QObject):
         return self._topics[topic]
 
     def _resolve_policy(self, topic: str) -> TopicPolicy:
-        pol = self._policy_prefix.get(topic.split(":", 1)[0])
-        if pol is not None:
-            return pol
+        # Specific glob patterns first (e.g. intraday ``history:*:*:*m``), so a
+        # broad ``prefix:*`` can't shadow them; the prefix dict stays the fast
+        # path for everything else.
         for pattern, policy in self._policies:
             if fnmatch.fnmatchcase(topic, pattern):
                 return policy
+        pol = self._policy_prefix.get(topic.split(":", 1)[0])
+        if pol is not None:
+            return pol
         return TopicPolicy()
 
     def _find_provider(self, topic: str) -> Optional[Provider]:

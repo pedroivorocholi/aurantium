@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import bisect
 import itertools
+import math
 from datetime import date, datetime, timedelta
 from typing import Any, Callable, Optional
 
@@ -41,7 +42,7 @@ from PySide6.QtWidgets import (
 
 from ..components.empty_state import EmptyState
 from ..date_context import DateContext
-from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, COMPACT, Panel, register_panel
+from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, COMPACT, WIDE, Panel, register_panel
 from ..color import contrast
 from ..symbol_context import DEFAULT_GROUP, UNLINKED
 from ..undo import UndoStack
@@ -69,13 +70,27 @@ from ._events_lane import EventsLane, build_marks
 # Range (how much history to show) and candle interval are independent.
 # A range is either a preset label or a custom (start, end) date pair.
 
-RANGE_PRESETS = ["1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "max"]
+RANGE_PRESETS = ["1h", "4h", "1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "max"]
 
 # Calendar span (days) of each preset — frames the visible window after we
 # fetch extra history so long moving averages have enough lookback.
 PERIOD_SPAN_DAYS = {
+    "1h": 1 / 24, "4h": 4 / 24,
     "1d": 1, "5d": 5, "1mo": 31, "3mo": 93, "6mo": 186,
     "1y": 372, "2y": 744, "5y": 1860, "max": 100000,
+}
+
+# Sub-day presets aren't yfinance periods. They fetch 5d — enough to reach the
+# last session over a weekend, and to warm up indicators — then frame the
+# final hour(s) of bars.
+SUB_DAY_FETCH_PERIOD = "5d"
+SUB_DAY_PRESETS = ("1h", "4h")
+
+# The interval a range switches to when the current one can't serve it
+# (e.g. 1d bars on a 1h range). Kept only when it is itself valid.
+PREFERRED_INTERVAL = {
+    "1h": "1m", "4h": "5m", "1d": "5m", "5d": "15m", "1mo": "1h",
+    "3mo": "1d", "6mo": "1d", "1y": "1d", "2y": "1d", "5y": "1wk", "max": "1mo",
 }
 
 INTERVALS = ["1m", "5m", "15m", "30m", "1h", "1d", "1wk", "1mo"]
@@ -101,6 +116,12 @@ _DAILY_FETCH_LADDER = [
 ]
 
 RSI_WINDOW = 14
+
+# Mouse-wheel zoom per notch. pyqtgraph's default (-1/8) jumps ~26% a notch,
+# too coarse to settle on a window; this is ~15%.
+WHEEL_SCALE_FACTOR = -1 / 15
+# Zooming in stops here, rather than at a single pixel-wide sliver of a bar.
+MIN_VISIBLE_BARS = 10
 
 # -- indicator colors ------------------------------------------------------
 #
@@ -887,6 +908,7 @@ class ChartPanel(Panel):
         self.plot_widget.addItem(self.line_curve)
         self.line_curve.setVisible(False)
         self.content_layout.addWidget(self.plot_widget, 3)
+        self._setup_navigation()
 
         # -- events lane -------------------------------------------------------
         # Deliberately its own x-linked strip rather than marks inside the price
@@ -936,8 +958,11 @@ class ChartPanel(Panel):
     #: What a narrow chart keeps: a day, a month, half a year, a year, and
     #: everything. Enough to cover the everyday moves without a horizontal row
     #: that clips off the panel edge.
-    COMPACT_RANGES = ("1d", "1mo", "6mo", "1y", "max")
+    COMPACT_RANGES = ("4h", "1d", "1mo", "6mo", "1y", "max")
     COMPACT_INTERVALS = ("1m", "1h", "1d", "1wk")
+    #: Hidden below WIDE: the sub-day presets pushed a regular-width range row
+    #: past the panel edge, and 1y / max already bracket these two.
+    WIDE_ONLY_RANGES = ("2y", "5y")
 
     def on_size_class(self, size_class: str) -> None:
         """Reorganize the control rows for the width the panel now has.
@@ -949,17 +974,19 @@ class ChartPanel(Panel):
         common set plus whatever is currently selected, so the row always fits.
         """
         compact = size_class == COMPACT
+        wide = size_class == WIDE
         self._range_eyebrow.setVisible(not compact)
         self._interval_eyebrow.setVisible(not compact)
         self._indicators_eyebrow.setVisible(not compact)
         self._custom_btn.setVisible(not compact)
 
         for label, btn in self._range_buttons.items():
-            btn.setVisible(
-                not compact
-                or label in self.COMPACT_RANGES
-                or btn.isChecked()  # never hide what is currently selected
-            )
+            if compact:
+                keep = label in self.COMPACT_RANGES
+            else:
+                keep = wide or label not in self.WIDE_ONLY_RANGES
+            # never hide what is currently selected
+            btn.setVisible(keep or btn.isChecked())
         for label, btn in self._interval_buttons.items():
             btn.setVisible(
                 not compact or label in self.COMPACT_INTERVALS or btn.isChecked()
@@ -1061,9 +1088,13 @@ class ChartPanel(Panel):
         explaining why)."""
         active_preset = self._range.get("preset")
         for label, btn in self._range_buttons.items():
-            problem = self._combo_problem({"preset": label}, self._interval)
-            btn.setEnabled(problem is None)
-            btn.setToolTip(problem or "")
+            # Never disabled: picking a range the interval can't serve moves
+            # the interval instead (see _set_range_preset). Greying ranges out
+            # made "1d" look unavailable on the default daily interval.
+            fit = self._interval_for_range({"preset": label})
+            btn.setToolTip(
+                "" if fit == self._interval else f"switches interval to {fit}"
+            )
             btn.setChecked(label == active_preset)
         self._custom_btn.setChecked(active_preset is None)
         if active_preset is None:
@@ -1077,13 +1108,34 @@ class ChartPanel(Panel):
             btn.setEnabled(problem is None)
             btn.setToolTip(problem or "")
             btn.setChecked(label == self._interval)
+        # Chip visibility depends on the checked chip (a selected 2y stays
+        # shown), and the base class never fires on_size_class for the size
+        # class a panel starts in — so apply it here, on every change.
+        self.on_size_class(self.size_class)
 
     def _set_range_preset(self, preset: str) -> None:
         if self._range.get("preset") == preset:
             self._update_range_interval_buttons()
             return
         self._range = {"preset": preset}
+        fit = self._interval_for_range(self._range)
+        if fit != self._interval:
+            self.set_status(f"{preset} range — using {fit} bars")
+            self._interval = fit
         self._range_or_interval_changed()
+
+    def _interval_for_range(self, rng: dict) -> str:
+        """The interval to use with ``rng``: the current one if it's valid,
+        else the range's preferred interval, else the finest valid one."""
+        if not self._combo_problem(rng, self._interval):
+            return self._interval
+        preferred = PREFERRED_INTERVAL.get(rng.get("preset", ""))
+        if preferred and not self._combo_problem(rng, preferred):
+            return preferred
+        for cand in INTERVALS:
+            if not self._combo_problem(rng, cand):
+                return cand
+        return self._interval
 
     def _pick_custom_range(self) -> None:
         if "preset" in self._range:
@@ -1284,6 +1336,13 @@ class ChartPanel(Panel):
         pane.getAxis("left").setTextPen(FG_DIM)
         pane.getAxis("bottom").setTextPen(FG_DIM)
         pane.setXLink(self.plot_widget)
+        # Same rule as the price plot: the mouse moves time, and Y fits what
+        # is visible (a fixed-scale pane like RSI's 0–100 overrides this).
+        pane.setMouseEnabled(x=True, y=False)
+        pane.hideButtons()
+        pane.getViewBox().setAutoVisible(y=True)
+        pane.getViewBox().state["wheelScaleFactor"] = WHEEL_SCALE_FACTOR
+        pane.scene().sigMouseClicked.connect(self._on_pane_clicked)
         self.content_layout.addWidget(pane, 1)
         return pane
 
@@ -1635,6 +1694,7 @@ class ChartPanel(Panel):
     def _toggle_log(self, checked: bool) -> None:
         self._log_on = checked
         self.plot_widget.setLogMode(y=checked)
+        self._fit_y_to_visible()
 
     # -- extras ----------------------------------------------------------------
 
@@ -1837,6 +1897,7 @@ class ChartPanel(Panel):
 
     def _on_scene_clicked(self, ev) -> None:
         if self._draw_tool is None:
+            self._on_pane_clicked(ev)  # double-click resets the view
             return
         if ev.button() != Qt.MouseButton.LeftButton:
             self._cancel_tool()
@@ -1981,6 +2042,8 @@ class ChartPanel(Panel):
         lookback = self._max_lookback_bars()
         if "preset" in self._range:
             preset = self._range["preset"]
+            if preset in SUB_DAY_PRESETS:
+                return SUB_DAY_FETCH_PERIOD, interval
             if interval != "1d":
                 return preset, interval
             vis_days = int(PERIOD_SPAN_DAYS.get(preset, 100000) * 0.69)  # ~trading days
@@ -2140,6 +2203,79 @@ class ChartPanel(Panel):
         else:
             self.set_status("hover a bar, then press D")
 
+    # -- navigation ------------------------------------------------------------
+    #
+    # pyqtgraph's default ViewBox scaled price and time together around the
+    # cursor, let a drag pan both axes off into blank space, and never refit
+    # price to what was on screen — so every zoom left the candles squashed
+    # into a strip or cut off. Trading charts navigate time, and price follows.
+
+    def _setup_navigation(self) -> None:
+        vb = self.plot_widget.getViewBox()
+        self.plot_widget.setMouseEnabled(x=True, y=False)
+        self.plot_widget.hideButtons()  # the stray "A" auto-range button
+        vb.state["wheelScaleFactor"] = WHEEL_SCALE_FACTOR
+        self._fitting_y = False
+        vb.sigXRangeChanged.connect(lambda *_: self._fit_y_to_visible())
+
+    def _bar_seconds(self) -> float:
+        t = self._hist_t
+        if len(t) < 2:
+            return 86400.0
+        gaps = sorted(b - a for a, b in zip(t, t[1:]) if b > a)
+        return gaps[len(gaps) // 2] if gaps else 86400.0
+
+    def _apply_x_limits(self) -> None:
+        """Keep the view on the data: a little air on the left, room to see
+        the last bar clear of the edge on the right, and zoom stops at a
+        handful of bars rather than at one pixel-wide sliver."""
+        vb = self.plot_widget.getViewBox()
+        t = self._hist_t
+        if not t:
+            vb.setLimits(xMin=None, xMax=None, minXRange=None, maxXRange=None)
+            return
+        bar = self._bar_seconds()
+        x_min = t[0] - 2 * bar
+        x_max = t[-1] + 8 * bar
+        vb.setLimits(
+            xMin=x_min,
+            xMax=x_max,
+            minXRange=min(MIN_VISIBLE_BARS * bar, x_max - x_min),
+            maxXRange=x_max - x_min,
+        )
+
+    def _fit_y_to_visible(self) -> None:
+        """Fit price to the bars currently in view (log-aware)."""
+        if self._fitting_y or not self._hist_t:
+            return
+        vb = self.plot_widget.getViewBox()
+        (x0, x1), _ = vb.viewRange()
+        t = self._hist_t
+        i0 = bisect.bisect_left(t, x0)
+        i1 = bisect.bisect_right(t, x1)
+        if i1 <= i0:
+            return
+        lo = min(self._hist_lo[i0:i1])
+        hi = max(self._hist_hi[i0:i1])
+        if self._log_on:
+            if lo <= 0:
+                return
+            lo, hi = math.log10(lo), math.log10(hi)
+        pad = (hi - lo) * 0.06 or max(abs(hi), 1.0) * 1e-3
+        self._fitting_y = True
+        try:
+            vb.setYRange(lo - pad, hi + pad, padding=0)
+        finally:
+            self._fitting_y = False
+
+    def _reset_view(self) -> None:
+        self._frame_window(self._hist_t, self._hist_hi, self._hist_lo)
+
+    def _on_pane_clicked(self, ev) -> None:
+        if ev.double() and ev.button() == Qt.MouseButton.LeftButton:
+            self._reset_view()
+            ev.accept()
+
     def _frame_window(self, t: list, highs: list, lows: list) -> None:
         """Zoom the plot to the selected range even though more bars may have
         been fetched, and fit Y to just the visible candles."""
@@ -2155,12 +2291,8 @@ class ChartPanel(Panel):
                 datetime.fromisoformat(self._range["end"]) + timedelta(days=1)
             ).timestamp()
         self.plot_widget.setXRange(start, end, padding=0.02)
-        vis = [(lows[i], highs[i]) for i in range(len(t)) if start <= t[i] <= end]
-        if vis:
-            lo = min(v[0] for v in vis)
-            hi = max(v[1] for v in vis)
-            pad = (hi - lo) * 0.06 or max(abs(hi), 1.0) * 1e-3
-            self.plot_widget.setYRange(lo - pad, hi + pad, padding=0)
+        # explicit: an unchanged X range emits no sigXRangeChanged
+        self._fit_y_to_visible()
 
     # -- data callbacks ------------------------------------------------------
 
@@ -2181,6 +2313,7 @@ class ChartPanel(Panel):
             self._hist_t, self._hist_o, self._hist_c = [], [], []
             self._hist_hi, self._hist_lo, self._hist_v = [], [], []
             self._refresh_all_indicators()
+            self._apply_x_limits()
             self._render_lane()
             self._sync_empty()
             return
@@ -2209,6 +2342,7 @@ class ChartPanel(Panel):
         self._hist_hi, self._hist_lo, self._hist_v = valid_h, valid_l, valid_v
         self._refresh_all_indicators()
         self._apply_chart_type()
+        self._apply_x_limits()
         self._frame_window(valid_t, valid_h, valid_l)
         self._render_annotations()  # keep horizontal drawings spanning the bars
         self._render_lane()  # unusual-move flags depend on the loaded closes

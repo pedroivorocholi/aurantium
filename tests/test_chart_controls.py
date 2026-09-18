@@ -34,6 +34,9 @@ def _row_width(layout) -> int:
 
 
 def test_the_range_row_fits_a_realistic_panel(chart):
+    # measured at that width: the row sheds 2y/5y below WIDE
+    chart.show()
+    chart.resize(REALISTIC_PANEL_WIDTH, 400)
     assert _row_width(chart._range_row) <= REALISTIC_PANEL_WIDTH
 
 

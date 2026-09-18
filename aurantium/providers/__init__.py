@@ -31,6 +31,10 @@ def register_all_providers() -> None:
 
     hub.set_policy("quote:*", TopicPolicy(ttl_s=30, min_interval_s=5))
     hub.set_policy("history:*", TopicPolicy(ttl_s=1800, min_interval_s=60))
+    # Intraday bars go stale in minutes, not half-hours: a 1h window
+    # refreshed every 30 min would be half out of date.
+    hub.set_policy("history:*:*:*m", TopicPolicy(ttl_s=60, min_interval_s=30))
+    hub.set_policy("history:*:*:1h", TopicPolicy(ttl_s=120, min_interval_s=60))
     hub.set_policy("analyst:*", TopicPolicy(ttl_s=3600, min_interval_s=60))
     hub.set_policy("news:*", TopicPolicy(ttl_s=300, min_interval_s=30))
     hub.set_policy("newsq:*", TopicPolicy(ttl_s=300, min_interval_s=30))

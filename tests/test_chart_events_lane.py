@@ -127,6 +127,9 @@ class _FakeClick:
 
         return Qt.MouseButton.LeftButton
 
+    def double(self):
+        return False
+
     def scenePos(self):
         from PySide6.QtCore import QPointF
 

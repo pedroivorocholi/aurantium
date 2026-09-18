@@ -105,12 +105,12 @@ _SHORTCUTS_HTML = _page_css() + f"""
 <h2>Charts</h2>
 <table>
   {_row("Move the mouse", "Crosshair snaps to the nearest bar with a date + O/H/L/C readout")}
-  {_row("Left-drag", "Pan the view")}
-  {_row("Mouse wheel", "Zoom in / out")}
-  {_row("Right-drag", "Scale the axes independently")}
+  {_row("Left-drag", "Scroll through time — the price axis refits to the visible bars")}
+  {_row("Mouse wheel", "Zoom time in / out around the cursor")}
+  {_row("Double-click", "Reset the view to the selected range")}
+  {_row("RANGE 1h / 4h", "Look at less than a day — the interval switches to minute bars")}
   {_row("Right-click", "Chart menu — type, colors, drawing tools, export image")}
   {_row("Right-click &#9656; Drawing", "Trendline, horizontal line, or channels — points snap to candles; saved with the layout")}
-  {_row("“A” button (bottom-left)", "Auto-range: reset the view to fit the data")}
 </table>
 
 <h2>Day Brief — why did it move?</h2>
@@ -212,7 +212,11 @@ at every size.</p>
 
 <h2>Charts</h2>
 <p>Hover the price chart to read any bar: a <b>crosshair</b> snaps to the nearest
-candle and shows its date and open/high/low/close in the corner. Right-click the
+candle and shows its date and open/high/low/close in the corner. The mouse moves
+<b>time</b>, never price: drag to scroll, wheel to zoom, and the price axis
+always refits to the bars in view; double-click to snap back. Ranges go down to
+<b>1h</b> and <b>4h</b>, and picking a range the current interval can't serve
+switches the interval for you. Right-click the
 chart for type (candles, bars, line, area), colors, indicators, and
 <b>Drawing</b> tools: a <i>trendline</i>, a <i>horizontal line</i>, or a
 <i>channel</i> (parallel, flat-bottom, disjoint). Pick a tool, then click to place
