@@ -151,6 +151,11 @@ def _detach_fade(widget) -> None:
         if fade_opacity(widget) < 0.999:
             return  # a new fade started before we got here
         anim = getattr(widget, "_aurantium_fade", None)
+        if anim is not None and anim.state() == QPropertyAnimation.State.Running:
+            # A fade-out started this same tick still reads ~1.0 at t=0.
+            # Detaching now would kill it mid-flight and strand the widget
+            # fully opaque (the eternal "Loading…" veil).
+            return
         if anim is not None:
             anim.stop()
             anim.setTargetObject(None)

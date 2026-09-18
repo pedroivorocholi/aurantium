@@ -26,6 +26,7 @@ rest of the design system lives.
 from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtWidgets import QWidget
 
 #: The focus reasons that mean "a person is navigating with the keyboard".
 #:
@@ -72,7 +73,9 @@ class FocusVisibleFilter(QObject):
         return False  # never consume: this observes, it does not intercept
 
     def _set(self, widget, value: bool) -> None:
-        if self._settling:
+        if self._settling or not isinstance(widget, QWidget):
+            # Only widgets wear a ring. QGraphicsScene (pyqtgraph) also has a
+            # style(), and unpolish(scene) raises TypeError.
             return
         try:
             if bool(widget.property(PROPERTY)) == value:

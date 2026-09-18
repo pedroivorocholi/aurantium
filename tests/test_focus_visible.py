@@ -114,6 +114,17 @@ def test_non_widget_objects_are_survivable(filt, qapp):
     # no exception is the assertion
 
 
+def test_a_graphics_scene_is_survivable(filt, qapp):
+    """QGraphicsScene (pyqtgraph's chart scene) has its own ``style()``, so it
+    slipped past the AttributeError guard and ``unpolish(scene)`` raised a
+    TypeError on every chart focus change."""
+    from PySide6.QtWidgets import QGraphicsScene
+
+    scene = QGraphicsScene()
+    filt.eventFilter(scene, QFocusEvent(QEvent.Type.FocusIn, Qt.FocusReason.TabFocusReason))
+    filt.eventFilter(scene, QFocusEvent(QEvent.Type.FocusOut, Qt.FocusReason.TabFocusReason))
+
+
 def test_repeated_events_do_not_thrash(filt, widget, monkeypatch):
     """Each change costs a style repolish, so an unchanged value must not
     trigger one. Panels re-focus often."""

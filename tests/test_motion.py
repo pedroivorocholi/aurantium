@@ -348,6 +348,39 @@ def test_fading_again_after_a_detach_still_works(qapp, monkeypatch):
     assert motion.fade_opacity(w) <= 1.0
 
 
+def test_a_fade_out_started_before_the_detach_still_finishes(qapp, monkeypatch):
+    """The eternal "Loading…" veil: set_loading(True) fades the overlay in
+    instantly (ms=0), which lands at full opacity and schedules a detach; a
+    cached value then clears loading in the same tick, starting a fade-out.
+    The detach ran next, saw opacity still ~1.0 at t=0, and tore down the
+    fade-out mid-flight — leaving the overlay shown at full opacity forever."""
+    monkeypatch.setattr(motion, "animations_enabled", lambda: True)
+    from PySide6.QtWidgets import QWidget
+
+    w = QWidget()
+    w.show()
+    motion.fade(w, 1.0, ms=0)
+    motion.fade(w, 0.0, hide_when_done=True)
+    motion.settle_pending_detach()
+    anim = motion.fade_animation(w)
+    anim.setCurrentTime(anim.duration())
+    assert not w.isVisible()
+
+
+def test_a_cached_value_lifts_the_market_table_veil(qapp, monkeypatch):
+    monkeypatch.setattr(motion, "animations_enabled", lambda: True)
+    from aurantium.components import MarketTable
+
+    t = MarketTable(0, 2)
+    t.show()
+    t.set_loading(True)
+    t.set_loading(False)  # warm cache delivered synchronously in subscribe()
+    motion.settle_pending_detach()
+    anim = motion.fade_animation(t._overlay)
+    anim.setCurrentTime(anim.duration())
+    assert not t._overlay.isVisible()
+
+
 def test_the_tick_flash_decays_on_the_house_curve(table):
     """It fell off linearly while every other animation used OutQuint — so it
     lingered at mid-intensity and then cut, instead of being bright on the
