@@ -97,11 +97,21 @@ def test_intraday_history_refreshes_quickly(qapp):
     from aurantium.providers import register_all_providers
 
     hub = DataHub.instance()
-    register_all_providers()
-    assert hub._resolve_policy("history:AAPL:5d:1m").ttl_s <= 120
-    assert hub._resolve_policy("history:AAPL:1d:15m").ttl_s <= 120
-    assert hub._resolve_policy("history:AAPL:1y:1d").ttl_s >= 1800
-    assert hub._resolve_policy("history:AAPL:2y:1mo").ttl_s >= 1800
+    # Restore afterwards: real providers left on the shared hub make every
+    # later test that subscribes fire live yfinance fetches, which pin the
+    # global QThreadPool and starve unrelated tests (symbol search) on CI.
+    saved = (list(hub._providers), list(hub._policies), dict(hub._policy_prefix))
+    try:
+        register_all_providers()
+        assert hub._resolve_policy("history:AAPL:5d:1m").ttl_s <= 120
+        assert hub._resolve_policy("history:AAPL:1d:15m").ttl_s <= 120
+        assert hub._resolve_policy("history:AAPL:1y:1d").ttl_s >= 1800
+        assert hub._resolve_policy("history:AAPL:2y:1mo").ttl_s >= 1800
+    finally:
+        hub._providers[:] = saved[0]
+        hub._policies[:] = saved[1]
+        hub._policy_prefix.clear()
+        hub._policy_prefix.update(saved[2])
 
 
 # -- navigation ----------------------------------------------------------------
