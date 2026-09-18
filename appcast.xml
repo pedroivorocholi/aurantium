@@ -20,6 +20,65 @@
     <language>en</language>
 
     <item>
+      <title>Aurantium 1.9.3</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.9.3</h3>
+        <ul>
+          <li>Charts can now show less than a day: new 1h and 4h ranges, with the interval switching to minute bars automatically</li>
+          <li>Picking any range now adjusts the interval for you instead of greying the button out</li>
+          <li>Zooming and dragging now move time only, and the price axis refits to the bars in view</li>
+          <li>Double-click a chart to reset its view; zooming can no longer drift off into empty space</li>
+          <li>Intraday charts refresh about every minute instead of every 30 minutes</li>
+        </ul>
+      ]]></description>
+      <pubDate>Fri, 18 Sep 2026 16:18:01 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.9.3/aurantium-setup.exe"
+        sparkle:version="1.9.3"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75272061"
+        sparkle:edSignature="HOAvZN9Tb2Mz1BxnZtKMVp6BtXi7450ep+ZVrt2nAaH5cvksyXgDXwaOexMzXm/KdwAi5aGBrw12oPIiT/2bCw=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.9.3</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.9.3</h3>
+        <ul>
+          <li>Charts can now show less than a day: new 1h and 4h ranges, with the interval switching to minute bars automatically</li>
+          <li>Picking any range now adjusts the interval for you instead of greying the button out</li>
+          <li>Zooming and dragging now move time only, and the price axis refits to the bars in view</li>
+          <li>Double-click a chart to reset its view; zooming can no longer drift off into empty space</li>
+          <li>Intraday charts refresh about every minute instead of every 30 minutes</li>
+        </ul>
+      ]]></description>
+      <pubDate>Fri, 18 Sep 2026 16:18:01 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.9.3/aurantium-mac.zip"
+        sparkle:version="1.9.3"
+        sparkle:os="macos"
+        length="291694750"
+        sparkle:edSignature="yIqVRAsvSjBd3IHO2AulHI2kdT4yGqyyz6+Eh8aRj72hxT62amqSvUHfym98ewsINJ6R1DSEV1zsLFDN4lfRDg=="
+        type="application/zip" />
+    </item>
+    <item>
       <title>Aurantium 1.9.2</title>
       <description><![CDATA[
         <style>
