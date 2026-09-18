@@ -19,6 +19,7 @@ from PySide6.QtGui import (
     QActionGroup,
     QColor,
     QFont,
+    QFontMetrics,
     QKeySequence,
     QPainter,
     QPicture,
@@ -600,7 +601,66 @@ class OHLCBarItem(pg.GraphicsObject):
         return QRectF(self._picture.boundingRect())
 
 
-class _CompactAxis(pg.AxisItem):
+def _next_nice(step: float) -> float:
+    """The next round step above ``step`` (1 → 1.5 → 2 → 2.5 → 3 → 4 → 5 → 10 ...).
+
+    Finer than pyqtgraph's 1-2-5 so a short pane can land on two labels
+    (e.g. 300M · 600M) instead of jumping from three crowded ones to one."""
+    exp = 10.0 ** np.floor(np.log10(step))
+    m = step / exp
+    for n in (1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 10.0):
+        if n > m * (1 + 1e-9):
+            return n * exp
+    return 20.0 * exp
+
+
+class _SpacedAxis(pg.AxisItem):
+    """Y axis whose labels never collide in a short pane.
+
+    pyqtgraph always labels the major tick level no matter how cramped, so a
+    squeezed indicator pane stacks its labels on top of each other. Here the
+    major step is the smallest round one whose labels clear each other — but never
+    past the point where no label fits inside the pane, so there is always at
+    least one. Ticks too close to an edge to show their whole label (pyqtgraph
+    silently drops those) are left out when picking the step."""
+
+    def tickValues(self, minVal: float, maxVal: float, size: float):
+        levels = super().tickValues(minVal, maxVal, size)
+        lo_v, hi_v = sorted((minVal, maxVal))
+        dif = hi_v - lo_v
+        if not levels or dif == 0 or size <= 0 or self._tickSpacing is not None:
+            return levels
+        text_h = QFontMetrics(self.style["tickFont"] or self.font()).height()
+        min_px = 1.0 * text_h  # pyqtgraph draws labels 0.8 text_h tall
+        px_per_unit = size / dif
+        margin = 0.4 * text_h / px_per_unit  # half a drawn label, in data units
+        lo, hi = lo_v + margin, hi_v - margin
+
+        def inside(step: float) -> list[float]:
+            first = np.ceil(lo / step) * step
+            return [float(v) for v in np.arange(first, hi + step * 1e-9, step)]
+
+        # aim for ~3 text-heights between labels, or pyqtgraph's own spacing
+        # if that's tighter; a short pane settles for anything >= min_px
+        want_px = max(min_px, min(levels[0][0] * px_per_unit, 3 * text_h))
+        step = 10.0 ** np.floor(np.log10(min_px / px_per_unit))
+        while step * px_per_unit < want_px and inside(_next_nice(step)):
+            step = _next_nice(step)
+        ticks = inside(step)
+        if step * px_per_unit < min_px:
+            ticks = ticks[-1:]  # even the widest step crowds — keep just the top
+        out = [(step, ticks)]
+        # finer levels only where they subdivide the step evenly and their
+        # labels clear the same gap
+        for sp, _vals in levels[1:]:
+            ratio = step / sp
+            if (sp < step and abs(ratio - round(ratio)) < 1e-6
+                    and sp * px_per_unit >= min_px):
+                out.append((sp, [v for v in inside(sp) if v not in ticks]))
+        return out
+
+
+class _CompactAxis(_SpacedAxis):
     """Y axis for big magnitudes (volume): 150M / 2.5B instead of 1.5e+08."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -1214,9 +1274,10 @@ class ChartPanel(Panel):
     # -- indicator plumbing: build pg items / panes, compute + set data -------
 
     def _make_pane(self, compact_y: bool = False) -> pg.PlotWidget:
-        axes: dict = {"bottom": pg.DateAxisItem(orientation="bottom")}
-        if compact_y:
-            axes["left"] = _CompactAxis(orientation="left")
+        axes: dict = {
+            "bottom": pg.DateAxisItem(orientation="bottom"),
+            "left": (_CompactAxis if compact_y else _SpacedAxis)(orientation="left"),
+        }
         pane = pg.PlotWidget(axisItems=axes)
         pane.setBackground(self._colors["bg"])
         pane.showGrid(x=self._grid_on, y=self._grid_on, alpha=0.15)
