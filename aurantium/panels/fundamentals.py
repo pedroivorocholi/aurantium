@@ -26,11 +26,25 @@ from ..components import MarketTable, make_filter_edit
 from ..panel import NULL_GLYPH, Panel, register_panel
 from ..theme import DOWN, palette_colors
 
-STATEMENTS = [("income", "Income"), ("balance", "Balance"), ("cashflow", "Cash Flow")]
+STATEMENTS = [
+    ("income", "Income"),
+    ("balance", "Balance"),
+    ("cashflow", "Cash Flow"),
+    ("debt", "Debt"),
+]
 PERIODS = [("annual", "Annual"), ("quarterly", "Quarterly")]
 
 # Yahoo Finance's statement-specific URL slug, keyed by our internal ids.
-_YF_SLUG = {"income": "financials", "balance": "balance-sheet", "cashflow": "cash-flow"}
+_YF_SLUG = {
+    "income": "financials",
+    "balance": "balance-sheet",
+    "cashflow": "cash-flow",
+    "debt": "balance-sheet",
+}
+
+# Row value kinds: statement figures ("money"), percentages stored as
+# fractions ("pct") and multiples ("ratio").
+MONEY, PCT, RATIO = "money", "pct", "ratio"
 
 
 def _xl(color: str) -> str:
@@ -72,6 +86,201 @@ def _fmt_compact(value: Any) -> str:
     if av >= 1e3:
         return f"{sign}{av:,.0f}"
     return f"{sign}{av:,.2f}"
+
+
+def _fmt_kind(value: Any, kind: str) -> str:
+    """Format a cell by its row kind — percentages and multiples read as
+    such; everything else takes the compact statement format."""
+    if kind == MONEY:
+        return _fmt_compact(value)
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return NULL_GLYPH
+    if v != v:
+        return NULL_GLYPH
+    if kind == PCT:
+        return f"{v * 100:.2f}%"
+    return f"{v:.2f}x"
+
+
+# -- debt analysis -------------------------------------------------------------
+
+
+def _stmt_lookup(data: dict, stmt: str, period: str) -> dict[str, dict[str, float]]:
+    """{line item: {period column: value}} for one fetched statement."""
+    block = (data.get(stmt) or {}).get(period) or {}
+    columns = block.get("columns") or []
+    out: dict[str, dict[str, float]] = {}
+    for row in block.get("rows") or []:
+        if not isinstance(row, (list, tuple)) or not row:
+            continue
+        vals = {}
+        for col, v in zip(columns, row[1:]):
+            try:
+                f = float(v)
+            except (TypeError, ValueError):
+                continue
+            if f == f:
+                vals[str(col)] = f
+        out[str(row[0])] = vals
+    return out
+
+
+def _pick(items: dict[str, dict[str, float]], col: str, *names: str) -> Optional[float]:
+    """First line item among ``names`` that has a value for ``col`` —
+    Yahoo's labels vary by filer, so each metric names its fallbacks."""
+    for name in names:
+        v = items.get(name, {}).get(col)
+        if v is not None:
+            return v
+    return None
+
+
+def _div(a: Optional[float], b: Optional[float], positive_den: bool = False) -> Optional[float]:
+    if a is None or b is None or b == 0:
+        return None
+    if positive_den and b < 0:
+        return None
+    return a / b
+
+
+def debt_block(data: dict, period: str) -> dict:
+    """Derive the Debt view from the fetched statements.
+
+    Balance-sheet dates are the columns. Income and cash-flow figures are
+    matched to them by period-end date; quarterly flows are annualized
+    (×4) wherever they feed a rate or a multiple, so an annual and a
+    quarterly column read on the same scale. The cost of debt uses
+    average debt (this period and the prior one) when the prior period is
+    in the fetch, and period-end debt otherwise.
+
+    Returns ``{"columns", "rows", "kinds", "notes"}`` — ``rows`` in the
+    same ``[label, *values]`` shape as a statement block.
+    """
+    bal = _stmt_lookup(data, "balance", period)
+    inc = _stmt_lookup(data, "income", period)
+    cf = _stmt_lookup(data, "cashflow", period)
+    block = (data.get("balance") or {}).get(period) or {}
+    columns = [str(c) for c in block.get("columns") or []]
+    if not columns:
+        return {"columns": [], "rows": [], "kinds": [], "notes": []}
+    scale = 4.0 if period == "quarterly" else 1.0
+    per = "annualized " if scale != 1.0 else ""
+
+    def ann(v: Optional[float]) -> Optional[float]:
+        return None if v is None else v * scale
+
+    series: dict[str, list[Optional[float]]] = {}
+    spec: list[tuple[str, str, str]] = []
+
+    def add(label: str, kind: str, note: str, values: list[Optional[float]]) -> None:
+        spec.append((label, kind, note))
+        series[label] = values
+
+    total_debt, st_debt, lt_debt, leases, cash, net_debt, equity = ([] for _ in range(7))
+    interest, interest_paid, ebit, ebitda = ([] for _ in range(4))
+    issued, repaid, net_issued = ([] for _ in range(3))
+    for col in columns:
+        st = _pick(bal, col, "Current Debt And Capital Lease Obligation", "Current Debt")
+        lt = _pick(bal, col, "Long Term Debt And Capital Lease Obligation", "Long Term Debt")
+        td = _pick(bal, col, "Total Debt")
+        if td is None and (st is not None or lt is not None):
+            td = (st or 0.0) + (lt or 0.0)
+        c = _pick(
+            bal, col,
+            "Cash Cash Equivalents And Short Term Investments",
+            "Cash And Cash Equivalents",
+        )
+        total_debt.append(td)
+        st_debt.append(st)
+        lt_debt.append(lt)
+        leases.append(_pick(bal, col, "Capital Lease Obligations"))
+        cash.append(c)
+        net_debt.append(None if td is None or c is None else td - c)
+        equity.append(_pick(bal, col, "Stockholders Equity", "Common Stock Equity"))
+        ie = _pick(inc, col, "Interest Expense", "Interest Expense Non Operating")
+        interest.append(None if ie is None else abs(ie))
+        ip = _pick(cf, col, "Interest Paid Supplemental Data")
+        interest_paid.append(None if ip is None else abs(ip))
+        ebit.append(_pick(inc, col, "EBIT", "Operating Income"))
+        ebitda.append(_pick(inc, col, "EBITDA", "Normalized EBITDA"))
+        issued.append(_pick(cf, col, "Issuance Of Debt", "Long Term Debt Issuance"))
+        repaid.append(_pick(cf, col, "Repayment Of Debt", "Long Term Debt Payments"))
+        net_issued.append(_pick(cf, col, "Net Issuance Payments Of Debt"))
+
+    def avg_prior(values: list[Optional[float]], i: int) -> Optional[float]:
+        # columns are newest-first, so the prior period is the next column
+        cur = values[i]
+        prev = values[i + 1] if i + 1 < len(values) else None
+        if cur is None:
+            return None
+        return cur if prev is None else (cur + prev) / 2
+
+    debt_ex_leases = [
+        None if td is None else td - (ls or 0.0) for td, ls in zip(total_debt, leases)
+    ]
+    n = len(columns)
+    cost = [_div(ann(interest[i]), avg_prior(total_debt, i), True) for i in range(n)]
+    cost_ex = [_div(ann(interest[i]), avg_prior(debt_ex_leases, i), True) for i in range(n)]
+    cost_cash = [_div(ann(interest_paid[i]), avg_prior(total_debt, i), True) for i in range(n)]
+
+    add("Total Debt", MONEY, "Short-term + long-term debt, including leases", total_debt)
+    add("Short-Term Debt", MONEY, "Debt and lease obligations due within a year", st_debt)
+    add("Long-Term Debt", MONEY, "Debt and lease obligations due after a year", lt_debt)
+    add("Lease Obligations", MONEY, "Capital/finance and operating lease liabilities (inside Total Debt)", leases)
+    add("Cash & ST Investments", MONEY, "Cash, equivalents and short-term investments", cash)
+    add("Net Debt", MONEY, "Total Debt − Cash & ST Investments (negative = net cash)", net_debt)
+    add("Interest Expense", MONEY, "Reported interest expense for the period", interest)
+    add("Interest Paid (Cash)", MONEY, "Cash interest paid, from the cash-flow supplemental data", interest_paid)
+    add(
+        "Implied Cost of Debt", PCT,
+        f"ESTIMATE — {per}interest expense ÷ average Total Debt. The reported"
+        " weighted-average rate is in the 10-K debt note (Browser ▸ SEC EDGAR)",
+        cost,
+    )
+    add(
+        "Implied Cost ex Leases", PCT,
+        f"ESTIMATE — {per}interest expense ÷ average (Total Debt − leases);"
+        " closer to the rate on borrowings when lease interest sits elsewhere",
+        cost_ex,
+    )
+    add(
+        "Implied Cost (Cash Basis)", PCT,
+        f"ESTIMATE — {per}cash interest paid ÷ average Total Debt",
+        cost_cash,
+    )
+    add("Interest Coverage (EBIT)", RATIO, "EBIT ÷ interest expense", [_div(e, i, True) for e, i in zip(ebit, interest)])
+    add("EBITDA / Interest", RATIO, "EBITDA ÷ interest expense", [_div(e, i, True) for e, i in zip(ebitda, interest)])
+    add(
+        "Total Debt / EBITDA", RATIO,
+        f"Total Debt ÷ {per}EBITDA (blank when EBITDA is negative)",
+        [_div(d, ann(e), True) for d, e in zip(total_debt, ebitda)],
+    )
+    add(
+        "Net Debt / EBITDA", RATIO,
+        f"Net Debt ÷ {per}EBITDA (blank when EBITDA is negative)",
+        [_div(d, ann(e), True) for d, e in zip(net_debt, ebitda)],
+    )
+    add("Debt / Equity", RATIO, "Total Debt ÷ stockholders' equity (blank when equity is negative)", [_div(d, e, True) for d, e in zip(total_debt, equity)])
+    add(
+        "Debt / Capital", PCT, "Total Debt ÷ (Total Debt + stockholders' equity)",
+        [None if d is None or e is None else _div(d, d + e, True) for d, e in zip(total_debt, equity)],
+    )
+    add("Short-Term Share of Debt", PCT, "Short-Term Debt ÷ Total Debt — refinancing pressure", [_div(s, d, True) for s, d in zip(st_debt, total_debt)])
+    add("Debt Issued", MONEY, "Cash raised from new borrowings in the period", issued)
+    add("Debt Repaid", MONEY, "Cash used to repay borrowings in the period", repaid)
+    add("Net Debt Issuance", MONEY, "Debt issued − debt repaid", net_issued)
+
+    rows, kinds, notes = [], [], []
+    for label, kind, note in spec:
+        values = series[label]
+        if all(v is None for v in values):
+            continue  # this filer doesn't report it — don't show an empty row
+        rows.append([label] + values)
+        kinds.append(kind)
+        notes.append(note)
+    return {"columns": columns, "rows": rows, "kinds": kinds, "notes": notes}
 
 
 @register_panel(id="fundamentals", title="Financials", category="Research")
@@ -188,11 +397,27 @@ class FundamentalsPanel(Panel):
         # there is anything to show.
         self.set_loading(False)
         self._data = data if isinstance(data, dict) else {}
+        if self._needs_reason_refetch(self._data):
+            # an empty result cached by a version that didn't record *why* it
+            # was empty: fetch once more so the panel can explain itself
+            self._hub.request([f"financials:{self.current_symbol}"], force=True)
         self._render()
+
+    @staticmethod
+    def _needs_reason_refetch(data: dict) -> bool:
+        if not data or "quote_type" in data:
+            return False
+        return not any(
+            ((data.get(k) or {}).get(f) or {}).get("rows")
+            for k in ("income", "balance", "cashflow")
+            for f in ("annual", "quarterly")
+        )
 
     # -- rendering -------------------------------------------------------------
 
     def _current_block(self) -> Optional[dict]:
+        if self._statement == "debt":
+            return debt_block(self._data, self._period) if self._data else None
         stmt = self._data.get(self._statement)
         if not isinstance(stmt, dict):
             return None
@@ -205,25 +430,30 @@ class FundamentalsPanel(Panel):
         rows = block.get("rows") if block else None
         columns = columns if isinstance(columns, list) else []
         rows = rows if isinstance(rows, list) else []
+        kinds = (block.get("kinds") if block else None) or []
+        notes = (block.get("notes") if block else None) or []
 
         headers = ["Line Item"] + [str(c) for c in columns]
         self.table.setColumnCount(len(headers))
         self.table.setHorizontalHeaderLabels(headers)
         self.table.setRowCount(0)
 
-        for row_data in rows:
+        for idx, row_data in enumerate(rows):
             if not isinstance(row_data, (list, tuple)) or not row_data:
                 continue
             label = row_data[0]
             values = list(row_data[1:])
+            kind = kinds[idx] if idx < len(kinds) else MONEY
             r = self.table.rowCount()
             self.table.insertRow(r)
             label_item = QTableWidgetItem(str(label) if label is not None else NULL_GLYPH)
             label_item.setFlags(label_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            if idx < len(notes) and notes[idx]:
+                label_item.setToolTip(notes[idx])
             self.table.setItem(r, 0, label_item)
             for col in range(len(columns)):
                 value = values[col] if col < len(values) else None
-                item = QTableWidgetItem(_fmt_compact(value))
+                item = QTableWidgetItem(_fmt_kind(value, kind))
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 item.setTextAlignment(
                     Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
@@ -236,12 +466,57 @@ class FundamentalsPanel(Panel):
                 self.table.setItem(r, col + 1, item)
 
         self.table.apply_filter(self._filter.text())
+        if not rows:
+            title, hint = self._empty_reason()
+            self.table.set_empty_text(title, hint)
 
         sym = self.current_symbol or "—"
         stmt_label = dict(STATEMENTS).get(self._statement, self._statement)
         period_label = dict(PERIODS).get(self._period, self._period)
-        self.set_status(f"{stmt_label} · {period_label} · {len(rows)} lines")
+        status = f"{stmt_label} · {period_label} · {len(rows)} lines"
+        if self._statement == "debt" and rows:
+            status += " · rates are estimates — hover a line for its formula"
+        self.set_status(status)
         self._update_actions()
+
+    def _empty_reason(self) -> tuple[str, str]:
+        """Why the table is empty, in words — never a silent blank panel."""
+        sym = self.current_symbol
+        if not sym:
+            return "No symbol linked", "Type a company ticker (e.g. MSFT) in the SYMBOL box."
+        if not self._data:
+            return f"Loading {sym}…", ""
+        qtype = str(self._data.get("quote_type") or "").upper()
+        kinds = {
+            "ETF": "an ETF",
+            "MUTUALFUND": "a mutual fund",
+            "INDEX": "an index",
+            "FUTURE": "a futures contract",
+            "CURRENCY": "a currency pair",
+            "CRYPTOCURRENCY": "a cryptocurrency",
+        }
+        if qtype in kinds:
+            return (
+                f"{sym} is {kinds[qtype]} — it doesn't file financial statements",
+                "Income statements, balance sheets and cash-flow statements exist only "
+                "for companies. Link a company ticker (e.g. MSFT) to see them. "
+                + ("Key Metrics shows this fund's yield, costs, returns and risk."
+                   if qtype in ("ETF", "MUTUALFUND") else ""),
+            )
+        if self._statement == "debt":
+            return (
+                f"No debt data for {sym}",
+                "The Debt view is derived from the balance sheet and income statement, "
+                "and Yahoo Finance returned none for this symbol.",
+            )
+        stmt_label = dict(STATEMENTS).get(self._statement, self._statement).lower()
+        period_label = dict(PERIODS).get(self._period, self._period).lower()
+        return (
+            f"No {period_label} {stmt_label} statement for {sym}",
+            "Yahoo Finance (no API key needed) has no statement for this symbol — "
+            "common for recent listings, SPACs and some foreign tickers. Try the "
+            "other period, or Browser ▸ SEC EDGAR for the filings themselves.",
+        )
 
     # -- statement actions: browser / download / copy -------------------------
 
@@ -335,9 +610,17 @@ class FundamentalsPanel(Panel):
         """Copy of the export frame with value columns rendered the way the
         on-screen table shows them (compact T/B/M figures)."""
         out = df.copy()
+        kinds = self._row_kinds(len(out))
         for col in out.columns[1:]:
-            out[col] = [_fmt_compact(v) for v in out[col]]
+            out[col] = [_fmt_kind(v, k) for v, k in zip(out[col], kinds)]
         return out
+
+    def _row_kinds(self, n: int) -> list[str]:
+        """Per-row value kinds for the displayed block (all money for the
+        raw statements)."""
+        block = self._current_block() or {}
+        kinds = list(block.get("kinds") or [])
+        return (kinds + [MONEY] * n)[:n]
 
     def _write_xlsx(self, path: str, df: pd.DataFrame) -> None:
         """Styled Excel export: title bar, dark header band, thousands-
@@ -379,7 +662,9 @@ class FundamentalsPanel(Panel):
         # data: label column left, figures right with thousands separators;
         # small magnitudes (per-share items) keep decimals, negatives go red
         zebra = PatternFill("solid", fgColor=_xl(_DOC["BG_ALT"]))
+        kinds = self._row_kinds(len(df))
         for r, row in enumerate(df.itertuples(index=False), start=3):
+            kind = kinds[r - 3]
             for c, value in enumerate(row, start=1):
                 cell = ws.cell(row=r, column=c, value=value)
                 if r % 2 == 1:
@@ -389,8 +674,15 @@ class FundamentalsPanel(Panel):
                     continue
                 cell.alignment = Alignment(horizontal="right")
                 cell.font = Font(size=10)
-                if isinstance(value, (int, float)):
-                    fmt = "#,##0" if abs(value) >= 1000 else "#,##0.00"
+                if isinstance(value, float) and value != value:
+                    cell.value = None
+                elif isinstance(value, (int, float)):
+                    if kind == PCT:
+                        fmt = "0.00%"
+                    elif kind == RATIO:
+                        fmt = '0.00"x"'
+                    else:
+                        fmt = "#,##0" if abs(value) >= 1000 else "#,##0.00"
                     cell.number_format = f"{fmt};[Red]({fmt})"
 
         label_width = max(

@@ -343,6 +343,28 @@ to show only the rows that match. Right-click any table to
 remembered with the layout). The Financials panel additionally offers styled
 Excel export and clipboard copy from its toolbar.</p>
 
+<h2>Debt analysis</h2>
+<p>The Financials panel's <b>Debt</b> tab derives a credit view from the
+statements: total, short- and long-term debt, leases, cash and <b>net debt</b>;
+interest expense and cash interest paid; the <b>implied cost of debt</b>
+(interest ÷ average debt, with and without leases); interest coverage,
+<b>Debt/EBITDA</b>, Net Debt/EBITDA, Debt/Equity and Debt/Capital; and debt
+issued and repaid. Quarterly figures are annualized ×4 for rates and multiples.
+The implied rates are <i>estimates</i>. Hover a line to see its formula, and use
+<b>Browser &#9656; SEC EDGAR</b> for the company's reported weighted-average
+rate in its 10-K debt note.</p>
+
+<h2>Key Metrics &amp; history</h2>
+<p>The <b>Key Metrics</b> panel (Research) lists valuation, earnings,
+profitability, dividend and risk ratios for the linked symbol: P/E on trailing
+(<b>TTM</b>) and next-twelve-month (<b>NTM</b>) earnings, P/B, P/S, EV/EBITDA,
+FCF yield, EBITDA and Adj. EBITDA, margins, ROE, dividend yield (TTM and NTM),
+payout, beta and volatility. Each metric is set against its own five-year
+<b>average, low, high and percentile</b>. <b>Click any row</b> to open its
+history chart, with a range picker, average and &plusmn;1&sigma; lines, and a
+Copy button. The chart follows the panel's link group, so it redraws when you
+switch symbols. Hover a metric's name to see how it is calculated.</p>
+
 <h2>Workspaces</h2>
 <p>Aurantium ships curated starter workspaces — <b>Macro Desk</b>,
 <b>Commodities Desk</b> and <b>Equity Research</b> — each a ready-made

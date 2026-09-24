@@ -42,6 +42,7 @@ providers keep the topics fresh (TTL-based polling, shared cache, rate limits):
 | `dayev:AAPL:2026-03-09..2026-03-15` | Dated corporate events `{events:[{date, kind, title, detail}]}`; kinds `earnings`/`dividend`/`split`/`rating` | 6 h |
 | `profile:AAPL` | Company profile `{name, description, sector, industry, market_cap, pe_trailing/forward, eps, dividend_yield, beta, week52_high/low, employees, website, officers}` | 24 h |
 | `financials:AAPL` | Income/balance/cashflow statements, annual+quarterly: `{income|balance|cashflow: {annual|quarterly: {columns, rows}}}` | 24 h |
+| `metrics:AAPL` | Key metrics with history: `{symbol, name, currency, price, metrics: [{id, label, group, kind, value, quote, note, history: {t, v}, stats}]}` (see `valuation.py`) | 6 h |
 | `earnings:AAPL` | `{next_date, rows: [[date, eps_est, eps_reported, surprise_pct]]}` | 6 h |
 | `dividends:AAPL` | `{yield_pct, rate, ex_date, payout_ratio, history, splits}` | 6 h |
 | `holders:AAPL` | `{insiders_pct, institutions_pct, top: [[holder, shares, pct, value]]}` | 24 h |
@@ -76,6 +77,7 @@ as you like (e.g. two Topic News feeds with different queries):
 | Chart Grid | Grid of mini index/commodity charts; click a cell to drive linked panels | Comma-separated symbol list |
 | Commodities | GLCO-style energy + metals monitor | "Edit…" dialog for both sections |
 | Financials | Bloomberg-FA-style statements table | Income/Balance/Cash Flow × Annual/Quarterly toggles |
+| Key Metrics | Valuation / earnings / profitability / dividend / risk ratios vs their 5-year range; click a row for its history chart | — (follows link group) |
 | Earnings | Next earnings date + EPS est vs actual history | — (follows link group) |
 | Dividends | Yield, rate, ex-date, payout + dividend/split history | — (follows link group) |
 | Holders | Insider/institution % + top institutional holders | — (follows link group) |

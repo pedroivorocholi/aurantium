@@ -51,6 +51,9 @@ def register_all_providers() -> None:
     hub.set_policy("cftc:*", TopicPolicy(ttl_s=3600, min_interval_s=120))
     hub.set_policy("eia:*", TopicPolicy(ttl_s=3600, min_interval_s=120))
     hub.set_policy("financials:*", TopicPolicy(ttl_s=86400, min_interval_s=120))
+    # Key metrics mix daily prices with quarterly statements: refresh a few
+    # times a day, not every minute.
+    hub.set_policy("metrics:*", TopicPolicy(ttl_s=21600, min_interval_s=120))
     hub.set_policy("holders:*", TopicPolicy(ttl_s=86400, min_interval_s=120))
     hub.set_policy("earnings:*", TopicPolicy(ttl_s=21600, min_interval_s=120))
     hub.set_policy("dividends:*", TopicPolicy(ttl_s=21600, min_interval_s=120))

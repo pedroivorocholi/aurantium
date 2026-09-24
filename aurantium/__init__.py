@@ -1,3 +1,3 @@
 """aurantium — a personal, Bloomberg-style, customizable market dashboard."""
 
-__version__ = "1.9.3"
+__version__ = "1.10.0"

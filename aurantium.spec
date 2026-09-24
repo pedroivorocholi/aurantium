@@ -64,6 +64,9 @@ hiddenimports += [
     "aurantium.providers.market",
     "aurantium.providers.news",
     "aurantium.providers.dayinfo",
+    # Key-metrics maths. Imported lazily inside FundamentalsProvider's
+    # metrics fetch, so static analysis never sees it.
+    "aurantium.valuation",
 ]
 # Shared UI components (imported by panels) and the onboarding dialog (imported
 # lazily inside app.py). Listed explicitly so the frozen build never misses them.

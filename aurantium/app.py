@@ -10,7 +10,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import PySide6QtAds as QtAds
-from PySide6.QtCore import Qt, QSettings
+from PySide6.QtCore import QEvent, QObject, QSettings, Qt, QTimer
 from PySide6.QtGui import (
     QAction,
     QActionGroup,
@@ -87,6 +87,21 @@ CURRENT_LAYOUT_VERSION = 1
 WORKSPACE_CHOOSER_SHOWN_KEY = "workspaceChooser/shown"
 
 
+class _DockParentWatch(QObject):
+    """Re-checks a dock after it changes parent — i.e. after it was dropped
+    somewhere — so a panel that arrived floating loses the ability to float
+    once it lives in the layout."""
+
+    def __init__(self, win: "MainWindow") -> None:
+        super().__init__(win)
+        self._win = win
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt override)
+        if event.type() == QEvent.Type.ParentChange:
+            QTimer.singleShot(0, lambda d=obj: self._win._lock_if_docked(d))
+        return False
+
+
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -100,6 +115,7 @@ class MainWindow(QMainWindow):
         self._pre_maximize_state = None  # QByteArray snapshot to restore on exit
         self._last_closed: dict | None = None  # for reopen-last-closed (Ctrl+Shift+T)
         self._loading_layout = False  # guard: mass-close during layout swap isn't a user close
+        self._dock_watch = _DockParentWatch(self)
         self._maximizing = False  # guard: hiding siblings is not a real close
         self._last_refresh_all = 0.0  # monotonic timestamp, debounces F5
         # OS full-screen (borderless, covers the taskbar). Distinct from the
@@ -136,10 +152,11 @@ class MainWindow(QMainWindow):
         bl.addWidget(self._cmd, 1)
         self.setMenuWidget(self._wrap_menu_and_bar(bar))
 
-        # Docking behaviour: panels move and snap into place and never tear off
-        # into free-floating windows — floating is disabled per-panel in
-        # add_panel unless the panel class opts in via Panel.FLOATABLE (only
-        # the Day Brief does). Live splitter resize + even splits for free
+        # Docking behaviour: a panel opened from the menu arrives as its own
+        # window; dragged into the layout it snaps in, and from then on docked
+        # panels move and snap but never tear off into windows (add_panel /
+        # _on_dock_top_level). Panel.FLOATABLE (the Day Brief) is the one
+        # class that may always float. Live splitter resize + even splits for free
         # arranging.
         _cfg = QtAds.CDockManager
         for _flag in (
@@ -1033,8 +1050,10 @@ class MainWindow(QMainWindow):
             sub = self._m_panels.addMenu(cat)
             for meta in metas:
                 act = QAction(meta.title, self)
+                # a panel opened from the menu arrives as its own window,
+                # so it never reshuffles the layout; drag it in to dock it
                 act.triggered.connect(
-                    lambda _=False, pid=meta.id: self.add_panel(pid)
+                    lambda _=False, pid=meta.id: self.add_panel(pid, floating=True)
                 )
                 sub.addAction(act)
 
@@ -1179,7 +1198,7 @@ class MainWindow(QMainWindow):
         arg = parts[1].strip() if len(parts) > 1 else ""
         if cmd == "add":
             if PanelRegistry.get(arg):
-                self.add_panel(arg)
+                self.add_panel(arg, floating=True)
                 self.notify(f"Added panel: {arg}", 3000)
             else:
                 self.notify(
@@ -1207,6 +1226,47 @@ class MainWindow(QMainWindow):
             self.notify(f"Unknown command: /{cmd}", 3000, level="warn")
 
     # -- panel management --------------------------------------------------------
+
+    def _on_dock_top_level(self, dock, is_floating: bool) -> None:
+        """A panel that arrived floating has been dragged into the layout:
+        from now on it moves and snaps like every docked panel and can't be
+        torn back out into a window."""
+        if not is_floating:
+            dock.setFeature(QtAds.CDockWidget.DockWidgetFloatable, False)
+
+    def _lock_if_docked(self, dock) -> None:
+        try:
+            floating = dock.isFloating() or dock.isInFloatingContainer()
+        except RuntimeError:  # deleted while the check was queued
+            return
+        if not floating:
+            self._on_dock_top_level(dock, False)
+
+    def _place_new_window(self, container, size: tuple[int, int] = (760, 540)) -> None:
+        """Centre a newly opened panel's window over the main window, stepping
+        each one down-right so several opened in a row don't stack exactly."""
+        if container is None:
+            return
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is None:
+            return
+        avail = screen.availableGeometry()
+        w = min(size[0], int(avail.width() * 0.9))
+        h = min(size[1], int(avail.height() * 0.9))
+        floating_now = sum(
+            1 for d in self._docks.values() if d.isFloating() or d.isInFloatingContainer()
+        )
+        step = 28 * (floating_now % 6)
+        centre = self.geometry().center()
+        x = centre.x() - w // 2 + step
+        y = centre.y() - h // 2 + step
+        x = min(max(avail.left(), x), avail.right() - w)
+        y = min(max(avail.top(), y), avail.bottom() - h)
+        try:
+            container.resize(w, h)
+            container.move(x, y)
+        except Exception:  # pragma: no cover - geometry is best-effort
+            pass
 
     def _place_floating(self, container, size: tuple[int, int] = (620, 700)) -> None:
         """Size and position a freshly floated panel.
@@ -1243,17 +1303,23 @@ class MainWindow(QMainWindow):
         area: QtAds.DockWidgetArea = QtAds.DockWidgetArea.CenterDockWidgetArea,
         target_instance: str | None = None,
         floating: bool = False,
+        restore_floating: bool = False,
     ) -> QtAds.CDockWidget | None:
         """Create a panel dock. ``area`` is global unless ``target_instance``
         names an existing panel instance — then the new dock is placed
         relative to (or tabbed into, with CenterDockWidgetArea) that panel's
         dock area. Lets layouts build precise multi-column arrangements.
 
-        ``floating`` opens the panel as its own window instead of docking it,
-        and is only honoured for panels whose class sets ``FLOATABLE`` (see
-        panel.py). Docking a panel into a tuned layout costs every other panel
-        width; for something opened on demand and closed again that trade is
-        wrong."""
+        ``floating`` opens the panel as its own window instead of docking it.
+        Docking a new panel into a tuned layout costs every other panel width,
+        so panels the user opens from the menu arrive floating. Once the user
+        drags one into the layout it loses the ability to float again (see
+        ``_on_dock_top_level``) — docked panels move and snap, never tear off —
+        unless its class sets ``FLOATABLE`` (the Day Brief).
+
+        ``restore_floating`` is for layout restore: the panel was still a
+        window when the layout was saved, so it must be allowed to float for
+        ``restoreState`` to put it back in one."""
         meta = PanelRegistry.get(panel_id)
         if meta is None:
             return None
@@ -1299,9 +1365,17 @@ class MainWindow(QMainWindow):
         # panels that opt in via Panel.FLOATABLE — for everything else dragging
         # relocates and snaps, and never produces a free window. Read from the
         # class, not the call, so a restored layout gets the same feature bits.
-        can_float = bool(getattr(meta.cls, "FLOATABLE", False))
+        always_float = bool(getattr(meta.cls, "FLOATABLE", False))
+        can_float = always_float or floating or restore_floating
         dock.setFeature(QtAds.CDockWidget.DockWidgetMovable, True)
         dock.setFeature(QtAds.CDockWidget.DockWidgetFloatable, can_float)
+        if not always_float:
+            # A drop into the layout always re-parents the dock (whatever QtAds
+            # signals do or don't fire for that drop path), so watch for that.
+            dock.installEventFilter(self._dock_watch)
+            dock.topLevelChanged.connect(
+                lambda is_floating, d=dock: self._on_dock_top_level(d, is_floating)
+            )
         # Let a panel be dragged down to a small size — size from the content's
         # own minimum (near-zero) rather than its full size hint.
         dock.setMinimumSizeHintMode(
@@ -1318,8 +1392,10 @@ class MainWindow(QMainWindow):
         self._maximize_actions[instance_id] = max_act
         dock.closed.connect(lambda iid=instance_id: self._on_dock_closed(iid))
         target = self._docks.get(target_instance) if target_instance else None
-        if floating and can_float:
+        if floating and always_float:
             self._place_floating(self.dock_manager.addDockWidgetFloating(dock))
+        elif floating:
+            self._place_new_window(self.dock_manager.addDockWidgetFloating(dock))
         elif target is not None:
             self.dock_manager.addDockWidget(area, dock, target.dockAreaWidget())
         else:
@@ -1352,6 +1428,7 @@ class MainWindow(QMainWindow):
                     "panel_id": panel.panel_id,
                     "link_group": panel.link_group,
                     "settings": panel.settings(),
+                    "floating": bool(dock.isFloating() or dock.isInFloatingContainer()),
                 }
             )
         # If a panel is maximized, the live arrangement has the others hidden.
@@ -1406,6 +1483,7 @@ class MainWindow(QMainWindow):
                 instance_id=spec.get("instance"),
                 link_group=spec.get("link_group"),
                 settings=spec.get("settings"),
+                restore_floating=bool(spec.get("floating")),
             )
         state = doc.get("ads_state", "")
         if state:

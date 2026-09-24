@@ -21,6 +21,7 @@ BUILTIN = (
     "futures_curve",
     "fx_monitor",
     "holders",
+    "key_metrics",
     "macro",
     "movers",
     "news",

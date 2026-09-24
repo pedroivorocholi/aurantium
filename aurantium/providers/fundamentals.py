@@ -19,6 +19,7 @@ from ..datahub import DataHub, Provider
 from ._yf import (
     RATE_LIMIT_GATE,
     RATE_LIMIT_MESSAGE,
+    is_rate_limited,
     publish_fetch_error,
     with_retry,
 )
@@ -29,6 +30,9 @@ from ._yf import (
 # stuck call keeps running in its own helper thread, which Python can't kill,
 # but it no longer blocks the pool).
 _FETCH_TIMEOUT_S = 20.0
+# Key metrics fans out to ~ten Yahoo endpoints (run in parallel); give the
+# whole bundle more room than a single call.
+_METRICS_TIMEOUT_S = 45.0
 
 
 def _as_float(x: Any) -> Optional[float]:
@@ -205,6 +209,7 @@ class FundamentalsProvider(Provider):
             "holders:*",
             "options:*",
             "movers:*",
+            "metrics:*",
         ]
 
     def refresh(self, topics: list[str]) -> None:
@@ -224,13 +229,21 @@ class FundamentalsProvider(Provider):
                 symbol = parts[1]
                 expiry = parts[2] if len(parts) == 3 else None
                 hub.run_async(lambda t=topic, s=symbol, e=expiry: self._guarded(t, lambda: self._fetch_options(t, s, e)))
+            elif kind == "metrics" and len(parts) == 2:
+                hub.run_async(
+                    lambda t=topic, s=parts[1]: self._guarded(
+                        t, lambda: self._fetch_metrics(t, s), timeout=_METRICS_TIMEOUT_S
+                    )
+                )
             elif kind == "movers" and len(parts) == 2:
                 hub.run_async(lambda t=topic, k=parts[1]: self._guarded(t, lambda: self._fetch_movers(t, k)))
             else:
                 hub.publish_error(topic, f"unrecognized topic: {topic}")
 
     @staticmethod
-    def _guarded(topic: str, fetch: Callable[[], None]) -> None:
+    def _guarded(
+        topic: str, fetch: Callable[[], None], timeout: float = _FETCH_TIMEOUT_S
+    ) -> None:
         """Run a fetch body with a hard timeout so a hung yfinance call frees its
         QThreadPool worker instead of pinning it.
 
@@ -254,8 +267,56 @@ class FundamentalsProvider(Provider):
                 done.set()
 
         threading.Thread(target=_run, name=f"fetch:{topic}", daemon=True).start()
-        if not done.wait(_FETCH_TIMEOUT_S):
+        if not done.wait(timeout):
             DataHub.instance().publish_error(topic, "data source timed out")
+
+    # -- key metrics ---------------------------------------------------
+
+    def _fetch_metrics(self, topic: str, symbol: str) -> None:
+        """Raw pieces for the Key Metrics panel, fetched in parallel, then
+        reduced to current values + history by ``valuation.build_metrics``.
+        Every piece is optional — a missing one blanks only the metrics
+        that need it."""
+        from concurrent.futures import ThreadPoolExecutor
+
+        from ..valuation import build_metrics
+
+        hub = DataHub.instance()
+        try:
+            tkr = yf.Ticker(symbol)
+            jobs = {
+                "info": lambda: with_retry(lambda: tkr.info) or {},
+                "prices": lambda: tkr.history(period="10y", interval="1d", auto_adjust=False, actions=True),
+                "bench": lambda: yf.Ticker("^GSPC").history(period="10y", interval="1d")["Close"],
+                "earnings_dates": lambda: tkr.get_earnings_dates(limit=48),
+                "earnings_estimate": lambda: tkr.earnings_estimate,
+                "income_a": lambda: tkr.income_stmt,
+                "income_q": lambda: tkr.quarterly_income_stmt,
+                "balance_a": lambda: tkr.balance_sheet,
+                "balance_q": lambda: tkr.quarterly_balance_sheet,
+                "cashflow_a": lambda: tkr.cashflow,
+                "cashflow_q": lambda: tkr.quarterly_cashflow,
+            }
+            with ThreadPoolExecutor(max_workers=6) as pool:
+                futures = {k: pool.submit(self._safe_df, fn) for k, fn in jobs.items()}
+                got = {k: f.result() for k, f in futures.items()}
+            prices = got.get("prices")
+            if prices is None or getattr(prices, "empty", True):
+                hub.publish_error(topic, "no price history for this symbol")
+                return
+            raw = {
+                "symbol": symbol,
+                "info": got.get("info") or {},
+                "prices": prices,
+                "bench": got.get("bench"),
+                "earnings_dates": got.get("earnings_dates"),
+                "earnings_estimate": got.get("earnings_estimate"),
+            }
+            for kind in ("income", "balance", "cashflow"):
+                raw[kind] = {"annual": got.get(f"{kind}_a"), "quarterly": got.get(f"{kind}_q")}
+            hub.publish(topic, build_metrics(raw))
+        except Exception as exc:
+            publish_fetch_error(hub, topic, "key metrics fetch failed", exc)
 
     # -- financials ----------------------------------------------------
 
@@ -285,27 +346,45 @@ class FundamentalsProvider(Provider):
         hub = DataHub.instance()
         try:
             tkr = yf.Ticker(symbol)
+            errors: list[BaseException] = []
+
+            def get(fn: Callable[[], Any]) -> Any:
+                # like _safe_df, but remember *why* a statement came back
+                # empty so the panel can say so instead of sitting blank
+                try:
+                    return fn()
+                except Exception as exc:
+                    errors.append(exc)
+                    return None
+
             value = {
                 "symbol": symbol,
                 "income": {
-                    "annual": self._stmt_dict(self._safe_df(lambda: tkr.income_stmt)),
-                    "quarterly": self._stmt_dict(
-                        self._safe_df(lambda: tkr.quarterly_income_stmt)
-                    ),
+                    "annual": self._stmt_dict(get(lambda: tkr.income_stmt)),
+                    "quarterly": self._stmt_dict(get(lambda: tkr.quarterly_income_stmt)),
                 },
                 "balance": {
-                    "annual": self._stmt_dict(self._safe_df(lambda: tkr.balance_sheet)),
-                    "quarterly": self._stmt_dict(
-                        self._safe_df(lambda: tkr.quarterly_balance_sheet)
-                    ),
+                    "annual": self._stmt_dict(get(lambda: tkr.balance_sheet)),
+                    "quarterly": self._stmt_dict(get(lambda: tkr.quarterly_balance_sheet)),
                 },
                 "cashflow": {
-                    "annual": self._stmt_dict(self._safe_df(lambda: tkr.cashflow)),
-                    "quarterly": self._stmt_dict(
-                        self._safe_df(lambda: tkr.quarterly_cashflow)
-                    ),
+                    "annual": self._stmt_dict(get(lambda: tkr.cashflow)),
+                    "quarterly": self._stmt_dict(get(lambda: tkr.quarterly_cashflow)),
                 },
             }
+            empty = not any(
+                value[k][f]["rows"] for k in ("income", "balance", "cashflow")
+                for f in ("annual", "quarterly")
+            )
+            if empty:
+                rate_limited = next((e for e in errors if is_rate_limited(e)), None)
+                if rate_limited is not None:
+                    # don't cache "no statements" when Yahoo simply refused
+                    publish_fetch_error(hub, topic, "financials fetch failed", rate_limited)
+                    return
+                info = get(lambda: with_retry(lambda: tkr.info)) or {}
+                value["quote_type"] = str(info.get("quoteType") or "").upper()
+                value["name"] = info.get("shortName") or info.get("longName") or ""
             hub.publish(topic, value)
         except Exception as exc:
             publish_fetch_error(hub, topic, "financials fetch failed", exc)
