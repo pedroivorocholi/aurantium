@@ -20,6 +20,69 @@
     <language>en</language>
 
     <item>
+      <title>Aurantium 1.10.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.10.0</h3>
+        <ul>
+          <li>New Key Metrics panel (Panels ▸ Research): about 110 metrics across valuation, growth, profitability, returns on capital, balance sheet, efficiency, per-share, dividends, performance, risk, ownership and analysts</li>
+          <li>Every metric is shown against its own 5-year average, low, high and percentile</li>
+          <li>Click any metric to open its history chart, with 1Y–Max ranges, average and ±1σ lines, and copy to clipboard</li>
+          <li>ETFs and funds get a Fund group: AUM, expense ratio, yield, NAV premium/discount, reported returns and category</li>
+          <li>Financials has a new Debt tab: debt structure, net debt, implied cost of debt, interest coverage, leverage and debt issuance</li>
+          <li>Financials now explains an empty table (for example, an ETF doesn&#x27;t file statements) instead of showing a blank panel</li>
+          <li>Panels opened from the menu or /add now open as their own window; drag one into the layout to dock it</li>
+        </ul>
+      ]]></description>
+      <pubDate>Thu, 24 Sep 2026 19:01:15 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.10.0/aurantium-setup.exe"
+        sparkle:version="1.10.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75329672"
+        sparkle:edSignature="ofoEvOTs1cXHf47nfPn259cRG8OLPLkjsHRTGpgGcNsn2DZr9Pc2HDKwvsNYQ/XVmJmbbyZP+lgOfWKZIbwMDQ=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.10.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.10.0</h3>
+        <ul>
+          <li>New Key Metrics panel (Panels ▸ Research): about 110 metrics across valuation, growth, profitability, returns on capital, balance sheet, efficiency, per-share, dividends, performance, risk, ownership and analysts</li>
+          <li>Every metric is shown against its own 5-year average, low, high and percentile</li>
+          <li>Click any metric to open its history chart, with 1Y–Max ranges, average and ±1σ lines, and copy to clipboard</li>
+          <li>ETFs and funds get a Fund group: AUM, expense ratio, yield, NAV premium/discount, reported returns and category</li>
+          <li>Financials has a new Debt tab: debt structure, net debt, implied cost of debt, interest coverage, leverage and debt issuance</li>
+          <li>Financials now explains an empty table (for example, an ETF doesn&#x27;t file statements) instead of showing a blank panel</li>
+          <li>Panels opened from the menu or /add now open as their own window; drag one into the layout to dock it</li>
+        </ul>
+      ]]></description>
+      <pubDate>Thu, 24 Sep 2026 19:01:15 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.10.0/aurantium-mac.zip"
+        sparkle:version="1.10.0"
+        sparkle:os="macos"
+        length="291757710"
+        sparkle:edSignature="wJPXVMzYVxWM6De5F36osk8s+ZgQ0RlnII4EkVXdIBgQ7gRHyWuBpBM5KyRyIWvQ7IqUvoZjHtTuTCr11dq5Aw=="
+        type="application/zip" />
+    </item>
+    <item>
       <title>Aurantium 1.9.3</title>
       <description><![CDATA[
         <style>
