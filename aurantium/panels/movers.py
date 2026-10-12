@@ -23,6 +23,7 @@ from ..components.fmt import num as _fmt_num
 from ..components import MarketTable, NumericTableWidgetItem, make_filter_edit
 from ..panel import NULL_GLYPH, Panel, register_panel
 from ..theme import apply_tick
+from ..components.responsive_row import ResponsiveRow
 
 KINDS = [("Gainers", "gainers"), ("Losers", "losers"), ("Most Active", "actives")]
 VALID_KINDS = {kind for _label, kind in KINDS}
@@ -50,7 +51,7 @@ class MoversPanel(Panel):
         self._kind = "gainers"
         self._kind_buttons: dict[str, QPushButton] = {}
 
-        kind_row = QHBoxLayout()
+        kind_row = ResponsiveRow()
         self._kind_group = QButtonGroup(self)
         self._kind_group.setExclusive(True)
         for label, kind in KINDS:

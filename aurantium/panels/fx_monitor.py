@@ -30,6 +30,7 @@ from ..components import (
 from ..undo import UndoStack
 from ..panel import NULL_GLYPH, Panel, register_panel
 from ..theme import ACCENT, BG_HEADER, FG_DIM, apply_tick
+from ..components.responsive_row import ResponsiveRow
 
 DEFAULT_MAJORS = [
     ["EUR/USD", "EURUSD=X"],
@@ -104,7 +105,7 @@ class FXMonitorPanel(Panel):
         self.content_layout.addWidget(self._filter)
         self.content_layout.addWidget(self.table, 1)
 
-        edit_row = QHBoxLayout()
+        edit_row = ResponsiveRow()
         edit_row.addStretch(1)
         edit_btn = QPushButton("Edit…", self)
         edit_btn.clicked.connect(self._open_edit_dialog)

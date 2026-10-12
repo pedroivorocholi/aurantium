@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 from ..components import MarketTable, NumericTableWidgetItem, make_filter_edit
 from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, Panel, register_panel
 from ..theme import ACCENT
+from ..components.responsive_row import ResponsiveRow
 
 HEADERS = ["Holder", "Shares", "% Held", "Value"]
 
@@ -48,7 +49,7 @@ def _fmt_pct(value: Any) -> str:
 @register_panel(id="holders", title="Holders", category="Research")
 class HoldersPanel(Panel):
     def build(self) -> None:
-        header_row = QHBoxLayout()
+        header_row = ResponsiveRow()
         self.insiders_lbl = QLabel("Insiders: -", self)
         self.insiders_lbl.setObjectName("statValue")
         self.institutions_lbl = QLabel("Institutions: -", self)

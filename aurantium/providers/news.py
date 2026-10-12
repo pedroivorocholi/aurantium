@@ -249,6 +249,149 @@ def _fetch_one_feed(feed: tuple[str, str, str, str]) -> list[dict]:
         return []  # dead/slow feeds must not break the rest
 
 
+# -- ticker relevance -------------------------------------------------------
+#
+# Every non-RSS source searches loosely: NewsAPI matches the ticker anywhere
+# in an article body (NRG -> Houston Texans at NRG Stadium), and yfinance's
+# ticker feed mixes in peers' stories. A headline must name the company.
+
+#: Enough on-topic items that the waterfall stops asking further sources.
+RELEVANT_ENOUGH = 10
+
+_LEGAL_SUFFIXES = {
+    "inc", "incorporated", "corp", "corporation", "company", "co", "ltd",
+    "limited", "plc", "llc", "lp", "l.p", "nv", "n.v", "sa", "s.a", "ag",
+    "se", "spa", "s.p.a", "ab", "asa", "oyj", "kgaa", "bhd", "tbk",
+}
+_SHARE_CLASS = re.compile(r"\s+class\s+[a-z]\b.*$", re.IGNORECASE)
+# Futures names end in their contract month: "Gold Dec 26", "Crude Oil Nov 26".
+_CONTRACT_MONTH = re.compile(
+    r"\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{2,4}$",
+    re.IGNORECASE,
+)
+#: A fund's name is fund-family vocabulary ("State Street SPDR ... Trust"):
+#: its single words identify nothing, so only the ticker or full name count.
+_FUND_WORDS = {"etf", "fund", "trust", "index", "portfolio", "etn"}
+
+#: Name words too common to identify a company on their own.
+_GENERIC_NAME_WORDS = {
+    "energy", "power", "electric", "technologies", "technology", "tech",
+    "group", "financial", "financials", "international", "systems",
+    "semiconductor", "semiconductors", "manufacturing", "computing",
+    "holdings", "holding", "bank", "bancorp", "pharmaceuticals", "pharma",
+    "communications", "industries", "global", "capital", "partners",
+    "resources", "solutions", "services", "therapeutics", "brands",
+    "networks", "software", "entertainment", "motors", "motor", "general",
+    "american", "america", "national", "united", "first", "trust", "fund",
+    "index", "health", "healthcare", "medical", "sciences", "biosciences",
+    "labs", "laboratories", "markets", "investments", "realty",
+    "properties", "airlines", "platforms", "digital", "data", "enterprises",
+    "products", "materials", "chemical", "chemicals", "petroleum", "mining",
+    "metals", "steel", "foods", "retail", "stores", "auto", "automotive",
+    "insurance", "equity", "income", "growth", "shares", "etf", "spdr",
+    "ishares", "vanguard", "invesco", "select", "sector", "walt", "the",
+    "and", "of", "new", "north", "south", "west", "east", "world", "street",
+    "state",
+}
+
+
+def name_core(name: str) -> str:
+    """"NRG Energy, Inc." -> "NRG Energy"; "The Walt Disney Company" ->
+    "Walt Disney". Legal suffixes, share classes and a leading "The" go."""
+    s = _SHARE_CLASS.sub("", (name or "").replace(",", " ").strip())
+    s = _CONTRACT_MONTH.sub("", s)
+    words = s.split()
+    if words and words[0].lower() == "the":
+        words = words[1:]
+    while words and words[-1].lower().rstrip(".") in _LEGAL_SUFFIXES:
+        words.pop()
+    return " ".join(words)
+
+
+def _ticker_base(symbol: str) -> str:
+    """"PETR4.SA" -> "PETR4", "^TNX" -> "TNX", "EURUSD=X" -> "EURUSD"."""
+    base = symbol.lstrip("^").split("=")[0]
+    return base.split(".")[0] if "." in base and not base.startswith(".") else base
+
+
+def _ticker_pattern(symbol: str) -> re.Pattern:
+    base = _ticker_base(symbol)
+    # BRK-B is written BRK.B / BRK/B / BRK-B in headlines
+    body = r"[.\-/]".join(re.escape(p) for p in base.split("-"))
+    return re.compile(rf"(?<![A-Za-z0-9])\$?{body}(?![A-Za-z0-9])")
+
+
+def _name_patterns(name: str) -> list[re.Pattern]:
+    core = name_core(name)
+    if not core:
+        return []
+    terms = [core]
+    if _FUND_WORDS & {w.lower() for w in core.split()}:
+        return [re.compile(rf"(?<!\w){re.escape(core)}(?!\w)", re.IGNORECASE)]
+    terms += [
+        w for w in core.split()
+        if len(w) >= 4 and w.lower().strip(".&'") not in _GENERIC_NAME_WORDS
+    ]
+    return [re.compile(rf"(?<!\w){re.escape(t)}(?!\w)", re.IGNORECASE) for t in terms]
+
+
+def is_relevant(item: dict, symbol: str, name: str) -> bool:
+    """Whether a headline is about ``symbol``: the ticker (case-sensitive,
+    whole word) or a distinctive part of the company name in the title, or
+    an exchange-style mention ("(NYSE: NRG)", "$NRG") in the summary. A
+    plain ticker in the summary doesn't count — that is exactly the
+    "at NRG Stadium" false positive."""
+    title = item.get("title") or ""
+    # "GC=F", "^TNX", "EURUSD=X" aren't written in headlines, and their bases
+    # collide with ordinary text ("GC" = gastric cancer): match the name only.
+    tradable_word = not any(c in symbol for c in "=^")
+    if tradable_word and _ticker_pattern(symbol).search(title):
+        return True
+    if any(p.search(title) for p in _name_patterns(name)):
+        return True
+    if not tradable_word:
+        return False
+    base = re.escape(_ticker_base(symbol))
+    summary = item.get("summary") or ""
+    return bool(
+        re.search(rf"(?:\b[A-Z]{{2,8}}\s*:\s*|\$|\(){base}\b", summary)
+    )
+
+
+_name_cache: dict[str, str] = {}
+
+
+def company_name(symbol: str) -> str:
+    """Best-effort display name for ``symbol`` ('' when unknown). Prefers the
+    quote topic most panels already hold; otherwise one Yahoo search call,
+    cached for the session."""
+    if symbol in _name_cache:
+        return _name_cache[symbol]
+    name = ""
+    try:
+        quote = DataHub.instance().peek(f"quote:{symbol}")
+        if isinstance(quote, dict) and quote.get("name") and quote["name"] != symbol:
+            name = str(quote["name"])
+    except Exception:
+        pass
+    if not name:
+        try:
+            from ._yf import RATE_LIMIT_GATE
+
+            if not RATE_LIMIT_GATE.blocked():
+                import yfinance as yf
+
+                for q in yf.Search(symbol, max_results=5, news_count=0, timeout=6).quotes or []:
+                    if str(q.get("symbol", "")).upper() == symbol.upper():
+                        name = q.get("longname") or q.get("shortname") or ""
+                        break
+        except Exception:
+            name = ""
+    if name:  # a throttled/failed lookup must not stick for the whole session
+        _name_cache[symbol] = name
+    return name
+
+
 def _sort_by_published(items: list[dict]) -> list[dict]:
     """Newest first; unparseable timestamps sink to the bottom. Used to merge
     the per-language result sets into one coherent list."""
@@ -328,18 +471,52 @@ class NewsProvider(Provider):
         hub = DataHub.instance()
         try:
             langs = languages.spoken_languages()
-            items = self._from_rss_symbol(symbol, langs)
-            if items is None:
-                items = self._from_newsapi(symbol, langs)
-            if items is None:
-                items = self._from_gnews(symbol, langs)
-            if items is None:
-                items = self._from_yfinance(symbol)
-            if items is None:
-                items = []
-            hub.publish(topic, self._gate(items, langs))
+            hub.publish(topic, self._gate(self._symbol_items(symbol, langs), langs))
         except Exception as exc:
             hub.publish_error(topic, f"news fetch failed: {exc}")
+
+    def _symbol_items(self, symbol: str, langs: list[str]) -> list[dict]:
+        """Walk the sources in order, keeping only headlines about ``symbol``
+        and topping up from the next source until there are enough.
+
+        The old rule — first source to return *anything* wins — let one
+        loose NewsAPI match set (NRG -> NRG Stadium -> Texans coverage) mask
+        a Google News result that was entirely on topic. If nothing at all
+        passes the relevance check (an ETF or index whose headlines rarely
+        name it), the first non-empty source is shown as before rather than
+        an empty panel.
+        """
+        name = company_name(symbol)
+        core = name_core(name)
+        # Finance terms keep "Netflix" from meaning its shows' premieres.
+        subject = f'("{core}" OR {_ticker_base(symbol)})' if core else symbol
+        newsapi_q = f"{subject} AND (stock OR shares OR earnings OR analyst OR investors)"
+        sources = (
+            lambda: self._from_rss_symbol(symbol, langs),
+            lambda: self._from_newsapi(newsapi_q, langs),
+            lambda: self._from_gnews(symbol, langs),
+            lambda: self._from_yfinance(symbol),
+        )
+        kept: list[dict] = []
+        seen: set[str] = set()
+        fallback: Optional[list[dict]] = None
+        for fetch in sources:
+            items = fetch()
+            if not items:
+                continue
+            if fallback is None:
+                fallback = items
+            for item in items:
+                key = re.sub(r"\W+", " ", (item.get("title") or "").lower()).strip()
+                if key in seen or not is_relevant(item, symbol, name):
+                    continue
+                seen.add(key)
+                kept.append(item)
+            if len(kept) >= RELEVANT_ENOUGH:
+                break
+        if not kept:
+            return fallback or []
+        return _sort_by_published(kept)
 
     def _fetch_query(self, topic: str, query: str) -> None:
         """Free-text query waterfall: NewsAPI -> gnews, no yfinance fallback

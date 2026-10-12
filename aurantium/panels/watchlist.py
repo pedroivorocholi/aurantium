@@ -31,6 +31,7 @@ from ..components import (
 from ..panel import NULL_GLYPH, Panel, register_panel
 from ..undo import UndoStack
 from ..theme import ACCENT, apply_tick
+from ..components.responsive_row import ResponsiveRow
 
 DEFAULT_SYMBOLS = [
     "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "TSLA",
@@ -91,7 +92,7 @@ class WatchlistPanel(Panel):
         self.content_layout.addWidget(self._filter)
         self.content_layout.addWidget(self.table, 1)
 
-        add_row = QHBoxLayout()
+        add_row = ResponsiveRow()
         self.symbol_edit = QLineEdit(self)
         self.symbol_edit.setPlaceholderText("Add symbol or name…")
         self.symbol_edit.returnPressed.connect(self._add_symbol)

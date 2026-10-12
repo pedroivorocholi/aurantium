@@ -73,6 +73,10 @@ hiddenimports += [
 hiddenimports += [
     "aurantium.components",
     "aurantium.components.market_table",
+    "aurantium.components.fit_width",
+    "aurantium.components.chip_bar",
+    "aurantium.components.responsive_row",
+    "aurantium.components.action_bar",
     "aurantium.components.fmt",
     # Pure-maths colour module: OKLab, CVD and contrast. Imported normally by
     # theme.py and several panels, so static analysis should find it — listed

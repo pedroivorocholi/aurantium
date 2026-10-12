@@ -17,6 +17,7 @@ from ..components.fmt import num as _fmt_price
 from ..components import MarketTable, make_filter_edit
 from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, Panel, register_panel
 from ..theme import DOWN, FG_DIM, FONT_TITLE, UP
+from ..components.responsive_row import ResponsiveRow
 
 UPGRADE_HEADERS = ["Date", "Firm", "Action", "From", "To"]
 
@@ -39,7 +40,7 @@ class AnalystPanel(Panel):
         # -- summary strip ------------------------------------------------
         summary = QVBoxLayout()
 
-        rec_row = QHBoxLayout()
+        rec_row = ResponsiveRow()
         self.rec_lbl = QLabel("—", self)
         self.rec_lbl.setStyleSheet(f"font-weight: 700; font-size: {FONT_TITLE}px;")
         self.mean_lbl = QLabel("", self)
@@ -50,7 +51,7 @@ class AnalystPanel(Panel):
         rec_row.addStretch(1)
         summary.addLayout(rec_row)
 
-        target_row = QHBoxLayout()
+        target_row = ResponsiveRow()
         self.target_low_lbl = QLabel("Low: -", self)
         self.target_mean_lbl = QLabel("Mean: -", self)
         self.target_high_lbl = QLabel("High: -", self)

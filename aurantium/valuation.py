@@ -24,7 +24,8 @@ Method, in one place (each metric's ``note`` repeats the part that applies):
   *final* pre-report consensus, which is later information than was known on
   the day plotted.
 * **Beta** is rolling 60-month beta of monthly returns against the S&P 500 —
-  Yahoo's own convention for its quoted beta.
+  Yahoo's own convention for its quoted beta. **Alpha** is the intercept of
+  that same regression, annualized.
 
 The current value of a metric with history is the latest point of that
 history, so the table, its 5-year statistics and the chart all agree. Where
@@ -170,6 +171,7 @@ CATALOGUE: list[tuple[str, str, str, str, str]] = [
     ("vs_200dma", "vs 200-Day Average", "Performance", PCT, "Price vs its 200-trading-day moving average."),
     # -- Risk --------------------------------------------------------------
     ("beta", "Beta (5Y Monthly)", "Risk", NUM, "Rolling 60-month beta of monthly returns vs the S&P 500 (36 months minimum)."),
+    ("alpha", "Alpha (5Y Monthly, ann.)", "Risk", PCT, "Jensen's alpha: the intercept of the same 60-month regression on the S&P 500 that gives beta, annualized (× 12). Zero risk-free rate; price returns, dividends excluded."),
     ("vol_1y", "Volatility (1Y)", "Risk", PCT, "Annualized standard deviation of daily returns over the trailing year."),
     ("max_dd_1y", "Max Drawdown (1Y)", "Risk", PCT, "Largest peak-to-trough fall in the trailing year."),
     ("ret_vol_1y", "Return / Volatility (1Y)", "Risk", RATIO, "1-year return ÷ 1-year volatility — a Sharpe ratio with a zero risk-free rate."),
@@ -540,19 +542,38 @@ def dividend_series(divs: pd.Series, index: pd.DatetimeIndex) -> tuple[pd.Series
     return ttm.reindex(index).fillna(0.0), indicated.reindex(index).fillna(0.0)
 
 
+def _monthly_returns(px: pd.Series, bench: pd.Series) -> pd.DataFrame:
+    m = pd.concat(
+        [px.resample("ME").last(), bench.resample("ME").last()], axis=1, keys=["s", "b"]
+    ).dropna()
+    return m.pct_change().dropna()
+
+
 def rolling_beta(px: pd.Series, bench: pd.Series, window: int = 60, min_periods: int = 36) -> pd.Series:
     """Rolling beta of month-end returns vs a benchmark."""
     if px.empty or bench.empty:
         return _empty()
-    m = pd.concat(
-        [px.resample("ME").last(), bench.resample("ME").last()], axis=1, keys=["s", "b"]
-    ).dropna()
-    r = m.pct_change().dropna()
+    r = _monthly_returns(px, bench)
     if len(r) < min_periods:
         return _empty()
     cov = r["s"].rolling(window, min_periods=min_periods).cov(r["b"])
     var = r["b"].rolling(window, min_periods=min_periods).var()
     return (cov / var).dropna()
+
+
+def rolling_alpha(px: pd.Series, bench: pd.Series, window: int = 60, min_periods: int = 36) -> pd.Series:
+    """Rolling annualized Jensen's alpha of month-end returns vs a benchmark:
+    the intercept of the same regression ``rolling_beta`` takes the slope of,
+    × 12. Zero risk-free rate, like the return/volatility ratio."""
+    if px.empty or bench.empty:
+        return _empty()
+    r = _monthly_returns(px, bench)
+    if len(r) < min_periods:
+        return _empty()
+    roll = r.rolling(window, min_periods=min_periods)
+    mean = roll.mean()
+    beta = r["s"].rolling(window, min_periods=min_periods).cov(r["b"]) / roll.var()["b"]
+    return ((mean["s"] - beta * mean["b"]) * 12).dropna()
 
 
 # -- the payload --------------------------------------------------------------------
@@ -817,6 +838,7 @@ def build_metrics(raw: dict) -> dict:
         # daily series → weekly to keep the payload small
         hist.update({k: _weekly(v) for k, v in daily.items()})
         hist["beta"] = rolling_beta(close, bench)
+        hist["alpha"] = rolling_alpha(close, bench)
         hist["eps_ttm"] = ttm_eps
         hist["eps_ntm"] = ntm_eps[ntm_eps.index <= today]
         hist["eps_growth"] = (ttm_eps / ttm_eps.shift(4) - 1).where(ttm_eps.shift(4) > 0).dropna()

@@ -80,7 +80,7 @@ PRESETS_DIR = APP_ROOT / "layouts" / "presets"
 #                     cot_history 50%w x 43%h beneath it
 #                     commodities 20%w full height | chart 30%w full height
 #   Equity Research   chart 63%w x 55%h (hero)
-#                     fundamentals+analyst 63%w x 40%h tabbed beneath
+#                     company+analyst 63%w x 40%h tabbed beneath
 #                     watchlist 15%w full height | news 22%w full height
 #
 # Re-measure after changing this table, and read each panel's rectangle rather
@@ -156,7 +156,7 @@ DESKS = [
     },
     {
         # Classic terminal shape: narrow nav column left, chart hero, and the
-        # wide tables (Financials / Analyst Recs, tabbed) across the full
+        # wide tables (Company / Analyst Recs, tabbed) across the full
         # centre width beneath it rather than squeezed into a sliver.
         "file": "equity_research.json",
         "name": "Equity Research",
@@ -165,15 +165,15 @@ DESKS = [
         "panels": [
             ("watchlist", "watchlist#1", "CenterDockWidgetArea", None),
             ("chart", "chart#1", "RightDockWidgetArea", "watchlist#1"),
-            ("fundamentals", "fundamentals#1", "BottomDockWidgetArea", "chart#1"),
-            ("analyst", "analyst#1", "CenterDockWidgetArea", "fundamentals#1"),
+            ("company", "company#1", "BottomDockWidgetArea", "chart#1"),
+            ("analyst", "analyst#1", "CenterDockWidgetArea", "company#1"),
             ("news", "news#1", "RightDockWidgetArea", None),
         ],
         "splits": [
             # outer: watchlist + centre | news
             (
                 [
-                    ["watchlist#1", "chart#1", "fundamentals#1", "analyst#1"],
+                    ["watchlist#1", "chart#1", "company#1", "analyst#1"],
                     ["news#1"],
                 ],
                 [78, 22],
@@ -181,11 +181,11 @@ DESKS = [
             # watchlist | centre column (weights are relative to the parent
             # split: 19% of the 78% region lands it at ~15% of the window)
             (
-                [["watchlist#1"], ["chart#1", "fundamentals#1", "analyst#1"]],
+                [["watchlist#1"], ["chart#1", "company#1", "analyst#1"]],
                 [19, 81],
             ),
             # centre: chart over the tabbed tables
-            ([["chart#1"], ["fundamentals#1", "analyst#1"]], [58, 42]),
+            ([["chart#1"], ["company#1", "analyst#1"]], [58, 42]),
         ],
     },
 ]

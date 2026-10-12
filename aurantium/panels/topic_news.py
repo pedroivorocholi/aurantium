@@ -14,6 +14,7 @@ from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QPushButton
 
 from ..panel import register_panel
 from ._news_common import NewsPanelBase
+from ..components.responsive_row import ResponsiveRow
 
 DEFAULT_QUERY = "markets"
 
@@ -23,7 +24,7 @@ class TopicNewsPanel(NewsPanelBase):
     def build(self) -> None:
         self._query = DEFAULT_QUERY
 
-        query_row = QHBoxLayout()
+        query_row = ResponsiveRow()
         self.query_edit = QLineEdit(self)
         self.query_edit.setText(self._query)
         self.query_edit.setPlaceholderText("Search query…")

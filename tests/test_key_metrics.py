@@ -283,12 +283,73 @@ def test_group_filter_and_fund_notice(panel):
     panel._on_metrics(V.build_metrics({"symbol": "SPY", "info": info, "prices": _prices()}))
     assert panel.notice_lbl.isVisibleTo(panel)
     assert "ETF" in panel.notice_lbl.text()
-    groups = [panel.group_combo.itemData(i) for i in range(panel.group_combo.count())]
+    groups = [panel.tabs.tabData(i) for i in range(panel.tabs.count())]
     assert "Fund" in groups and "Profitability" not in groups   # no rows there
-    panel.group_combo.setCurrentIndex(groups.index("Fund"))
+    panel.tabs.setCurrentIndex(groups.index("Fund"))
     labels = [panel.table.item(r, 0).text() for r in range(panel.table.rowCount())]
     assert labels[0] == "Fund" and any("Category" in t for t in labels)
-    assert panel.settings() == {"group": "Fund"}
+    assert panel.settings() == {"group": "Fund", "custom": []}
+
+
+def test_alpha_is_the_regression_intercept():
+    p = V.build_metrics(_raw())
+    # a stock returning 0.5%/month + 1.2 × a noisy benchmark: alpha = 6%/yr
+    months = pd.date_range("2021-01-31", "2026-08-31", freq="ME", tz="America/New_York")
+    bench = pd.Series([100 * 1.01 ** i for i in range(len(months))], index=months)
+    rng = np.random.default_rng(0)
+    b_ret = bench.pct_change().fillna(0) + rng.normal(0, 0.03, len(months))
+    s_ret = 0.005 + 1.2 * b_ret
+    bench = 100 * (1 + b_ret).cumprod()
+    px = 100 * (1 + s_ret).cumprod()
+    a = V.rolling_alpha(px, bench)
+    assert a.iloc[-1] == pytest.approx(0.06, abs=1e-6)
+    assert V.rolling_beta(px, bench).iloc[-1] == pytest.approx(1.2, abs=1e-6)
+    assert any(m["id"] == "alpha" for m in p["metrics"])
+
+
+def test_tabs_and_custom_tab(panel):
+    from aurantium.panels.key_metrics import _METRIC_ROLE, CUSTOM
+
+    panel._on_metrics(V.build_metrics(_raw()))
+    datas = [panel.tabs.tabData(i) for i in range(panel.tabs.count())]
+    assert datas[0] == "" and datas[-1] == CUSTOM and "Risk" in datas
+    # a group tab shows only that group
+    panel.tabs.setCurrentIndex(datas.index("Valuation"))
+    assert panel.table.item(0, 0).text() == "Valuation"
+    with pytest.raises(KeyError):
+        _row_of(panel, "roe")
+    # add via the row's right-click action, then look at the Custom tab
+    r = _row_of(panel, "pe_ttm")
+    (text, slot), *_ = panel._row_actions(r)
+    assert text == "Add to Custom"
+    slot()
+    panel.add_custom("roe")
+    panel.tabs.setCurrentIndex(datas.index(CUSTOM))
+    assert panel.edit_btn.isVisibleTo(panel)
+    shown = [panel.table.item(i, 0).data(_METRIC_ROLE) for i in range(panel.table.rowCount())]
+    assert shown == ["pe_ttm", "roe"]   # the user's order, no group headers
+    # rows still open their history from the Custom tab
+    panel._on_cell_clicked(0, 0)
+    assert panel._dialog.metric_id == "pe_ttm"
+    panel.remove_custom("pe_ttm")
+    assert panel.table.rowCount() == 1
+    # persisted and restored, unknown ids dropped
+    s = panel.settings()
+    assert s == {"group": CUSTOM, "custom": ["roe"]}
+    panel.restore({"group": CUSTOM, "custom": ["roe", "nope"]})
+    assert panel._custom == ["roe"]
+
+
+def test_custom_dialog_keeps_order(qapp):
+    from aurantium.panels.key_metrics import CustomMetricsDialog
+
+    dlg = CustomMetricsDialog(["roe", "pe_ttm"])
+    dlg._items["beta"].setCheckState(0, dlg._items["beta"].checkState(0).Checked)
+    assert dlg.chosen() == ["roe", "pe_ttm", "beta"]
+    dlg._filter("alpha")
+    assert not dlg._items["alpha"].isHidden() and dlg._items["roe"].isHidden()
+    dlg._clear()
+    assert dlg.chosen() == []
 
 
 def test_company_has_no_notice(panel):

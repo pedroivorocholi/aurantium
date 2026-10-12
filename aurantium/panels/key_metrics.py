@@ -21,20 +21,27 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
-    QComboBox,
     QDialog,
+    QDialogButtonBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QPushButton,
     QTableWidgetItem,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
 )
 
 from ..components import MarketTable, attach_hover, make_filter_edit
+from ..components.chip_bar import ChipBar
 from ..components.fmt import compact
 from ..panel import NULL_GLYPH, Panel, register_panel
 from ..theme import ACCENT, BG, BG_HEADER, FG_DIM, FG_MUTED
-from ..valuation import DAYS, MONEY, NUM, PCT, RATIO, TEXT, history_rows, stats
+from ..valuation import (
+    CATALOGUE, DAYS, GROUPS, MONEY, NUM, PCT, RATIO, TEXT, history_rows, stats,
+)
+from ..components.responsive_row import ResponsiveRow
 
 HEADERS = ["Metric", "Current", "5Y Avg", "5Y Low", "5Y High", "5Y %ile"]
 COL_METRIC, COL_CUR, COL_AVG, COL_LOW, COL_HIGH, COL_PCT = range(6)
@@ -46,6 +53,9 @@ RANGES = [("1Y", 365), ("3Y", 3 * 365), ("5Y", 5 * 365), ("10Y", 10 * 365), ("Ma
 _SPARSE = 16
 
 _METRIC_ROLE = Qt.ItemDataRole.UserRole + 1
+
+#: tab data for the user's own pick of metrics ("" = all groups)
+CUSTOM = "__custom__"
 
 
 def fmt_metric(value: Any, kind: str) -> str:
@@ -97,7 +107,7 @@ class MetricHistoryDialog(QDialog):
         root.setContentsMargins(10, 10, 10, 10)
         root.setSpacing(6)
 
-        top = QHBoxLayout()
+        top = ResponsiveRow()
         self.title_lbl = QLabel("", self)
         self.title_lbl.setObjectName("statValue")
         top.addWidget(self.title_lbl)
@@ -152,7 +162,7 @@ class MetricHistoryDialog(QDialog):
         self.note_lbl.setWordWrap(True)
         root.addWidget(self.note_lbl)
 
-        bottom = QHBoxLayout()
+        bottom = ResponsiveRow()
         bottom.addStretch(1)
         self.copy_btn = QPushButton("Copy", self)
         self.copy_btn.setToolTip("Copy the history (date, value) to the clipboard")
@@ -283,12 +293,93 @@ class MetricHistoryDialog(QDialog):
         QApplication.clipboard().setText("\n".join(lines) + "\n")
 
 
-@register_panel(id="key_metrics", title="Key Metrics", category="Research")
+class CustomMetricsDialog(QDialog):
+    """Tick the metrics the Custom tab shows, from the full catalogue.
+
+    Already-chosen metrics keep their order; newly ticked ones are appended
+    in catalogue order.
+    """
+
+    def __init__(self, chosen: list[str], parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowFlag(Qt.WindowType.WindowContextHelpButtonHint, False)
+        self.setWindowTitle("Custom key metrics")
+        self.resize(420, 560)
+        self._initial = list(chosen)
+        picked = set(chosen)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(10, 10, 10, 10)
+        root.setSpacing(6)
+        hint = QLabel("Tick the metrics to show on the Custom tab.", self)
+        hint.setObjectName("secondary")
+        root.addWidget(hint)
+        self.search = QLineEdit(self)
+        self.search.setPlaceholderText("Find metric…")
+        self.search.setClearButtonEnabled(True)
+        self.search.textChanged.connect(self._filter)
+        root.addWidget(self.search)
+
+        self.tree = QTreeWidget(self)
+        self.tree.setHeaderHidden(True)
+        self._items: dict[str, QTreeWidgetItem] = {}
+        groups: dict[str, QTreeWidgetItem] = {}
+        for g in GROUPS:
+            top = QTreeWidgetItem(self.tree, [g])
+            top.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            top.setForeground(0, QColor(ACCENT))
+            groups[g] = top
+        for mid, label, group, _kind, note in CATALOGUE:
+            parent_item = groups.get(group)
+            if parent_item is None:
+                continue
+            item = QTreeWidgetItem(parent_item, [label])
+            item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(0, Qt.CheckState.Checked if mid in picked else Qt.CheckState.Unchecked)
+            item.setToolTip(0, note)
+            item.setData(0, _METRIC_ROLE, mid)
+            self._items[mid] = item
+        self.tree.expandAll()
+        root.addWidget(self.tree, 1)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self
+        )
+        clear = buttons.addButton("Clear all", QDialogButtonBox.ButtonRole.ResetRole)
+        clear.clicked.connect(self._clear)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        root.addWidget(buttons)
+
+    def _filter(self, text: str) -> None:
+        needle = text.strip().lower()
+        for i in range(self.tree.topLevelItemCount()):
+            top = self.tree.topLevelItem(i)
+            any_shown = False
+            for j in range(top.childCount()):
+                child = top.child(j)
+                hide = bool(needle) and needle not in child.text(0).lower()
+                child.setHidden(hide)
+                any_shown |= not hide
+            top.setHidden(not any_shown)
+
+    def _clear(self) -> None:
+        for item in self._items.values():
+            item.setCheckState(0, Qt.CheckState.Unchecked)
+
+    def chosen(self) -> list[str]:
+        ticked = {mid for mid, it in self._items.items() if it.checkState(0) == Qt.CheckState.Checked}
+        kept = [mid for mid in self._initial if mid in ticked]
+        return kept + [mid for mid in self._items if mid in ticked and mid not in kept]
+
+
+@register_panel(id="key_metrics", title="Key Metrics", category="Research", listed=False)
 class KeyMetricsPanel(Panel):
     def build(self) -> None:
         self._data: dict = {}
         self._dialog: Optional[MetricHistoryDialog] = None
-        self._group = ""  # "" = all groups
+        self._group = ""  # "" = all groups, CUSTOM = the user's pick, else a group
+        self._custom: list[str] = []  # metric ids on the Custom tab, in order
 
         self.table = MarketTable(0, len(HEADERS), self)
         self.register_state_target(self.table)
@@ -298,17 +389,29 @@ class KeyMetricsPanel(Panel):
         )
         self.table.enable_column_menu()
         self.table.set_empty_text("No symbol linked", "Pick a stock to see its key metrics")
+        self.table.set_row_actions(self._row_actions)
         self.table.cellClicked.connect(self._on_cell_clicked)
         self.table.setMouseTracking(True)
 
+        # one chip per group: jump straight to a section instead of scrolling.
+        # One line, always — chips when they fit, a dropdown when they don't —
+        # sharing it with the search box, so the table keeps the height.
+        self.tabs = ChipBar(self)
+        self.tabs.currentChanged.connect(self._on_tab)
+        self._sync_tabs()
+
         self._filter = make_filter_edit(self.table, "Find metric…")
-        self.group_combo = QComboBox(self)
-        self.group_combo.setToolTip("Show one group of metrics")
-        self.group_combo.addItem("All groups", "")
-        self.group_combo.currentIndexChanged.connect(self._on_group)
-        top = QHBoxLayout()
-        top.addWidget(self._filter, 1)
-        top.addWidget(self.group_combo)
+        self._filter.setMinimumWidth(70)
+        self._filter.setMaximumWidth(240)
+        self.edit_btn = QPushButton("Edit…", self)
+        self.edit_btn.setToolTip("Choose the metrics on the Custom tab")
+        self.edit_btn.clicked.connect(self.edit_custom)
+        self.edit_btn.setVisible(False)
+        top = ResponsiveRow()
+        top.addWidget(self.tabs)
+        top.addStretch(1)
+        top.addWidget(self._filter)
+        top.addWidget(self.edit_btn)
         self.content_layout.addLayout(top)
 
         # one line of context when the symbol isn't an operating company
@@ -332,26 +435,77 @@ class KeyMetricsPanel(Panel):
     def _on_metrics(self, data: Any) -> None:
         self.set_loading(False)
         self._data = data if isinstance(data, dict) else {}
-        self._sync_groups()
+        self._sync_tabs()
         self._render()
         self._sync_dialog()
 
-    def _sync_groups(self) -> None:
-        """Offer only the groups this symbol has rows in, keeping the choice."""
+    def _sync_tabs(self) -> None:
+        """All · the groups this symbol has rows in · Custom, keeping the
+        choice. A group the new symbol lacks falls back to All for now but is
+        remembered, so it comes back with the next symbol that has it."""
         present = {m.get("group") for m in self._metrics() if self._shown(m)}
         groups = [g for g in (self._data.get("groups") or []) if g in present]
-        self.group_combo.blockSignals(True)
-        self.group_combo.clear()
-        self.group_combo.addItem("All groups", "")
-        for g in groups:
-            self.group_combo.addItem(g, g)
-        i = self.group_combo.findData(self._group)
-        self.group_combo.setCurrentIndex(max(i, 0))
-        self.group_combo.blockSignals(False)
+        tabs = [("All", "")] + [(g, g) for g in groups] + [("Custom", CUSTOM)]
+        self.tabs.blockSignals(True)
+        while self.tabs.count():
+            self.tabs.removeTab(0)
+        for label, data in tabs:
+            i = self.tabs.addTab(label)
+            self.tabs.setTabData(i, data)
+        self.tabs.setTabToolTip(self.tabs.count() - 1, "Your own pick of metrics")
+        datas = [d for _l, d in tabs]
+        self.tabs.setCurrentIndex(datas.index(self._group) if self._group in datas else 0)
+        self.tabs.blockSignals(False)
 
-    def _on_group(self, _i: int) -> None:
-        self._group = self.group_combo.currentData() or ""
+    def _on_tab(self, i: int) -> None:
+        self._group = self.tabs.tabData(i) or ""
         self._render()
+
+    def show_group(self, group: str) -> None:
+        """Open one group's tab ("" = All, ``CUSTOM`` = the user's pick).
+        A group this symbol has no rows in is remembered and shown once a
+        symbol that has it arrives."""
+        self._group = group
+        self._select_tab(group)
+        if self._data:
+            self._render()
+
+    def _select_tab(self, data: str) -> None:
+        for i in range(self.tabs.count()):
+            if self.tabs.tabData(i) == data:
+                self.tabs.setCurrentIndex(i)
+                return
+
+    # -- custom tab ---------------------------------------------------------
+
+    def _row_actions(self, row: int) -> list:
+        item = self.table.item(row, COL_METRIC) if row >= 0 else None
+        mid = item.data(_METRIC_ROLE) if item is not None else None
+        actions = []
+        if mid:
+            if mid in self._custom:
+                actions.append(("Remove from Custom", lambda: self.remove_custom(mid)))
+            else:
+                actions.append(("Add to Custom", lambda: self.add_custom(mid)))
+        actions.append(("Edit Custom Metrics…", self.edit_custom))
+        return actions
+
+    def add_custom(self, mid: str) -> None:
+        if mid not in self._custom:
+            self._custom.append(mid)
+            self._render()
+
+    def remove_custom(self, mid: str) -> None:
+        if mid in self._custom:
+            self._custom.remove(mid)
+            self._render()
+
+    def edit_custom(self) -> None:
+        dlg = CustomMetricsDialog(self._custom, self.window())
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self._custom = dlg.chosen()
+            self._select_tab(CUSTOM)
+            self._render()
 
     @staticmethod
     def _shown(m: dict) -> bool:
@@ -366,22 +520,49 @@ class KeyMetricsPanel(Panel):
 
     def _render(self) -> None:
         self.table.setRowCount(0)
-        group = None
+        # the tab actually showing — a remembered group this symbol lacks
+        # leaves All selected while ``_group`` keeps the preference
+        current = self.tabs.tabData(self.tabs.currentIndex()) or ""
+        custom = current == CUSTOM
+        self.edit_btn.setVisible(custom)
+        sym = self._data.get("symbol") or self.current_symbol
         shown = 0
-        for m in self._metrics():
-            has_hist = len((m.get("history") or {}).get("t") or []) >= 2
-            if not self._shown(m):
-                continue  # not reported for this symbol (e.g. margins on an ETF)
-            if self._group and m.get("group") != self._group:
-                continue
-            if m.get("group") != group:
-                group = m.get("group")
-                self._append_header(str(group))
-            self._append_metric(m, has_hist)
-            shown += 1
+        if custom:
+            # the user's own pick, in their order. Rows the payload has but
+            # can't fill still show (as dashes) — they were asked for by name.
+            by_id = {m.get("id"): m for m in self._metrics()}
+            for mid in self._custom:
+                m = by_id.get(mid)
+                if m is None:
+                    continue  # not offered for this kind of symbol (e.g. Fund rows on a stock)
+                self._append_metric(m, len((m.get("history") or {}).get("t") or []) >= 2)
+                shown += 1
+            if self._custom:
+                self.table.set_empty_text(
+                    "None of your custom metrics apply here", f"{sym} doesn't report them"
+                )
+            else:
+                self.table.set_empty_text(
+                    "No custom metrics yet",
+                    "Right-click a metric ▸ Add to Custom, or press Edit…",
+                )
+        else:
+            group = None
+            for m in self._metrics():
+                has_hist = len((m.get("history") or {}).get("t") or []) >= 2
+                if not self._shown(m):
+                    continue  # not reported for this symbol (e.g. margins on an ETF)
+                if current and m.get("group") != current:
+                    continue
+                if m.get("group") != group:
+                    group = m.get("group")
+                    self._append_header(str(group))
+                self._append_metric(m, has_hist)
+                shown += 1
+            if sym:
+                self.table.set_empty_text(f"No key metrics for {sym}", "")
         self.table.apply_filter(self._filter.text())
         cur = self._data.get("currency")
-        sym = self._data.get("symbol") or self.current_symbol
         qtype = (self._data.get("quote_type") or "").upper()
         notice = {
             "ETF": f"{sym} is an ETF. Funds don't file company financial statements, so "
@@ -396,8 +577,9 @@ class KeyMetricsPanel(Panel):
         }.get(qtype, "")
         self.notice_lbl.setText(notice)
         self.notice_lbl.setVisible(bool(notice))
+        # (the header strip already shows the symbol)
         self.set_status(
-            f"{sym} · {shown} metrics" + (f" · {cur}" if cur else "") + " · click a row for its history"
+            f"{shown} metrics" + (f" · {cur}" if cur else "") + " · click a row for its history"
         )
 
     def _append_header(self, text: str) -> None:
@@ -497,11 +679,20 @@ class KeyMetricsPanel(Panel):
     # -- persistence ---------------------------------------------------------
 
     def settings(self) -> dict:
-        return {"group": self._group}
+        return {"group": self._group, "custom": list(self._custom)}
 
     def restore(self, settings: dict) -> None:
-        if isinstance(settings, dict) and isinstance(settings.get("group"), str):
+        if not isinstance(settings, dict):
+            return
+        if isinstance(settings.get("custom"), list):
+            known = {m[0] for m in CATALOGUE}
+            self._custom = [m for m in settings["custom"] if isinstance(m, str) and m in known]
+        if isinstance(settings.get("group"), str):
             self._group = settings["group"]
+        self._sync_tabs()
+        self.edit_btn.setVisible(self._group == CUSTOM)
+        if self._data:
+            self._render()
 
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt override)
         if self._dialog is not None:

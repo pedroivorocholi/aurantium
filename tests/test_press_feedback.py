@@ -418,3 +418,35 @@ def test_the_scrim_follows_a_control_that_resizes_mid_press(qapp, filt):
     assert scrim.size() == button.size(), (
         f"scrim {scrim.size()} did not follow the control to {button.size()}"
     )
+
+
+# -- opt-in surfaces (Company ▸ Profile stat tiles) ----------------------------
+
+
+def test_clickable_profile_tiles_sink_like_buttons(qapp, filt):
+    """The stat tiles are frames, not buttons, so the filter skipped them and
+    a click on one acknowledged nothing. A clickable tile opts in through
+    ``pressRadius``; an inert one (Employees) stays inert."""
+    from aurantium.panels.profile import StatTile
+
+    tile = StatTile("P/E TTM")
+    tile.resize(120, 48)
+    tile.show()
+    qapp.processEvents()
+    assert press.corner_radius(tile) is None          # inert: no feedback
+    tile.set_clickable(True)
+    assert press.corner_radius(tile) == theme.RADIUS_SM
+    # users click the figure, i.e. the label child: the press propagates up
+    # to the tile, which is what sinks
+    qapp.sendEvent(tile.value, QMouseEvent(
+        QEvent.Type.MouseButtonPress, QPointF(4, 4), QPointF(4, 4),
+        Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier))
+    scrim = press.scrim_of(tile)
+    assert scrim is not None
+    _settle(qapp, scrim._anim)
+    assert press.press_level(tile) > 0.5
+    _click(qapp, tile, QEvent.Type.MouseButtonRelease)
+    _settle(qapp, scrim._anim)
+    assert press.press_level(tile) == pytest.approx(0.0)
+    tile.set_clickable(False)
+    assert press.corner_radius(tile) is None

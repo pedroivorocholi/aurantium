@@ -452,6 +452,35 @@ QLabel#statValueLarge {{
 QLabel#panelEyebrow {{
     color: {p['FG_MUTED']}; font-size: {FONT_SM}px; font-weight: {WEIGHT_BOLD}; letter-spacing: 1.5px;
 }}
+/* Stat tiles (Company ▸ Profile). A hairline box on the data surface, not a
+   raised card — the figure is the content. A tile that opens a deeper view
+   says so on hover with the accent edge; an inert tile never lights up. */
+QFrame#statTile {{
+    background: {p['BG_ALT']}; border: 1px solid {p['BORDER_STRONG']};
+    border-radius: {RADIUS_SM}px;
+}}
+QFrame#statTile[clickable="true"]:hover {{ border-color: {p['ACCENT_DEEP']}; background: {p['CHROME_LOW']}; }}
+QFrame#statTile > QLabel {{ background: transparent; }}
+QLabel#tileLabel {{
+    color: {p['FG_MUTED']}; font-size: {FONT_SM}px; font-weight: {WEIGHT_BOLD}; letter-spacing: 1px;
+}}
+QLabel#tileValue {{
+    color: {p['FG']}; font-family: "{MONO_FONT}"; font-size: {FONT_LG}px; font-weight: {WEIGHT_BOLD};
+}}
+QFrame#statTile[clickable="true"] QLabel#tileValue {{ color: {p['ACCENT']}; }}
+/* The "⋯" overflow menu on a panel's control line: a chip-height square,
+   no menu arrow — the glyph already says "more". */
+QToolButton#moreButton {{
+    font-size: {FONT_LG}px; font-weight: {WEIGHT_BOLD}; padding: 0px 8px;
+    min-height: 22px; border: 1px solid {p['BORDER_STRONG']}; border-radius: {RADIUS_SM}px;
+    background: {p['BG_ELEV']}; color: {p['CHROME_TEXT']};
+}}
+QToolButton#moreButton:hover {{ border-color: {p['ACCENT_DEEP']}; }}
+QToolButton#moreButton::menu-indicator {{ image: none; width: 0px; }}
+QLabel#profilePrice {{
+    background: transparent; color: {p['FG']};
+    font-family: "{MONO_FONT}"; font-size: {FONT_TITLE}px; font-weight: {WEIGHT_BOLD};
+}}
 QLabel#panelStatus {{
     background: transparent; color: {p['ACCENT_DEEP']};
     font-size: {FONT_SM}px; font-family: "{MONO_FONT}";

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import webbrowser
 from pathlib import Path
+from datetime import datetime
 from typing import Any, Optional
 
 import pandas as pd
@@ -19,12 +20,16 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QMenu,
     QPushButton,
+    QToolButton,
     QTableWidgetItem,
 )
 
 from ..components import MarketTable, make_filter_edit
+from ..components.action_bar import ActionBar
+from ..components.chip_bar import ChipBar
 from ..panel import NULL_GLYPH, Panel, register_panel
 from ..theme import DOWN, palette_colors
+from ..components.responsive_row import ResponsiveRow
 
 STATEMENTS = [
     ("income", "Income"),
@@ -236,7 +241,7 @@ def debt_block(data: dict, period: str) -> dict:
     add(
         "Implied Cost of Debt", PCT,
         f"ESTIMATE — {per}interest expense ÷ average Total Debt. The reported"
-        " weighted-average rate is in the 10-K debt note (Browser ▸ SEC EDGAR)",
+        " weighted-average rate is in the 10-K debt note (Browser ▸ Company filings)",
         cost,
     )
     add(
@@ -283,67 +288,52 @@ def debt_block(data: dict, period: str) -> dict:
     return {"columns": columns, "rows": rows, "kinds": kinds, "notes": notes}
 
 
-@register_panel(id="fundamentals", title="Financials", category="Research")
+@register_panel(id="fundamentals", title="Financials", category="Research", listed=False)
 class FundamentalsPanel(Panel):
     def build(self) -> None:
         self._statement = "income"
         self._period = "annual"
         self._data: dict = {}
 
-        # -- statement picker + period toggle -------------------------------
-        picker_row = QHBoxLayout()
-        self._statement_buttons: dict[str, QPushButton] = {}
-        stmt_group = QButtonGroup(self)
-        stmt_group.setExclusive(True)
+        # -- one control line: statement · period · search · actions -------
+        # One line at any width. The statement and period pickers show as
+        # chips when they fit and collapse to dropdowns when they don't; the
+        # browser / download / copy actions live in one "⋯" menu. Three rows
+        # of buttons above the table used to leave it a sliver in a narrow
+        # dock.
+        self._stmt_bar = ChipBar(self)
         for key, label in STATEMENTS:
-            btn = QPushButton(label, self)
-            btn.setCheckable(True)
-            btn.clicked.connect(lambda _=False, k=key: self._set_statement(k))
-            stmt_group.addButton(btn)
-            picker_row.addWidget(btn)
-            self._statement_buttons[key] = btn
-        picker_row.addSpacing(16)
-
-        self._period_buttons: dict[str, QPushButton] = {}
-        period_group = QButtonGroup(self)
-        period_group.setExclusive(True)
-        for key, label in PERIODS:
-            btn = QPushButton(label, self)
-            btn.setCheckable(True)
-            btn.clicked.connect(lambda _=False, k=key: self._set_period(k))
-            period_group.addButton(btn)
-            picker_row.addWidget(btn)
-            self._period_buttons[key] = btn
-        picker_row.addStretch(1)
-
-        self._browser_btn = QPushButton("Browser", self)
-        self._browser_btn.setToolTip(
-            "Open the company's SEC filings (EDGAR) or this statement on"
-            " Yahoo Finance"
+            self._stmt_bar.setTabData(self._stmt_bar.addTab(label), key)
+        self._stmt_bar.currentChanged.connect(
+            lambda i: self._set_statement(self._stmt_bar.tabData(i))
         )
-        browser_menu = QMenu(self._browser_btn)
-        edgar_act = QAction("Company filings (SEC EDGAR)", browser_menu)
-        edgar_act.triggered.connect(self._open_filings)
-        browser_menu.addAction(edgar_act)
-        yahoo_act = QAction("Statement on Yahoo Finance", browser_menu)
-        yahoo_act.triggered.connect(self._open_in_browser)
-        browser_menu.addAction(yahoo_act)
-        self._browser_btn.setMenu(browser_menu)
-        picker_row.addWidget(self._browser_btn)
+        self._period_bar = ChipBar(self)
+        for key, label in PERIODS:
+            self._period_bar.setTabData(self._period_bar.addTab(label), key)
+        self._period_bar.currentChanged.connect(
+            lambda i: self._set_period(self._period_bar.tabData(i))
+        )
 
-        self._download_btn = QPushButton("Download", self)
-        self._download_btn.setToolTip("Export the displayed table (CSV / Excel)")
-        self._download_btn.clicked.connect(self._download)
-        picker_row.addWidget(self._download_btn)
-
-        self._copy_btn = QPushButton("Copy", self)
-        self._copy_btn.setToolTip("Copy the displayed table to the clipboard")
-        self._copy_btn.clicked.connect(self._copy_to_clipboard)
-        picker_row.addWidget(self._copy_btn)
-
-        self.content_layout.addLayout(picker_row)
-        self._update_buttons()
-        self._update_actions()
+        # Browser ▾ · Download · Copy as buttons when there's room (a
+        # maximized panel); folded into one "⋯" menu when there isn't
+        self._actions = ActionBar(self)
+        browser = self._actions.add_menu(
+            "Browser", "Open the company's SEC filings (EDGAR) or this statement on Yahoo Finance"
+        )
+        self._edgar_act = browser.addAction("Company filings (SEC EDGAR)")
+        self._edgar_act.triggered.connect(self._open_filings)
+        self._yahoo_act = browser.addAction("Statement on Yahoo Finance")
+        self._yahoo_act.triggered.connect(self._open_in_browser)
+        self._browser_menu = browser
+        self._actions.add_separator()
+        self._download_act = self._actions.add_action(
+            "Download", self._download, "Export the displayed table (CSV / Excel)",
+            menu_text="Download (CSV / Excel)…",
+        )
+        self._copy_act = self._actions.add_action(
+            "Copy", self._copy_to_clipboard, "Copy the displayed table to the clipboard",
+            menu_text="Copy table",
+        )
 
         # -- table -----------------------------------------------------------
         self.table = MarketTable(0, 1, self)
@@ -354,16 +344,36 @@ class FundamentalsPanel(Panel):
         )
 
         self._filter = make_filter_edit(self.table, "Find line item…")
-        self.content_layout.addWidget(self._filter)
+        self._filter.setMinimumWidth(70)
+        self._filter.setMaximumWidth(220)
+
+        # pickers keep left, search and the menu keep right; the slack sits
+        # between them rather than inside the picker groups
+        controls = ResponsiveRow()
+        controls.addWidget(self._stmt_bar)
+        controls.addSpacing(6)
+        controls.addWidget(self._period_bar)
+        controls.addStretch(1)
+        controls.addWidget(self._filter)
+        controls.addWidget(self._actions)
+        # pickers reach full size first, then search; the action buttons
+        # only unfold from "⋯" once both have what they need
+        controls.set_grow_priority(self._filter, 1)
+        controls.set_grow_priority(self._actions, 2)
+        self.content_layout.addLayout(controls)
+        self._update_buttons()
+        self._update_actions()
         self.content_layout.addWidget(self.table, 1)
 
     # -- statement / period toggles -------------------------------------------
 
     def _update_buttons(self) -> None:
-        for key, btn in self._statement_buttons.items():
-            btn.setChecked(key == self._statement)
-        for key, btn in self._period_buttons.items():
-            btn.setChecked(key == self._period)
+        for bar, want in ((self._stmt_bar, self._statement), (self._period_bar, self._period)):
+            bar.blockSignals(True)
+            for i in range(bar.count()):
+                if bar.tabData(i) == want:
+                    bar.setCurrentIndex(i)
+            bar.blockSignals(False)
 
     def _set_statement(self, key: str) -> None:
         if key == self._statement:
@@ -413,6 +423,45 @@ class FundamentalsPanel(Panel):
             for f in ("annual", "quarterly")
         )
 
+    # -- period headers -----------------------------------------------------------
+
+    @staticmethod
+    def _short_period(label: str) -> str:
+        """``2025-09-30`` → ``Sep '25``: the period end at a glance, in under
+        half the width. Anything that isn't an ISO date is left as is."""
+        try:
+            d = datetime.strptime(label[:10], "%Y-%m-%d")
+        except (TypeError, ValueError):
+            return label
+        return d.strftime("%b '%y")
+
+    def _sync_header_labels(self) -> None:
+        """Full period dates when they fit, ``Sep '25`` when they don't — a
+        clipped "025-09-3" is neither date. The full date stays in the
+        tooltip either way."""
+        headers = getattr(self, "_full_headers", None)
+        if not headers or len(headers) < 2:
+            return
+        periods = headers[1:]
+        fm = self.table.horizontalHeader().fontMetrics()
+        need = max(fm.horizontalAdvance(h) for h in periods) + 24
+        per_col = (self.table.viewport().width() - 90) / len(periods)
+        compact = per_col < need
+        if compact == self._compact_headers:
+            return
+        self._compact_headers = compact
+        for col, full in enumerate(periods, start=1):
+            item = self.table.horizontalHeaderItem(col)
+            if item is None:
+                continue
+            item.setText(self._short_period(full) if compact else full)
+            item.setToolTip(full)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        super().resizeEvent(event)
+        if hasattr(self, "table"):
+            self._sync_header_labels()
+
     # -- rendering -------------------------------------------------------------
 
     def _current_block(self) -> Optional[dict]:
@@ -436,6 +485,9 @@ class FundamentalsPanel(Panel):
         headers = ["Line Item"] + [str(c) for c in columns]
         self.table.setColumnCount(len(headers))
         self.table.setHorizontalHeaderLabels(headers)
+        self._full_headers = headers
+        self._compact_headers = None
+        self._sync_header_labels()
         self.table.setRowCount(0)
 
         for idx, row_data in enumerate(rows):
@@ -515,7 +567,7 @@ class FundamentalsPanel(Panel):
             f"No {period_label} {stmt_label} statement for {sym}",
             "Yahoo Finance (no API key needed) has no statement for this symbol — "
             "common for recent listings, SPACs and some foreign tickers. Try the "
-            "other period, or Browser ▸ SEC EDGAR for the filings themselves.",
+            "other period, or Browser ▸ Company filings (SEC EDGAR) for the filings themselves.",
         )
 
     # -- statement actions: browser / download / copy -------------------------
@@ -526,9 +578,9 @@ class FundamentalsPanel(Panel):
         has_symbol = bool(self.current_symbol)
         block = self._current_block()
         has_rows = bool(block and block.get("rows"))
-        self._browser_btn.setEnabled(has_symbol)
-        self._download_btn.setEnabled(has_rows)
-        self._copy_btn.setEnabled(has_rows)
+        self._actions.set_menu_enabled(self._browser_menu, has_symbol)
+        self._download_act.setEnabled(has_rows)
+        self._copy_act.setEnabled(has_rows)
 
     def _open_in_browser(self) -> None:
         sym = self.current_symbol
@@ -732,10 +784,10 @@ class FundamentalsPanel(Panel):
         if not isinstance(settings, dict):
             return
         stmt = settings.get("statement")
-        if stmt in self._statement_buttons:
+        if stmt in dict(STATEMENTS):
             self._statement = stmt
         period = settings.get("period")
-        if period in self._period_buttons:
+        if period in dict(PERIODS):
             self._period = period
         self._update_buttons()
         self._render()

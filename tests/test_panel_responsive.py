@@ -26,18 +26,27 @@ def test_the_classes_are_ordered_by_width():
 
 
 def test_the_compact_boundary_clears_the_widest_control_row(qapp):
-    """The breakpoint is not a round number — it sits just above the widest
-    control row any panel builds (the chart's range row), so a panel that has
-    left COMPACT can always lay that row out without clipping."""
+    """A panel that has left COMPACT must lay out the chart's control rows
+    (the widest any panel builds) without clipping.
+
+    The rows are ``ResponsiveRow``s: they wrap onto another line rather than
+    clip, so the guarantee is that no single control is wider than the
+    COMPACT ceiling — then every control fits at every non-compact width."""
+    from PySide6.QtCore import QRect
+
+    from aurantium.panel import COMPACT_MAX
     from aurantium.panels.chart import ChartPanel
 
     chart = ChartPanel()
     chart.build()
-    widest = max(
-        chart._range_row.minimumSize().width(),
-        chart._interval_row.minimumSize().width(),
-    )
-    assert size_class_for(widest + 1) != COMPACT
+    for row in (chart._range_row, chart._interval_row):
+        assert row.minimumSize().width() <= COMPACT_MAX
+        width = COMPACT_MAX + 1
+        row.setGeometry(QRect(0, 0, width, row.heightForWidth(width)))
+        for i in range(row.count()):
+            item = row.itemAt(i)
+            if item.widget() is not None and not item.widget().isHidden():
+                assert item.geometry().right() < width, item.widget()
 
 
 # -- panels are told about it ----------------------------------------------

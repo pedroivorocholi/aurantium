@@ -13,6 +13,7 @@ BUILTIN = (
     "chart",
     "chart_grid",
     "commodities",
+    "company",
     "cot_history",
     "day_brief",
     "dividends",

@@ -36,6 +36,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..components import attach_suggestions
+from ..components.fit_width import fit_columns, fit_tabs
 from ..panel import NULL_GLYPH, Panel, register_panel
 from ..theme import (
     ACCENT,
@@ -48,6 +49,7 @@ from ..theme import (
     apply_tick,
 )
 from ..undo import UndoStack
+from ..components.responsive_row import ResponsiveRow
 
 (COL_SYMBOL, COL_QTY, COL_COST, COL_DATE, COL_LAST, COL_MKTVAL, COL_PNL,
  COL_PNLPCT) = range(8)
@@ -317,6 +319,9 @@ class PortfolioPanel(Panel):
         self._histories_inited = False
 
         self.tabs = QTabWidget(self)
+        fit_tabs(self.tabs)
+        self.tabs.tabBar().setMinimumWidth(1)  # below its floor, clip — never widen
+        self.tabs.setMinimumWidth(1)
         self.tabs.addTab(self._build_positions_tab(), "Positions")
         self.tabs.addTab(self._build_allocation_tab(), "Allocation")
         self.tabs.addTab(self._build_performance_tab(), "Performance")
@@ -334,6 +339,7 @@ class PortfolioPanel(Panel):
         lay.setContentsMargins(0, 0, 0, 0)
 
         self.table = QTableWidget(0, len(HEADERS), w)
+        fit_columns(self.table)
         self.table.setHorizontalHeaderLabels(HEADERS)
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -348,7 +354,7 @@ class PortfolioPanel(Panel):
         self.table.itemSelectionChanged.connect(self._on_row_selected)
         lay.addWidget(self.table, 1)
 
-        add_row = QHBoxLayout()
+        add_row = ResponsiveRow()
         self.symbol_edit = QLineEdit(w)
         self.symbol_edit.setPlaceholderText("Symbol")
         self.symbol_edit.setMaximumWidth(84)

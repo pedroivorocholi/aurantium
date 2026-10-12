@@ -80,6 +80,8 @@ class PanelRegistry:
     """Global id → panel-class registry populated by @register_panel."""
 
     _panels: dict[str, PanelMeta] = {}
+    #: retired id → (current id, settings that reproduce the retired panel)
+    _aliases: dict[str, tuple[str, dict]] = {}
 
     @classmethod
     def add(cls, meta: PanelMeta) -> None:
@@ -90,23 +92,47 @@ class PanelRegistry:
         return cls._panels.get(panel_id)
 
     @classmethod
+    def add_alias(cls, old_id: str, new_id: str, settings: dict) -> None:
+        """Keep a retired panel id openable: saved layouts, presets and
+        ``/add <old id>`` get ``new_id`` restored with ``settings``."""
+        cls._aliases[old_id] = (new_id, dict(settings))
+
+    @classmethod
+    def resolve(cls, panel_id: str) -> tuple[str, dict]:
+        """``(panel_id, extra settings)`` — a retired id mapped to its
+        replacement, anything else returned as-is."""
+        if panel_id not in cls._panels and panel_id in cls._aliases:
+            new_id, settings = cls._aliases[panel_id]
+            return new_id, dict(settings)
+        return panel_id, {}
+
+    @classmethod
+    def known_ids(cls) -> set[str]:
+        """Every id a layout may name: registered panels plus retired aliases."""
+        return set(cls._panels) | set(cls._aliases)
+
+    @classmethod
     def all(cls) -> list[PanelMeta]:
         return sorted(cls._panels.values(), key=lambda m: (m.category, m.title))
 
 
-def register_panel(id: str, title: str, category: str = "General"):
+def register_panel(id: str, title: str, category: str = "General", listed: bool = True):
     """Class decorator registering a Panel subclass under ``id``.
 
     ``category="Examples"`` is reserved for tutorial files: the class is
     annotated but NOT registered, so a stray copy of a template can never
     leak into the Panels menu. To publish a copied template, change its
-    category (and id/title) along with the filename."""
+    category (and id/title) along with the filename.
+
+    ``listed=False`` annotates without registering too: for a panel that only
+    lives as a tab inside another (the Company panel's Profile, Key Metrics,
+    Financials and Earnings)."""
 
     def deco(cls: Type["Panel"]) -> Type["Panel"]:
         cls.panel_id = id
         cls.panel_title = title
         cls.panel_category = category
-        if category != "Examples":
+        if category != "Examples" and listed:
             PanelRegistry.add(PanelMeta(id=id, title=title, category=category, cls=cls))
         return cls
 
@@ -377,6 +403,22 @@ class _HeaderStrip(QWidget):
         p.end()
 
 
+class _PanelLayout(QVBoxLayout):
+    """The panel's outermost layout: fills whatever height the dock gives.
+
+    Wrapping rows (``ResponsiveRow``, chip bars) make a layout report
+    height-for-width. QtAds wraps every panel in a ``QScrollArea``, and a
+    scroll area sizes height-for-width content to its *preferred* height for
+    that width rather than to the viewport — so a chart, whose plot prefers
+    to be large, grew taller than its dock and was cut off. Hiding
+    height-for-width here, at the top, makes the panel take the dock's height
+    while every layout inside still wraps and shares that height as before.
+    """
+
+    def hasHeightForWidth(self) -> bool:  # noqa: N802 (Qt override)
+        return False
+
+
 # --------------------------------------------------------------------------
 # Panel base class
 # --------------------------------------------------------------------------
@@ -417,8 +459,12 @@ class Panel(QWidget):
         self._current_symbol = ""
         self._topics: set[str] = set()
         self._size_class = size_class_for(self.width())
+        #: the panel this one is a tab inside, if any (see ``panels/company.py``).
+        #: A hosted panel hides its own header; its status, state and symbol
+        #: clicks go through the host's instead.
+        self._host: Optional["Panel"] = None
 
-        outer = QVBoxLayout(self)
+        outer = _PanelLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
         # Don't let the content dictate a floor on the panel's size. By default
@@ -464,6 +510,11 @@ class Panel(QWidget):
         self._state_lbl.setObjectName("panelState")
         self._state_lbl.setVisible(False)
         self._state_targets: list = []
+        # info and state text clip rather than set the panel's width: a long
+        # status must never make a narrow dock scroll sideways
+        # (an explicit minimum keeps the natural width whenever there's room)
+        for lbl in (self._status_lbl, self._state_lbl):
+            lbl.setMinimumWidth(1)
         self._badge = QToolButton(header)
         self._badge.setObjectName("groupBadge")
         self._badge.setToolTip(
@@ -586,6 +637,9 @@ class Panel(QWidget):
 
     def set_symbol(self, symbol: str) -> None:
         """Publish a symbol click to this panel's link group."""
+        if self._host is not None:
+            self._host.set_symbol(symbol)
+            return
         if self._link_group == UNLINKED:
             # unlinked panels still navigate themselves
             self._apply_symbol(symbol.strip().upper())
@@ -602,6 +656,8 @@ class Panel(QWidget):
         loading or error state, because those live in their own label now.
         """
         self._status_lbl.setText(text)
+        if self._host is not None:
+            self._host._child_header_changed(self)
 
     # -- panel state -----------------------------------------------------------
     #
@@ -631,6 +687,11 @@ class Panel(QWidget):
         if style is not None:
             style.unpolish(self._state_lbl)
             style.polish(self._state_lbl)
+        if self._host is not None:
+            self._host._child_header_changed(self)
+
+    def _child_header_changed(self, child: "Panel") -> None:
+        """A hosted child wrote its status or state. Hosts override."""
 
     def set_loading(self, on: bool = True) -> None:
         """Mark the panel as fetching.

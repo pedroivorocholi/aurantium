@@ -340,26 +340,39 @@ Indices) and the Financials statement keep their natural order and aren't
 sortable, but <i>every</i> table has a <b>filter box</b> above it: start typing
 to show only the rows that match. Right-click any table to
 <b>Export Table to CSV…</b> or to <b>show/hide columns</b> (your choice is
-remembered with the layout). The Financials panel additionally offers styled
-Excel export and clipboard copy from its toolbar.</p>
+remembered with the layout). The Company panel's Financials tab additionally offers styled
+Excel export and clipboard copy (<b>Download</b>, <b>Copy</b>). In a narrow
+panel the statement and period pickers (and the Key Metrics groups) fold into
+dropdowns, and Browser / Download / Copy into one <b>&#8943;</b> menu, so the
+table keeps its height.</p>
 
 <h2>Debt analysis</h2>
-<p>The Financials panel's <b>Debt</b> tab derives a credit view from the
+<p>The Financials tab's <b>Debt</b> view derives a credit view from the
 statements: total, short- and long-term debt, leases, cash and <b>net debt</b>;
 interest expense and cash interest paid; the <b>implied cost of debt</b>
 (interest ÷ average debt, with and without leases); interest coverage,
 <b>Debt/EBITDA</b>, Net Debt/EBITDA, Debt/Equity and Debt/Capital; and debt
 issued and repaid. Quarterly figures are annualized ×4 for rates and multiples.
 The implied rates are <i>estimates</i>. Hover a line to see its formula, and use
-<b>Browser &#9656; SEC EDGAR</b> for the company's reported weighted-average
+<b>Browser &#9656; Company filings (SEC EDGAR)</b> for the company's reported weighted-average
 rate in its 10-K debt note.</p>
 
-<h2>Key Metrics &amp; history</h2>
-<p>The <b>Key Metrics</b> panel (Research) lists valuation, earnings,
+<h2>Company panel &amp; Key Metrics</h2>
+<p>The <b>Company</b> panel (Research) gathers single-name research into
+four tabs: <b>Profile</b>, <b>Key Metrics</b>, <b>Financials</b> and
+<b>Earnings</b>. The Profile tab shows the live price, the 52-week range and the
+business description; <b>click a stat tile</b> (P/E, market cap, beta, EPS,
+dividend yield) to jump to the tab that explains it. Old layouts that had
+these as separate panels open them as one Company panel.</p>
+<p>The <b>Key Metrics</b> tab lists valuation, earnings,
 profitability, dividend and risk ratios for the linked symbol: P/E on trailing
 (<b>TTM</b>) and next-twelve-month (<b>NTM</b>) earnings, P/B, P/S, EV/EBITDA,
 FCF yield, EBITDA and Adj. EBITDA, margins, ROE, dividend yield (TTM and NTM),
-payout, beta and volatility. Each metric is set against its own five-year
+payout, beta, alpha and volatility. The <b>tabs</b> across the top jump
+straight to one group (Valuation, Growth, Risk&hellip;) instead of scrolling.
+The <b>Custom</b> tab holds only the metrics you pick: right-click any row
+&#9656; <b>Add to Custom</b>, or open the Custom tab and press <b>Edit&hellip;</b>
+to tick metrics from the full list. Each metric is set against its own five-year
 <b>average, low, high and percentile</b>. <b>Click any row</b> to open its
 history chart, with a range picker, average and &plusmn;1&sigma; lines, and a
 Copy button. The chart follows the panel's link group, so it redraws when you

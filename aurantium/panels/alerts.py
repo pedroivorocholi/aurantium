@@ -21,7 +21,9 @@ from PySide6.QtWidgets import (
 
 from ..alerts import AlertEngine
 from ..components import attach_suggestions
+from ..components.fit_width import fit_columns
 from ..panel import Panel, register_panel
+from ..components.responsive_row import ResponsiveRow
 
 HEADERS = ["Symbol", "Field", "Cond", "Threshold", "On"]
 _FIELD_ITEMS = [("Price", "price"), ("Change %", "change_pct")]
@@ -36,7 +38,7 @@ class AlertsPanel(Panel):
         self._engine = AlertEngine.instance()
 
         # -- add-rule row ----------------------------------------------------
-        add_row = QHBoxLayout()
+        add_row = ResponsiveRow()
         self.symbol_edit = QLineEdit(self)
         self.symbol_edit.setPlaceholderText("Symbol…")
         self.symbol_edit.setMaximumWidth(90)
@@ -62,6 +64,7 @@ class AlertsPanel(Panel):
 
         # -- rules table -----------------------------------------------------
         self.table = QTableWidget(0, len(HEADERS), self)
+        fit_columns(self.table)
         self.table.setHorizontalHeaderLabels(HEADERS)
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -72,7 +75,7 @@ class AlertsPanel(Panel):
         self.table.itemChanged.connect(self._on_item_changed)
         self.content_layout.addWidget(self.table, 1)
 
-        remove_row = QHBoxLayout()
+        remove_row = ResponsiveRow()
         remove_row.addStretch(1)
         remove_btn = QPushButton("Remove selected", self)
         remove_btn.clicked.connect(self._remove_selected)

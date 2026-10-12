@@ -21,7 +21,8 @@
           "BTC-USD"
         ],
         "hidden_cols": []
-      }
+      },
+      "floating": false
     },
     {
       "instance": "chart#1",
@@ -48,7 +49,7 @@
             "params": {
               "window": 50
             },
-            "color": "#e91e63",
+            "color": "#0c699a",
             "on": true
           },
           {
@@ -56,7 +57,7 @@
             "params": {
               "window": 200
             },
-            "color": "#f8e71c",
+            "color": "#6e6b03",
             "on": true
           },
           {
@@ -64,23 +65,42 @@
             "params": {
               "window": 14
             },
-            "color": "#ffab2e",
+            "color": "#7035f5",
             "on": true
           }
         ],
         "annotations": [],
         "annotations_symbol": "AAPL",
-        "drawing_color": "#2196f3"
-      }
+        "drawing_color": "#2196f3",
+        "events_lane": true
+      },
+      "floating": false
     },
     {
-      "instance": "fundamentals#1",
-      "panel_id": "fundamentals",
+      "instance": "company#1",
+      "panel_id": "company",
       "link_group": "A",
       "settings": {
-        "statement": "income",
-        "period": "annual"
-      }
+        "tab": "profile",
+        "tabs": {
+          "profile": {},
+          "key_metrics": {
+            "group": "",
+            "custom": []
+          },
+          "fundamentals": {
+            "statement": "income",
+            "period": "annual"
+          },
+          "earnings": {
+            "hidden_cols": [
+              1,
+              3
+            ]
+          }
+        }
+      },
+      "floating": false
     },
     {
       "instance": "analyst#1",
@@ -88,7 +108,8 @@
       "link_group": "A",
       "settings": {
         "hidden_cols": []
-      }
+      },
+      "floating": false
     },
     {
       "instance": "news#1",
@@ -96,13 +117,15 @@
       "link_group": "A",
       "settings": {
         "read": []
-      }
+      },
+      "floating": false
     }
   ],
-  "ads_state": "0000031f78da8d52cb4ec33010bcf3159639973c5b8294a4aa827a04a13e389b78692d1c1bd94e4b111f8f5ddad0aa49e014efcc6466d6723afea838da80d24c8a0c07373e46204a4999586578319f0e123cced32733a11b224aa0f7b27cb3dc6ca70d5468d9fc88d142836a666b53486108131671749e36339a7249cc3ec0b7f8ec9d33632cfca8185889d91b7c39835a980c879d9a41a309fee9335140d09cbcec2ba1a2560a1cb525a65c73a6cdb5337a667405063d900ace295470a981bada5e9e7aceecef6a3db1e59aa896c823dc1a7762159e581141f8aeadff6b2da83dd8625c5f789e297f2ddaf7649fa0f3f82e46d1f016a5decf6cbf87fd8f8a301aa1c0f7931e49328c5ad98e6b12b0d5978b1dd09eae41188f6cd9b035cb6b9ea33d773ceffcea1b7ee803a3",
+  "ads_state": "0000031a78da8d525d4fc230147df75734f319f709ce641b21333c6a0c1f3ed7ee061abb96b4059cf1c7db224c08ddf469bde79c9e73eed26cfc5133b403a9a8e0b917de051e024e4445f92af716f3e920f5c645f6a227d50e7302d5a320ef869b354a438d96ed450f2d14c8763636a5e01a536e104b17593ba32913581f020283cf368c6a6de06749c148f4c1e0cb1a6cb9cebda853336835e13f7d2612309ae3b74325546ea5044bedb1266b4695beb546afb45a81464fb8864b0a954c28a86c6dbfc87c6bf677b59e58b2c6d21179829d716756d19915e69835aefe44d41bcc9b2bbb0bd1ef6df78af41354913c24281edea3ccff99cdf7b8fa4911c523140641da234987b193edf8431cf6ea7aa723dad3358c9291291b39b3fcf6259a73c7cb2e6ebe01e4820198",
   "symbols": {
     "A": "AAPL"
   },
+  "dates": {},
   "name": "Equity Research",
   "description": "Watchlist, chart and fundamentals for single-name work."
 }

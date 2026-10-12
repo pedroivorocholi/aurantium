@@ -42,6 +42,7 @@ from ..components import (
 from ..panel import NULL_GLYPH, Panel, register_panel
 from ..undo import UndoStack
 from ..theme import ACCENT, BG, DOWN, FG, FG_DIM, UP, apply_tick
+from ..components.responsive_row import ResponsiveRow
 
 # (maturity years, curve tick label, quote ticker) — price field IS the yield
 DEFAULT_TENORS = [
@@ -182,7 +183,7 @@ class MacroPanel(Panel):
         self.cftc_table.set_row_actions(self._cftc_row_actions)
         self.content_layout.addWidget(self.cftc_table, 1)
 
-        edit_row = QHBoxLayout()
+        edit_row = ResponsiveRow()
         edit_row.addStretch(1)
         edit_btn = QPushButton("Edit…", self)
         edit_btn.clicked.connect(self._open_edit_dialog)

@@ -40,7 +40,7 @@ providers keep the topics fresh (TTL-based polling, shared cache, rate limits):
 | `newsr:AAPL:2026-03-09..2026-03-15` | Date-ranged headlines `{symbol, start, end, items:[…], found, hidden}` — `hidden` counts what the language gate removed | 6 h |
 | `daystat:AAPL:2026-03-14` | One session explained `{date, snapped_from, o,h,l,c,v, pct, avg_vol_30, vol_ratio, bench_sym, bench_pct, sector_sym, sector_pct, excess_pct, verdict}` | 6 h |
 | `dayev:AAPL:2026-03-09..2026-03-15` | Dated corporate events `{events:[{date, kind, title, detail}]}`; kinds `earnings`/`dividend`/`split`/`rating` | 6 h |
-| `profile:AAPL` | Company profile `{name, description, sector, industry, market_cap, pe_trailing/forward, eps, dividend_yield, beta, week52_high/low, employees, website, officers}` | 24 h |
+| `profile:AAPL` | Company profile `{name, description, sector, industry, market_cap, pe_trailing/forward, eps, dividend_yield_pct, beta, week52_high/low, employees, website, officers}` | 24 h |
 | `financials:AAPL` | Income/balance/cashflow statements, annual+quarterly: `{income|balance|cashflow: {annual|quarterly: {columns, rows}}}` | 24 h |
 | `metrics:AAPL` | Key metrics with history: `{symbol, name, currency, price, metrics: [{id, label, group, kind, value, quote, note, history: {t, v}, stats}]}` (see `valuation.py`) | 6 h |
 | `earnings:AAPL` | `{next_date, rows: [[date, eps_est, eps_reported, surprise_pct]]}` | 6 h |
@@ -73,12 +73,12 @@ as you like (e.g. two Topic News feeds with different queries):
 | News | Company headlines for the linked symbol | — (follows link group) |
 | Topic News | Keyword news feed, independent of linked symbol | Editable query (e.g. "Brazil", "energy commodities") |
 | Analyst Recs | Consensus, targets, upgrades/downgrades | — (follows link group) |
-| Company Profile | Bloomberg-DES-style: description, sector, key stats, officers | — (follows link group) |
+| Company | Single-name research in one panel, as tabs: **Profile** (DES-style snapshot — live price, stat tiles that open the deeper tabs, 52-week range bar, description, officers), **Key Metrics**, **Financials**, **Earnings**. Only the visible tab fetches. The retired ids `profile`, `key_metrics`, `fundamentals`, `earnings` still open it on that tab, and old layouts fold into one Company panel per link group | Tab choice, plus each tab's own settings |
 | Chart Grid | Grid of mini index/commodity charts; click a cell to drive linked panels | Comma-separated symbol list |
 | Commodities | GLCO-style energy + metals monitor | "Edit…" dialog for both sections |
-| Financials | Bloomberg-FA-style statements table | Income/Balance/Cash Flow × Annual/Quarterly toggles |
-| Key Metrics | Valuation / earnings / profitability / dividend / risk ratios vs their 5-year range; click a row for its history chart | — (follows link group) |
-| Earnings | Next earnings date + EPS est vs actual history | — (follows link group) |
+| Company ▸ Financials | Bloomberg-FA-style statements table | Income/Balance/Cash Flow × Annual/Quarterly toggles |
+| Company ▸ Key Metrics | Valuation / earnings / profitability / dividend / risk ratios (incl. beta and alpha) vs their 5-year range; one tab per group plus a **Custom** tab of your own pick; click a row for its history chart | Group tab, custom metric list |
+| Company ▸ Earnings | Next earnings date + EPS est vs actual history | Hidden columns |
 | Dividends | Yield, rate, ex-date, payout + dividend/split history | — (follows link group) |
 | Holders | Insider/institution % + top institutional holders | — (follows link group) |
 | Options Chain | Calls/puts around ATM with IV, volume, OI | Expiry dropdown |

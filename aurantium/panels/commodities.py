@@ -29,6 +29,7 @@ from ..components import (
 from ..panel import NULL_GLYPH, Panel, register_panel
 from ..undo import UndoStack
 from ..theme import ACCENT, BG_HEADER, FG_DIM, apply_tick
+from ..components.responsive_row import ResponsiveRow
 
 #: display groups in table order — keys are the settings keys, titles match
 #: the catalog categories so a picked commodity files into the right group
@@ -107,7 +108,7 @@ class CommoditiesPanel(Panel):
         self.content_layout.addWidget(self._filter)
         self.content_layout.addWidget(self.table, 1)
 
-        edit_row = QHBoxLayout()
+        edit_row = ResponsiveRow()
         edit_row.addStretch(1)
         edit_btn = QPushButton("Edit…", self)
         edit_btn.clicked.connect(self._open_edit_dialog)

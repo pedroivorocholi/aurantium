@@ -42,7 +42,8 @@ class Preset:
 def _registered_panel_ids() -> set[str]:
     from .panel import PanelRegistry
 
-    return {meta.id for meta in PanelRegistry.all()}
+    # retired ids still load — apply_layout folds them into their replacement
+    return PanelRegistry.known_ids()
 
 
 def parse_preset(raw: str, known_panel_ids: set[str]) -> Preset | None:

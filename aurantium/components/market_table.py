@@ -44,6 +44,7 @@ from PySide6.QtWidgets import (
 from .. import motion
 from ..theme import ACCENT, BG, tick_color
 from .empty_state import EmptyState
+from .fit_width import fit_columns
 
 
 _NUM_SUFFIX = {"T": 1e12, "B": 1e9, "M": 1e6, "K": 1e3}
@@ -226,6 +227,10 @@ class MarketTable(QTableWidget):
         ):
             signal.connect(self._sync_empty)
         self._sync_empty()  # a table built empty says so from the first paint
+
+        # never scroll sideways: whatever columns survive a narrow panel shrink
+        # to fit it (see components/fit_width.py)
+        self._fitter = fit_columns(self)
 
     # -- loading state ------------------------------------------------------
 
@@ -540,6 +545,7 @@ class MarketTable(QTableWidget):
         if not self._droppable_columns:
             return
         self._enforce_content_sizing()
+        self._fitter.forget_saved_modes()
         available = self.viewport().width()
         candidates = [
             c for c in self._droppable_columns if c not in self._user_hidden
@@ -553,6 +559,8 @@ class MarketTable(QTableWidget):
             want = col in shown and col not in self._user_hidden
             if self.isColumnHidden(col) == want:
                 self.setColumnHidden(col, not want)
+        # the kept columns alone may still be too wide: shrink them to fit
+        self._fitter.fit()
 
     # -- column show/hide ---------------------------------------------------
 

@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..components.empty_state import EmptyState
+from ..components.fit_width import fit_columns
 from ..languages import main_language
 from ..panel import EMPTY_NO_SYMBOL, Panel
 from ..symbol_context import GROUPS, SymbolContext
@@ -72,6 +73,7 @@ def format_when(dt: Optional[datetime]) -> str:
 
 def make_news_table(parent) -> QTableWidget:
     table = QTableWidget(0, 2, parent)
+    fit_columns(table)
     table.setHorizontalHeaderLabels(["Time", "Headline"])
     vh = table.verticalHeader()
     vh.setVisible(False)

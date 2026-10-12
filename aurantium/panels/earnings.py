@@ -40,7 +40,7 @@ def _fmt_pct(value: Any) -> str:
     return f"{sign}{v:.2f}%"
 
 
-@register_panel(id="earnings", title="Earnings", category="Research")
+@register_panel(id="earnings", title="Earnings", category="Research", listed=False)
 class EarningsPanel(Panel):
     def build(self) -> None:
         self.next_lbl = QLabel("Next earnings: -", self)

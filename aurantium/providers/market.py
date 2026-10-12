@@ -44,6 +44,22 @@ def _as_float(x: Any) -> Optional[float]:
     return f
 
 
+def _profile_yield_pct(info: dict) -> Optional[float]:
+    """Dividend yield in percent. yfinance's ``dividendYield`` has flipped
+    between fraction and percent across versions, so derive it from the rate
+    and price when both exist (as the dividends feed does)."""
+    rate = _as_float(info.get("dividendRate"))
+    price = _as_float(info.get("regularMarketPrice") or info.get("currentPrice"))
+    if rate is not None and price:
+        return rate / price * 100.0
+    dy = _as_float(info.get("dividendYield"))
+    if dy is None:
+        return None
+    if dy < 0.25:
+        return dy * 100.0  # a fraction
+    return dy if dy <= 25 else None
+
+
 def _as_int(x: Any) -> Optional[int]:
     f = _as_float(x)
     return int(f) if f is not None else None
@@ -417,7 +433,7 @@ class MarketProvider(Provider):
                 "pe_trailing": _as_float(info.get("trailingPE")),
                 "pe_forward": _as_float(info.get("forwardPE")),
                 "eps_trailing": _as_float(info.get("trailingEps")),
-                "dividend_yield": _as_float(info.get("dividendYield")),
+                "dividend_yield_pct": _profile_yield_pct(info),
                 "beta": _as_float(info.get("beta")),
                 "week52_high": _as_float(info.get("fiftyTwoWeekHigh")),
                 "week52_low": _as_float(info.get("fiftyTwoWeekLow")),

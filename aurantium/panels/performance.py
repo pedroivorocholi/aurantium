@@ -17,6 +17,7 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton
 from ..components import attach_suggestions
 from ..panel import NULL_GLYPH, Panel, register_panel
 from ..theme import ACCENT, BG, FG, FG_DIM, series_color
+from ..components.responsive_row import ResponsiveRow
 
 # label -> (period, interval) passed straight into history:SYM:PERIOD:INTERVAL
 PERIODS = [
@@ -86,7 +87,7 @@ class PerformancePanel(Panel):
         self._period_buttons: dict[str, QPushButton] = {}
 
         # -- period selector ---------------------------------------------------
-        period_row = QHBoxLayout()
+        period_row = ResponsiveRow()
         for label, _period, _interval in PERIODS:
             btn = QPushButton(label, self)
             btn.setCheckable(True)
@@ -99,7 +100,7 @@ class PerformancePanel(Panel):
         self._update_period_buttons()
 
         # -- comparison list editor --------------------------------------------
-        compare_row = QHBoxLayout()
+        compare_row = ResponsiveRow()
         compare_row.addWidget(QLabel("Compare:", self))
         self.compare_edit = QLineEdit(self)
         self.compare_edit.setText(", ".join(self._compare))
@@ -112,7 +113,7 @@ class PerformancePanel(Panel):
         self.content_layout.addLayout(compare_row)
 
         # -- legend row (colored symbol + cumulative % labels), above the plot --
-        self.legend_row = QHBoxLayout()
+        self.legend_row = ResponsiveRow()
         self.content_layout.addLayout(self.legend_row)
 
         # -- plot -----------------------------------------------------------------

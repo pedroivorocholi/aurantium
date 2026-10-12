@@ -239,6 +239,11 @@ class _PressScrim(QWidget):
 # Eligibility
 # --------------------------------------------------------------------------
 
+#: Set this dynamic property (to a corner radius) on any widget that should
+#: sink when clicked like a button; clear it (``None``) to opt back out.
+PRESS_RADIUS_PROPERTY = "pressRadius"
+
+
 def corner_radius(widget) -> int | None:
     """The scrim radius for ``widget``, or None if it takes no press feedback.
 
@@ -251,6 +256,15 @@ def corner_radius(widget) -> int | None:
     """
     if isinstance(widget, (QPushButton, QToolButton)):
         return RADIUS_SM
+    # Opt-in for clickable surfaces that aren't buttons (the Profile's stat
+    # tiles): a widget sets the ``pressRadius`` property while it is
+    # clickable and gets the same sink every button does.
+    try:
+        opt_in = widget.property(PRESS_RADIUS_PROPERTY)
+    except (AttributeError, RuntimeError):
+        opt_in = None
+    if opt_in is not None:
+        return int(opt_in)
     try:
         if _TAB_CLASS in widget.metaObject().className():
             return 0

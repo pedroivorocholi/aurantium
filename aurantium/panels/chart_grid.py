@@ -33,6 +33,7 @@ from ..components import (
 from ..panel import NULL_GLYPH, Panel, register_panel
 from ..undo import UndoStack
 from ..theme import ACCENT, BG, BORDER_STRONG, DOWN, FG_DIM, UP
+from ..components.responsive_row import ResponsiveRow
 
 DEFAULT_SYMBOLS = [
     "^NDX", "^GSPC", "^DJI", "^BVSP", "^FCHI",
@@ -154,13 +155,16 @@ class ChartGridPanel(Panel):
 
         self._scroll = QScrollArea(self)
         self._scroll.setWidgetResizable(True)
+        # vertical only: the grid drops columns to fit instead
+        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._cols = COLUMNS
         self._grid_host = QWidget(self._scroll)
         self._grid = QGridLayout(self._grid_host)
         self._grid.setSpacing(6)
         self._scroll.setWidget(self._grid_host)
         self.content_layout.addWidget(self._scroll, 1)
 
-        config_row = QHBoxLayout()
+        config_row = ResponsiveRow()
         config_row.addStretch(1)
         edit_btn = QPushButton("Edit…", self)
         edit_btn.clicked.connect(self._open_edit_dialog)
@@ -168,6 +172,22 @@ class ChartGridPanel(Panel):
         self.content_layout.addLayout(config_row)
 
         self._rebuild_grid()
+
+    #: narrowest a chart cell may get before the grid drops a column
+    CELL_MIN = 170
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        super().resizeEvent(event)
+        if not hasattr(self, "_scroll"):
+            return
+        width = self._scroll.viewport().width()
+        cols = max(1, min(COLUMNS, width // self.CELL_MIN))
+        if cols != self._cols:
+            self._cols = cols
+            for i, cell in enumerate(self._cells.values()):
+                self._grid.removeWidget(cell)
+                r, c = divmod(i, cols)
+                self._grid.addWidget(cell, r, c)
 
     # -- grid (re)construction -------------------------------------------------
 
@@ -186,7 +206,8 @@ class ChartGridPanel(Panel):
             cell = _ChartCell(
                 sym, self._on_cell_click, self._show_cell_menu, self._grid_host
             )
-            row, col = divmod(i, COLUMNS)
+            cell.setMinimumWidth(0)
+            row, col = divmod(i, self._cols)
             self._grid.addWidget(cell, row, col)
             self._cells[sym] = cell
 

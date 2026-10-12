@@ -64,6 +64,7 @@ from ..theme import (
     series_slot_of,
 )
 from ._events_lane import EventsLane, build_marks
+from ..components.responsive_row import ResponsiveRow
 
 # -- range / interval model -------------------------------------------------
 #
@@ -713,7 +714,7 @@ class _RangeDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Custom range")
         lay = QVBoxLayout(self)
-        row = QHBoxLayout()
+        row = ResponsiveRow()
         self.start_edit = QDateEdit(QDate(start.year, start.month, start.day), self)
         self.end_edit = QDateEdit(QDate(end.year, end.month, end.day), self)
         for edit in (self.start_edit, self.end_edit):
@@ -793,7 +794,7 @@ class ChartPanel(Panel):
         self._cross_index: Optional[int] = None
 
         # -- title row: ticker · price · change ------------------------------
-        title_row = QHBoxLayout()
+        title_row = ResponsiveRow()
         title_row.setContentsMargins(2, 2, 2, 2)
         title_row.setSpacing(10)
         self.title_lbl = QLabel("", self)
@@ -830,7 +831,7 @@ class ChartPanel(Panel):
         # The density win came from the compact chip style, not the merge:
         # #chartChip took each row from ~50px to ~24px, so two rows still cost
         # a third of what three loose rows did.
-        range_row = QHBoxLayout()
+        range_row = ResponsiveRow()
         self._range_row = range_row
         range_row.setSpacing(3)
         self._range_eyebrow = self._eyebrow("RANGE")
@@ -851,7 +852,7 @@ class ChartPanel(Panel):
         range_row.addStretch(1)
         self.content_layout.addLayout(range_row)
 
-        int_row = QHBoxLayout()
+        int_row = ResponsiveRow()
         self._interval_row = int_row
         int_row.setSpacing(3)
         self._interval_eyebrow = self._eyebrow("INTERVAL")
@@ -870,7 +871,7 @@ class ChartPanel(Panel):
         # -- indicator chips: one toggle per active indicator; the chip wears
         # its line color when on, doubling as the legend. Right-click a chip
         # to recolor / edit / remove; "+" adds a new indicator.
-        chips_row = QHBoxLayout()
+        chips_row = ResponsiveRow()
         chips_row.setSpacing(6)
         self._indicators_eyebrow = self._eyebrow("INDICATORS")
         chips_row.addWidget(self._indicators_eyebrow)

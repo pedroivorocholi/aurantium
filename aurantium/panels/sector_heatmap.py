@@ -30,6 +30,7 @@ from ..color import mix_oklab, readable_on
 from ..panel import NULL_GLYPH, Panel, register_panel
 from ..theme import BG, BG_ALT, BORDER_STRONG, DOWN, FG_DIM, FG_MUTED, UP
 from ..undo import UndoStack
+from ..components.responsive_row import ResponsiveRow
 
 DEFAULT_TILES = [
     ["Technology", "XLK"],
@@ -237,7 +238,7 @@ class SectorHeatmapPanel(Panel):
         self.grid.setSpacing(6)
         self.content_layout.addWidget(self.grid_container, 1)
 
-        edit_row = QHBoxLayout()
+        edit_row = ResponsiveRow()
         edit_row.addStretch(1)
         edit_btn = QPushButton("Edit…", self)
         edit_btn.clicked.connect(self._open_edit_dialog)
@@ -260,7 +261,7 @@ class SectorHeatmapPanel(Panel):
                 w.deleteLater()
 
         for idx, (label, symbol) in enumerate(self._tiles_cfg):
-            row, col = divmod(idx, GRID_COLS)
+            row, col = divmod(idx, self._grid_cols())
             tile = _Tile(label, symbol, self.grid_container)
             tile.clicked.connect(self.set_symbol)
             tile.menu_requested.connect(self._show_tile_menu)
@@ -269,6 +270,29 @@ class SectorHeatmapPanel(Panel):
 
         for _label, sym in self._tiles_cfg:
             self.subscribe(f"quote:{sym}", lambda data, s=sym: self._on_quote(s, data))
+
+    def _grid_cols(self) -> int:
+        """Up to ``GRID_COLS`` tiles across; fewer when the panel is narrow,
+        so tiles stack instead of holding the dock wide."""
+        width = self.grid_container.width() if hasattr(self, "grid_container") else 0
+        if width <= 0:
+            return GRID_COLS
+        return max(1, min(GRID_COLS, (width + 4) // 84))
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        super().resizeEvent(event)
+        if not hasattr(self, "_tile_of_symbol"):
+            return
+        cols = self._grid_cols()
+        tiles = list(self._tile_of_symbol.values())
+        placed = {self.grid.getItemPosition(self.grid.indexOf(t))[1] for t in tiles}
+        if tiles and max(placed) + 1 == min(cols, len(tiles)):
+            return  # already laid out for this width
+        for t in tiles:
+            self.grid.removeWidget(t)
+        for idx, t in enumerate(tiles):
+            r, c = divmod(idx, cols)
+            self.grid.addWidget(t, r, c)
 
     # -- data callbacks ----------------------------------------------------------
 

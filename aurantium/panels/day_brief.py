@@ -44,6 +44,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import QUrl
 
 from ..components.empty_state import EmptyState
+from ..components.fit_width import fit_columns
 from ..date_context import (
     DEFAULT_WINDOW,
     WINDOW_SPAN_DAYS,
@@ -61,6 +62,7 @@ from ._news_common import (
     news_url_at,
     populate_news_table,
 )
+from ..components.responsive_row import ResponsiveRow
 
 #: rows of the stat block, in the order they read
 _STAT_ROWS = ("MOVE", "VOL", "VS", "EXCESS")
@@ -167,7 +169,7 @@ class DayBriefPanel(Panel):
 
     def _build_controls(self) -> None:
         row = QWidget(self)
-        hl = QHBoxLayout(row)
+        hl = ResponsiveRow(row)
         hl.setContentsMargins(0, 0, 0, 0)
         hl.setSpacing(4)
 
@@ -237,7 +239,7 @@ class DayBriefPanel(Panel):
         self._stat_labels: dict[str, tuple[QLabel, QLabel, QLabel]] = {}
         for key in _STAT_ROWS:
             line = QWidget(holder)
-            hl = QHBoxLayout(line)
+            hl = ResponsiveRow(line)
             hl.setContentsMargins(0, 0, 0, 0)
             hl.setSpacing(8)
 
@@ -273,6 +275,7 @@ class DayBriefPanel(Panel):
         self.content_layout.addWidget(head)
 
         self.events_table = QTableWidget(0, 4, self)
+        fit_columns(self.events_table)
         self.events_table.horizontalHeader().setVisible(False)
         self.events_table.verticalHeader().setVisible(False)
         self.events_table.setShowGrid(False)

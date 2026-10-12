@@ -30,6 +30,7 @@ from ..components import MarketTable
 from ..panel import Panel, register_panel
 from ..color import delta_e, mix_oklab
 from ..theme import BG, BG_HEADER, DOWN, UP
+from ..components.responsive_row import ResponsiveRow
 
 # calls: Vol | OI | IV% | Δ | Γ | Θ | Vega | Bid | Ask | Last | Strike
 CALL_HEADERS = ["Vol", "OI", "IV%", "Δ", "Γ", "Θ", "Vega", "Bid", "Ask", "Last", "Strike"]
@@ -205,7 +206,7 @@ class OptionsChainPanel(Panel):
         self._t_years: float | None = None
 
         # -- header row: expiry combo + spot label ---------------------------
-        header_row = QHBoxLayout()
+        header_row = ResponsiveRow()
         header_row.addWidget(QLabel("Expiry:", self))
         self.expiry_combo = QComboBox(self)
         self.expiry_combo.currentTextChanged.connect(self._on_expiry_changed)
@@ -217,7 +218,7 @@ class OptionsChainPanel(Panel):
         self.content_layout.addLayout(header_row)
 
         # -- calls / puts tables side by side ---------------------------------
-        tables_row = QHBoxLayout()
+        tables_row = ResponsiveRow()
 
         self.calls_table = MarketTable(0, len(CALL_HEADERS), self)
         self.register_state_target(self.calls_table)

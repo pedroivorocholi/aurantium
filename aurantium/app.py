@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QScrollArea,
     QSystemTrayIcon,
     QWidget,
     QHBoxLayout,
@@ -40,6 +41,7 @@ from .date_context import WINDOW_SPAN_DAYS, WINDOWS, DateContext, parse_iso
 from . import motion
 from .layout_store import LayoutStore
 from .notifier import Notifier
+from .components.fit_width import relax_min_widths
 from .panel import Panel, PanelRegistry
 from .paths import BUNDLE_DIR
 from .presets import Preset, available_presets
@@ -1197,7 +1199,7 @@ class MainWindow(QMainWindow):
         cmd = parts[0].lower() if parts else ""
         arg = parts[1].strip() if len(parts) > 1 else ""
         if cmd == "add":
-            if PanelRegistry.get(arg):
+            if arg in PanelRegistry.known_ids():
                 self.add_panel(arg, floating=True)
                 self.notify(f"Added panel: {arg}", 3000)
             else:
@@ -1320,6 +1322,11 @@ class MainWindow(QMainWindow):
         ``restore_floating`` is for layout restore: the panel was still a
         window when the layout was saved, so it must be allowed to float for
         ``restoreState`` to put it back in one."""
+        # a retired id (e.g. "key_metrics") opens its replacement on the
+        # matching tab; explicit settings win over the alias defaults
+        panel_id, alias_settings = PanelRegistry.resolve(panel_id)
+        if alias_settings:
+            settings = {**alias_settings, **(settings or {})}
         meta = PanelRegistry.get(panel_id)
         if meta is None:
             return None
@@ -1339,6 +1346,8 @@ class MainWindow(QMainWindow):
         try:
             panel: Panel = meta.cls()
             panel.build()
+            # one long label or combo must not hold the dock wide
+            relax_min_widths(panel)
         except Exception as exc:
             import traceback
 
@@ -1360,6 +1369,15 @@ class MainWindow(QMainWindow):
         dock = QtAds.CDockWidget(self.dock_manager, meta.title)
         dock.setObjectName(instance_id)
         dock.setWidget(panel)
+        # QtAds wraps the panel in a scroll area. Panels reflow to any width
+        # (wrapping control rows, shrinking columns), so that wrapper only
+        # ever scrolls vertically — a docked panel never scrolls sideways.
+        wrapper = panel.parentWidget()
+        while wrapper is not None and wrapper is not dock:
+            if isinstance(wrapper, QScrollArea):
+                wrapper.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+                break
+            wrapper = wrapper.parentWidget()
         dock.setFeature(QtAds.CDockWidget.DockWidgetDeleteOnClose, True)
         # Movable (can be dragged to a new dock position). Floatable only for
         # panels that opt in via Panel.FLOATABLE — for everything else dragging
@@ -1477,6 +1495,9 @@ class MainWindow(QMainWindow):
         self._maximize_actions.clear()
         SymbolContext.instance().from_json(doc.get("symbols", {}))
         DateContext.instance().from_json(doc.get("dates", {}))
+        from .panels.company import migrate_layout
+
+        doc = migrate_layout(doc)
         for spec in doc.get("panels", []):
             self.add_panel(
                 spec.get("panel_id", ""),

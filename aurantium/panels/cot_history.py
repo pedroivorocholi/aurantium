@@ -23,6 +23,7 @@ from ..components import attach_hover, clamp_view
 from ..panel import Panel, register_panel
 from ..theme import ACCENT, BG, FG_DIM, tick_color
 from .futures_curve import make_commodity_combo
+from ..components.responsive_row import ResponsiveRow
 
 #: range-button choices: (label, days back; None = everything)
 _RANGES = [("6M", 183), ("1Y", 365), ("All", None)]
@@ -45,7 +46,7 @@ class CotHistoryPanel(Panel):
         self._dates: list[str] = []
 
         # -- market selector + range buttons -----------------------------------
-        sel_row = QHBoxLayout()
+        sel_row = ResponsiveRow()
         self.selector = make_commodity_combo(self, _COVERED)
         self.selector.currentIndexChanged.connect(self._on_select)
         sel_row.addWidget(self.selector)

@@ -123,7 +123,7 @@ def test_centrepiece_is_the_widest_panel(window, qapp, preset):
     )
 
 
-def test_equity_research_tabs_fundamentals_with_analyst(window, qapp):
+def test_equity_research_tabs_company_with_analyst(window, qapp):
     """A tabbed pair is the one arrangement detail that cannot survive a failed
     restoreState, so it doubles as proof the ads_state really applied rather
     than degrading to default tiling."""
@@ -136,10 +136,10 @@ def test_equity_research_tabs_fundamentals_with_analyst(window, qapp):
     shared = [
         set(insts)
         for _, insts in areas.values()
-        if {"fundamentals#1", "analyst#1"} <= set(insts)
+        if {"company#1", "analyst#1"} <= set(insts)
     ]
     assert shared, (
-        "fundamentals#1 and analyst#1 are not tabbed together — the layout "
+        "company#1 and analyst#1 are not tabbed together — the layout "
         f"restored as {[insts for _, insts in areas.values()]}"
     )
 

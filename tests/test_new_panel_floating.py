@@ -41,7 +41,7 @@ def _menu_action(win, title):
 
 def test_menu_opens_a_floating_window(win):
     before = set(win._docks)
-    _menu_action(win, "Key Metrics").trigger()
+    _menu_action(win, "Company").trigger()
     (new_id,) = set(win._docks) - before
     dock = win._docks[new_id]
     assert _floating(dock)
@@ -57,7 +57,7 @@ def test_slash_add_opens_floating(win):
 def test_docking_it_ends_floating_for_good(win, qapp):
     import PySide6QtAds as QtAds
 
-    dock = win.add_panel("key_metrics", floating=True)
+    dock = win.add_panel("company", floating=True)
     assert _floatable(dock)
     # what a drop onto the layout does: move it into a dock area
     win.dock_manager.addDockWidget(QtAds.DockWidgetArea.RightDockWidgetArea, dock)
@@ -75,10 +75,10 @@ def test_programmatic_panels_still_dock(win):
 
 def test_a_floating_panel_survives_save_and_restore(win):
     win.add_panel("chart")
-    win.add_panel("key_metrics", floating=True)
+    win.add_panel("company", floating=True)
     doc = win.serialize_layout()
-    spec = next(p for p in doc["panels"] if p["panel_id"] == "key_metrics")
+    spec = next(p for p in doc["panels"] if p["panel_id"] == "company")
     assert spec["floating"] is True
     assert win.apply_layout(doc)
-    dock = next(d for d in win._docks.values() if d.widget().panel_id == "key_metrics")
+    dock = next(d for d in win._docks.values() if d.widget().panel_id == "company")
     assert _floating(dock)

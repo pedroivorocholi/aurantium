@@ -26,6 +26,7 @@ from ..commodities_meta import (
 from ..components import attach_hover, clamp_view
 from ..panel import Panel, register_panel
 from ..theme import ACCENT, BG, FG, FG_DIM
+from ..components.responsive_row import ResponsiveRow
 
 #: minimum horizontal pixels per contract before per-point price labels show
 _LABEL_MIN_PX = 70
@@ -67,7 +68,7 @@ class FuturesCurvePanel(Panel):
         self._syncing = False  # True while the combo is being set from code
 
         # -- commodity selector: grouped dropdown ------------------------------
-        sel_row = QHBoxLayout()
+        sel_row = ResponsiveRow()
         self.selector = make_commodity_combo(self, COMMODITIES)
         self.selector.currentIndexChanged.connect(self._on_select)
         sel_row.addWidget(self.selector)
