@@ -20,6 +20,61 @@
     <language>en</language>
 
     <item>
+      <title>Aurantium 1.10.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.10.2</h3>
+        <ul>
+          <li>Hover any Financials line (e.g. Minority Interest) or jargon column header (IV%, OI, Surprise%) for a plain-language explanation</li>
+          <li>Menus, dropdowns and tooltips now have properly rounded corners — no more square edges behind them</li>
+          <li>New Ctrl shortcuts for laptops whose F-keys need Fn: Ctrl+R refresh, Ctrl+Shift+M maximize panel, Ctrl+Shift+F full screen, Ctrl+Shift+H shortcuts guide</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 13 Oct 2026 01:01:20 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.10.2/aurantium-setup.exe"
+        sparkle:version="1.10.2"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75268226"
+        sparkle:edSignature="A1nfs8v2sluw2MsqZahl53I/uaU4izdQl7iHcXhu8vHwicVBLnCtNhDEs5oPH4GKf2AvzkdjsZy2JxFaoTNtBw=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.10.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.10.2</h3>
+        <ul>
+          <li>Hover any Financials line (e.g. Minority Interest) or jargon column header (IV%, OI, Surprise%) for a plain-language explanation</li>
+          <li>Menus, dropdowns and tooltips now have properly rounded corners — no more square edges behind them</li>
+          <li>New Ctrl shortcuts for laptops whose F-keys need Fn: Ctrl+R refresh, Ctrl+Shift+M maximize panel, Ctrl+Shift+F full screen, Ctrl+Shift+H shortcuts guide</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 13 Oct 2026 01:01:20 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.10.2/aurantium-mac.zip"
+        sparkle:version="1.10.2"
+        sparkle:os="macos"
+        length="291828839"
+        sparkle:edSignature="eI7cZe/89I0bI6yyDb1Tdt/yI4YDmZOw8t88ZP0Z+w5o0QMueYmFZQiBROdIcTUIeHSTQLJl/t5H2QCWPxR+CA=="
+        type="application/zip" />
+    </item>
+    <item>
       <title>Aurantium 1.10.1</title>
       <description><![CDATA[
         <style>
