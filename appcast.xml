@@ -20,6 +20,69 @@
     <language>en</language>
 
     <item>
+      <title>Aurantium 1.10.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.10.1</h3>
+        <ul>
+          <li>New Company panel: Profile, Key Metrics, Financials and Earnings together as tabs in one panel</li>
+          <li>Redesigned Profile with live price, a 52-week range bar, and stat tiles that jump to the tab that explains them</li>
+          <li>Key Metrics: group tabs instead of one long scroll, a Custom tab with the metrics you pick, and alpha alongside beta</li>
+          <li>Every panel now fits its size: no more sideways scrolling, tables shrink to fit and controls fold into menus when narrow</li>
+          <li>Financials keeps its controls on one line so the table gets the height; dates shorten to Sep &#x27;25 when narrow</li>
+          <li>News panels now only show headlines that actually name the company</li>
+          <li>Your existing layouts open the old Profile, Key Metrics, Financials and Earnings panels as one Company panel</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 13 Oct 2026 00:05:27 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.10.1/aurantium-setup.exe"
+        sparkle:version="1.10.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75262016"
+        sparkle:edSignature="Jugkn0q3+9kDn1daoT3j7L9+FDsycpi36A467gAPsUoTQDoCcjiqUknwpLDhh3TI+QQf0eRH6m46swxRbq3UAg=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.10.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.10.1</h3>
+        <ul>
+          <li>New Company panel: Profile, Key Metrics, Financials and Earnings together as tabs in one panel</li>
+          <li>Redesigned Profile with live price, a 52-week range bar, and stat tiles that jump to the tab that explains them</li>
+          <li>Key Metrics: group tabs instead of one long scroll, a Custom tab with the metrics you pick, and alpha alongside beta</li>
+          <li>Every panel now fits its size: no more sideways scrolling, tables shrink to fit and controls fold into menus when narrow</li>
+          <li>Financials keeps its controls on one line so the table gets the height; dates shorten to Sep &#x27;25 when narrow</li>
+          <li>News panels now only show headlines that actually name the company</li>
+          <li>Your existing layouts open the old Profile, Key Metrics, Financials and Earnings panels as one Company panel</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 13 Oct 2026 00:05:27 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.10.1/aurantium-mac.zip"
+        sparkle:version="1.10.1"
+        sparkle:os="macos"
+        length="291812365"
+        sparkle:edSignature="cO8NyYehixntOKm+WA7Lj4u4wirl7eGGabXq828sqBC8uznPomJq+Q0T/cnIE/IS+M1MobQgcLcYTN9Q05tgCw=="
+        type="application/zip" />
+    </item>
+    <item>
       <title>Aurantium 1.10.0</title>
       <description><![CDATA[
         <style>
