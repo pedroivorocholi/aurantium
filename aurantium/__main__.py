@@ -313,6 +313,13 @@ def main() -> int:
 
     app._aurantium_focus_filter = focus.install(app)
 
+    # Menus, combo dropdowns and tooltips are styled with rounded corners, but
+    # each is its own window and an opaque window is a rectangle — the square
+    # corners showed around the rounded border. Makes them translucent.
+    from . import popups
+
+    app._aurantium_popup_filter = popups.install(app)
+
     # QSS cannot animate, so a pressed control could only ever snap to another
     # colour — and the colour it snapped to was two levels off the hover fill,
     # i.e. invisible. This filter eases a shadow over any button on mouse-down

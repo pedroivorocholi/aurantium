@@ -629,8 +629,12 @@ QLineEdit:hover, QComboBox:hover {{ border-color: {p['CHROME_HOVER']}; }}
 QLineEdit:disabled, QComboBox:disabled {{ color: {p['FG_MUTED']}; }}
 QComboBox:pressed {{ border-color: {p['ACCENT']}; background: {p['CHROME_LOW']}; }}
 QComboBox::drop-down {{ border: 0; width: 18px; }}
+/* Plain list popup. The default menu-style popup paints its own square
+   panel and margins around the list, which no translucency can round. */
+QComboBox {{ combobox-popup: 0; }}
 QComboBox QAbstractItemView {{
     background: {p['CHROME']}; border: 1px solid {p['CHROME_BORDER']};
+    border-radius: {RADIUS_MD}px;
     selection-background-color: {p['ACCENT']}; selection-color: {p['ON_ACCENT']};
     padding: 2px;
 }}

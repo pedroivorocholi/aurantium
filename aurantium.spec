@@ -67,6 +67,7 @@ hiddenimports += [
     # Key-metrics maths. Imported lazily inside FundamentalsProvider's
     # metrics fetch, so static analysis never sees it.
     "aurantium.valuation",
+    "aurantium.glossary",
 ]
 # Shared UI components (imported by panels) and the onboarding dialog (imported
 # lazily inside app.py). Listed explicitly so the frozen build never misses them.
@@ -87,6 +88,7 @@ hiddenimports += [
     # onboarding_dialog in this list. Without it a frozen build loses the focus
     # ring, or fails at startup.
     "aurantium.focus",
+    "aurantium.popups",
     # Press feedback filter. Imported the same lazy way as ``focus`` above,
     # from inside __main__.main(), so static analysis never sees it — without
     # this line a frozen build silently loses every button's press response.

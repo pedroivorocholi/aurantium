@@ -81,17 +81,20 @@ _SHORTCUTS_HTML = _page_css() + f"""
   {_row(_kbd("Enter"), "In the SYMBOL box: send the ticker (or run a /command)")}
   {_row(_kbd("↑") + " / " + _kbd("↓"), "In the SYMBOL box: recall previous entries")}
   {_row(_kbd("Tab") + " / " + _kbd("Shift", "Tab"), "In a symbol box: cycle through the suggestions popup")}
-  {_row(_kbd("F5"), "Refresh all live feeds (quotes, news, charts, financials)")}
-  {_row(_kbd("F11"), "Maximize the focused panel — press again to restore")}
+  {_row(_kbd("F5") + " / " + _kbd("Ctrl", "R"), "Refresh all live feeds (quotes, news, charts, financials)")}
+  {_row(_kbd("F11") + " / " + _kbd("Ctrl", "Shift", "M"), "Maximize the focused panel — press again to restore")}
   {_row(_kbd("Esc"), "Restore a maximized panel")}
-  {_row(_kbd("Shift", "F11"), "Toggle borderless full screen (Aurantium opens in full screen)")}
+  {_row(_kbd("Shift", "F11") + " / " + _kbd("Ctrl", "Shift", "F"), "Toggle borderless full screen (Aurantium opens in full screen)")}
   {_row(_kbd("Ctrl", "W"), "Close the focused panel")}
   {_row(_kbd("Ctrl", "Shift", "T"), "Reopen the last panel you closed")}
-  {_row(_kbd("F1"), "Open this Keyboard Shortcuts &amp; Guide window")}
+  {_row(_kbd("F1") + " / " + _kbd("Ctrl", "Shift", "H"), "Open this Keyboard Shortcuts &amp; Guide window")}
   {_row(_kbd("Ctrl", "Z"), "Undo the last edit — drawing, watchlist / portfolio / monitor change")}
   {_row(_kbd("Ctrl", "S"), "Save the current layout under a name")}
   {_row(_kbd("Ctrl", "Q"), "Quit Aurantium")}
 </table>
+<p>On many laptops (Lenovo, HP) the F-row controls volume and brightness
+unless you hold <b>Fn</b> — use the Ctrl alternates above, or press
+<b>Fn + Esc</b> on most Lenovos to lock the F-keys on.</p>
 
 <h2>Panels &amp; symbols</h2>
 <table>
@@ -345,6 +348,12 @@ Excel export and clipboard copy (<b>Download</b>, <b>Copy</b>). In a narrow
 panel the statement and period pickers (and the Key Metrics groups) fold into
 dropdowns, and Browser / Download / Copy into one <b>&#8943;</b> menu, so the
 table keeps its height.</p>
+
+<h2>Plain-language glossary</h2>
+<p>Not sure what a line means? <b>Hover any statement line</b> on the Financials
+tab (e.g. <i>Minority Interest</i>, <i>Gains Losses Not Affecting Retained
+Earnings</i>) or a jargon column header (<i>IV%</i>, <i>OI</i>, <i>Surprise%</i>,
+<i>5Y %ile</i>) for a short explanation.</p>
 
 <h2>Debt analysis</h2>
 <p>The Financials tab's <b>Debt</b> view derives a credit view from the

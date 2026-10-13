@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from .. import glossary
 from ..components import MarketTable, make_filter_edit
 from ..components.action_bar import ActionBar
 from ..components.chip_bar import ChipBar
@@ -500,8 +501,10 @@ class FundamentalsPanel(Panel):
             self.table.insertRow(r)
             label_item = QTableWidgetItem(str(label) if label is not None else NULL_GLYPH)
             label_item.setFlags(label_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            if idx < len(notes) and notes[idx]:
-                label_item.setToolTip(notes[idx])
+            note = notes[idx] if idx < len(notes) else None
+            tip = glossary.tooltip(label_item.text(), note)
+            if tip:
+                label_item.setToolTip(tip)
             self.table.setItem(r, 0, label_item)
             for col in range(len(columns)):
                 value = values[col] if col < len(values) else None

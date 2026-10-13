@@ -226,7 +226,9 @@ class MainWindow(QMainWindow):
         self._icon_restore = self._chrome_icon("restore")
 
         f11 = QAction(self)
-        f11.setShortcut(QKeySequence(Qt.Key.Key_F11))
+        # Letter-key alternates: many laptops (Lenovo, HP) send media keys
+        # from the F-row unless Fn is held.
+        f11.setShortcuts([QKeySequence(Qt.Key.Key_F11), QKeySequence("Ctrl+Shift+M")])
         f11.triggered.connect(self._toggle_maximize_focused)
         self.addAction(f11)
 
@@ -240,7 +242,7 @@ class MainWindow(QMainWindow):
         """Set up the F5 hotkey: force-refresh every currently-subscribed
         topic (news, charts, quotes, financials — whatever's live)."""
         f5 = QAction(self)
-        f5.setShortcut(QKeySequence(Qt.Key.Key_F5))
+        f5.setShortcuts([QKeySequence(Qt.Key.Key_F5), QKeySequence("Ctrl+R")])
         f5.triggered.connect(self._refresh_all)
         self.addAction(f5)
 
@@ -732,7 +734,8 @@ class MainWindow(QMainWindow):
         a_fs = QAction("Full Screen", self)
         a_fs.setCheckable(True)
         a_fs.setChecked(self._want_fullscreen)  # set before connecting
-        a_fs.setShortcut(QKeySequence("Shift+F11"))  # F11 is panel-maximize
+        # F11 is panel-maximize; Ctrl+Shift+F for F-row-less laptops
+        a_fs.setShortcuts([QKeySequence("Shift+F11"), QKeySequence("Ctrl+Shift+F")])
         a_fs.setToolTip("Borderless full screen (covers the taskbar)")
         a_fs.toggled.connect(self._set_window_fullscreen)
         self._fullscreen_act = a_fs
@@ -765,7 +768,10 @@ class MainWindow(QMainWindow):
 
         # -- help / updates / about -----------------------------------------
         a_guide = QAction("Keyboard Shortcuts && Guide…", self)
-        a_guide.setShortcut(QKeySequence.StandardKey.HelpContents)
+        a_guide.setShortcuts(
+            QKeySequence.keyBindings(QKeySequence.StandardKey.HelpContents)
+            + [QKeySequence("Ctrl+Shift+H")]
+        )
         a_guide.triggered.connect(self._show_onboarding)
         m.addAction(a_guide)
         a_update = QAction("Check for Updates…", self)

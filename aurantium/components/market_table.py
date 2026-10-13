@@ -41,7 +41,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import motion
+from .. import glossary, motion
 from ..theme import ACCENT, BG, tick_color
 from .empty_state import EmptyState
 from .fit_width import fit_columns
@@ -233,6 +233,18 @@ class MarketTable(QTableWidget):
         self._fitter = fit_columns(self)
 
     # -- loading state ------------------------------------------------------
+
+    def setHorizontalHeaderLabels(self, labels) -> None:  # noqa: N802 (Qt override)
+        """Also give jargon headers ("IV%", "Surprise%") a glossary tooltip.
+
+        Panels that set their own header tooltips afterwards still win."""
+        super().setHorizontalHeaderLabels(labels)
+        for col in range(self.columnCount()):
+            item = self.horizontalHeaderItem(col)
+            if item is not None and not item.toolTip():
+                tip = glossary.tooltip(item.text())
+                if tip:
+                    item.setToolTip(tip)
 
     def set_loading(self, loading: bool) -> None:
         """Show/hide the 'Loading…' overlay. Idempotent."""
