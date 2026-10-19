@@ -27,7 +27,7 @@ from datetime import date, timedelta
 from typing import Any, Optional
 
 from PySide6.QtCore import QDate, Qt
-from PySide6.QtGui import QDesktopServices, QFont
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QDateEdit,
@@ -43,6 +43,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import QUrl
 
+from ..guide import PanelGuide
 from ..components.empty_state import EmptyState
 from ..components.fit_width import fit_columns
 from ..date_context import (
@@ -56,7 +57,7 @@ from ..date_context import (
 )
 from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, Panel, register_panel
 from ..symbol_context import UNLINKED
-from ..theme import ACCENT, BORDER, FG, FG_DIM, FG_MUTED, MONO_FONT, tick_color
+from ..theme import ACCENT, BORDER, FG, FG_DIM, FG_MUTED, tick_color
 from ._news_common import (
     make_news_table,
     news_url_at,
@@ -80,9 +81,13 @@ EVENT_GLYPH = {
     "split": "S",
     "rating": "▲",
     "rating_down": "▼",
+    "rating_held": "·",
     "move": "●",
 }
 
+
+#: the date box's "nothing chosen" value (shown as "Pick a date")
+_NO_DATE = QDate(1970, 1, 1)
 
 def event_glyph(event: dict) -> str:
     """Glyph for one event row. Rating changes split by direction so a
@@ -93,7 +98,11 @@ def event_glyph(event: dict) -> str:
         detail = str(event.get("detail") or "").lower()
         if "down" in action or "down" in detail:
             return EVENT_GLYPH["rating_down"]
-        return EVENT_GLYPH["rating"]
+        if "up" in action or "up" in detail or "→" in detail:
+            return EVENT_GLYPH["rating"]
+        # a maintained or reiterated rating is not a change: the chart's events
+        # lane skips it, and an upgrade arrow here said the opposite
+        return EVENT_GLYPH["rating_held"]
     return EVENT_GLYPH.get(kind, "·")
 
 
@@ -133,8 +142,30 @@ def fmt_volume(value: Any) -> str:
 class DayBriefPanel(Panel):
     """Symbol- and date-linked. Subscribes to three topics and renders three
     blocks; the cross-source joining all happens in providers/dayinfo.py."""
+    GUIDE = PanelGuide(
+        purpose="Why did it move? One session of the linked stock, set against the market, with the events and news around it.",
+        links="Follows the link group's symbol and date. A click on the chart's "
+        "EVENTS lane, **D** over a bar, the chart's right-click menu or /day in the "
+        "SYMBOL box opens it — as its own window; drag it into the layout to dock it.",
+        interactions=(
+            "◀ ▶ step a session at a time; the date box picks any day. A date that "
+            "wasn't a trading day snaps to the session before it, and the panel says so.",
+            "**1D / 3D / 1W / 1M** set how many days of events and news to gather, "
+            "centered on the day (default **3D**). The resolved dates print under the date box.",
+            "Double-click a headline to open it in your browser.",
+        ),
+        fields=(
+            ("MOVE", "The session's change, with its open, high, low and close"),
+            ("VOL", "Volume, against the stock's own 30-day average"),
+            ("VS", "The same day's move for the broad index and the stock's sector"),
+            ("EXCESS", "The stock's move minus the index's: was it the company or the market?"),
+            ("EVENTS", "Earnings, dividends, splits and rating changes inside the window"),
+            ("NEWS", "Headlines from the window"),
+        ),
+    )
 
-    #: The one panel exempt from the never-float rule (see Panel.FLOATABLE).
+
+    #: Opens as a window parked at the screen edge (see Panel.FLOATABLE).
     #: A brief is opened on demand, read, and closed; docking it into a tuned
     #: workspace to do that squeezes every other panel and forces the user to
     #: scroll sideways in the panels they actually keep open.
@@ -189,6 +220,12 @@ class DayBriefPanel(Panel):
         self.date_edit.setCalendarPopup(True)
         self.date_edit.setDisplayFormat("ddd d MMM yyyy")
         self.date_edit.setMaximumDate(QDate.currentDate())
+        # Until a date is chosen the box sits on its minimum and says so. It
+        # used to show QDateEdit's default, "Sat 1 Jan 2000" — a real-looking
+        # date nobody picked, beside a brief that was explaining nothing.
+        self.date_edit.setMinimumDate(_NO_DATE)
+        self.date_edit.setSpecialValueText("Pick a date")
+        self.date_edit.setDate(_NO_DATE)
         self.date_edit.setToolTip("The day being explained")
         self.date_edit.dateChanged.connect(self._on_date_edit)
 
@@ -233,9 +270,6 @@ class DayBriefPanel(Panel):
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setSpacing(1)
 
-        mono = QFont(MONO_FONT)
-        mono.setPointSize(9)
-
         self._stat_labels: dict[str, tuple[QLabel, QLabel, QLabel]] = {}
         for key in _STAT_ROWS:
             line = QWidget(holder)
@@ -249,14 +283,13 @@ class DayBriefPanel(Panel):
             eyebrow.setFixedWidth(58)
 
             value = QLabel("—", line)
-            value.setFont(mono)
+            value.setObjectName("figure")  # tabular digits (setFont is overridden)
             value.setAlignment(
                 Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
             )
             value.setFixedWidth(78)
 
             rest = QLabel("", line)
-            rest.setFont(mono)
             rest.setObjectName("secondary")
 
             hl.addWidget(eyebrow)
@@ -328,7 +361,7 @@ class DayBriefPanel(Panel):
             self.range_lbl.setText("")
 
     def _on_date_edit(self, qdate: QDate) -> None:
-        if self._suppress_date_signal:
+        if self._suppress_date_signal or qdate == _NO_DATE:
             return
         self._publish(qdate.toString("yyyy-MM-dd"), self._window)
 

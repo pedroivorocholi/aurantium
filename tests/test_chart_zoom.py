@@ -89,7 +89,8 @@ def test_a_sub_day_range_frames_just_that_window(chart):
     data = _bars()
     chart._on_history(data)
     (x0, x1), _ = chart.plot_widget.getViewBox().viewRange()
-    assert x1 - x0 == pytest.approx(3600, rel=0.1)
+    # x is the bar slot: an hour of 1-minute bars is 60 slots wide
+    assert x1 - x0 == pytest.approx(60, rel=0.1)
 
 
 def test_intraday_history_refreshes_quickly(qapp):
@@ -134,7 +135,7 @@ def test_price_refits_to_the_visible_bars_after_a_zoom(chart):
     chart._on_history(data)
     vb = chart.plot_widget.getViewBox()
     # zoom into bars 100..200: closes 200..300, so lows 199.5 / highs 300.5
-    vb.setXRange(data["t"][100], data["t"][200], padding=0)
+    vb.setXRange(100, 200, padding=0)
     _, (y0, y1) = vb.viewRange()
     assert y0 < 199.5 and y1 > 300.5
     assert y0 > 190 and y1 < 310, "y should hug the visible bars, not all 600"
@@ -146,7 +147,7 @@ def test_price_refit_respects_log_scale(chart):
     chart._toggle_log(True)
     chart._on_history(data)
     vb = chart.plot_widget.getViewBox()
-    vb.setXRange(data["t"][100], data["t"][200], padding=0)
+    vb.setXRange(100, 200, padding=0)
     _, (y0, y1) = vb.viewRange()
     assert y0 < math.log10(199.5) and y1 > math.log10(300.5)
     assert y1 < 3.0  # log units, not raw prices
@@ -159,8 +160,9 @@ def test_you_cannot_pan_off_into_empty_space(chart):
     limits = chart.plot_widget.getViewBox().state["limits"]
     x_min, x_max = limits["xLimits"]
     assert x_min is not None and x_max is not None
-    assert x_min >= data["t"][0] - 3600
-    assert x_max <= data["t"][-1] + 3600 * 3
+    n = len(data["t"])
+    assert x_min >= -3
+    assert x_max <= (n - 1) + 10
     assert limits["xRange"][0] is not None, "zooming in must stop at a few bars"
 
 
@@ -170,7 +172,67 @@ def test_double_click_resets_the_view(chart):
     chart._on_history(data)
     vb = chart.plot_widget.getViewBox()
     before = vb.viewRange()[0]
-    vb.setXRange(data["t"][10], data["t"][30], padding=0)
+    vb.setXRange(10, 30, padding=0)
     chart._reset_view()
     after = vb.viewRange()[0]
     assert after == pytest.approx(before, rel=1e-6)
+
+
+# -- closed-market gaps ----------------------------------------------------------
+
+def _two_sessions():
+    """Two 6.5-hour sessions of 15-minute bars with a 17.5-hour night between."""
+    t0 = 1_750_000_000.0
+    day1 = [t0 + i * 900 for i in range(26)]
+    day2 = [day1[-1] + 17.5 * 3600 + i * 900 for i in range(26)]
+    t = day1 + day2
+    c = [100.0 + i for i in range(len(t))]
+    return {"t": t, "o": c, "h": [x + 0.5 for x in c],
+            "l": [x - 0.5 for x in c], "c": c, "v": [1000] * len(t)}
+
+
+def test_closed_hours_take_no_room(chart):
+    """Bars sit one slot apart, so the overnight close is not a blank strip."""
+    chart._set_range_preset("5d")
+    chart._set_interval("15m")
+    chart._on_history(_two_sessions())
+    rows = chart.candle_item._rows
+    xs = [r[0] for r in rows]
+    assert xs == list(range(52))
+
+
+def test_the_time_axis_labels_slots_with_real_dates(chart):
+    from datetime import datetime
+
+    data = _two_sessions()
+    chart._set_range_preset("5d")
+    chart._set_interval("15m")
+    chart._on_history(data)
+    axis = chart.plot_widget.getAxis("bottom")
+    levels = axis.tickValues(0, 51, 800)
+    ticks = levels[0][1]
+    assert 26.0 in ticks, "the second session's open gets a tick"
+    labels = axis.tickStrings(ticks, 1, 1)
+    second = labels[ticks.index(26.0)]
+    assert second == datetime.fromtimestamp(data["t"][26]).strftime("%d %b")
+
+
+def test_time_and_slot_convert_both_ways(chart):
+    data = _two_sessions()
+    chart._on_history(data)
+    for i in (0, 10, 25, 26, 51):
+        assert chart._x_of_time(data["t"][i]) == pytest.approx(i)
+        assert chart._time_of_x(i) == pytest.approx(data["t"][i])
+    # past the last bar extends at the bar spacing
+    assert chart._x_of_time(data["t"][-1] + 1800) == pytest.approx(53)
+    assert chart._time_of_x(53.0) == pytest.approx(data["t"][-1] + 1800)
+
+
+def test_drawings_are_kept_as_times_and_drawn_on_slots(chart):
+    data = _two_sessions()
+    chart._on_history(data)
+    chart._annotations = [{"type": "trendline",
+                           "points": [[data["t"][20], 120.0], [data["t"][30], 130.0]]}]
+    chart._render_annotations()
+    xs, _ys = chart._annotation_items[0].getData()
+    assert list(xs) == [20.0, 30.0]

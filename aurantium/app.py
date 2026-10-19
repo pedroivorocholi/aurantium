@@ -14,9 +14,12 @@ from PySide6.QtCore import QEvent, QObject, QSettings, Qt, QTimer
 from PySide6.QtGui import (
     QAction,
     QActionGroup,
+    QBitmap,
+    QCursor,
     QIcon,
     QKeySequence,
     QPixmap,
+    QRegion,
     QShortcut,
 )
 from PySide6.QtWidgets import (
@@ -88,11 +91,14 @@ CURRENT_LAYOUT_VERSION = 1
 # offered twice — an empty auto-saved session is not proof of a first run.
 WORKSPACE_CHOOSER_SHOWN_KEY = "workspaceChooser/shown"
 
+# Name of the monitor the main window was last closed on (QScreen.name()).
+MAIN_SCREEN_KEY = "window/screen"
+
 
 class _DockParentWatch(QObject):
-    """Re-checks a dock after it changes parent — i.e. after it was dropped
-    somewhere — so a panel that arrived floating loses the ability to float
-    once it lives in the layout."""
+    """Notes where a dock lives after it changes parent — i.e. after it was
+    dropped somewhere — so a drag that ends off any drop target can put the
+    panel back where it came from (see ``MainWindow._settle_new_window``)."""
 
     def __init__(self, win: "MainWindow") -> None:
         super().__init__(win)
@@ -100,7 +106,7 @@ class _DockParentWatch(QObject):
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt override)
         if event.type() == QEvent.Type.ParentChange:
-            QTimer.singleShot(0, lambda d=obj: self._win._lock_if_docked(d))
+            QTimer.singleShot(0, lambda d=obj: self._win._remember_home(d))
         return False
 
 
@@ -118,6 +124,15 @@ class MainWindow(QMainWindow):
         self._last_closed: dict | None = None  # for reopen-last-closed (Ctrl+Shift+T)
         self._loading_layout = False  # guard: mass-close during layout swap isn't a user close
         self._dock_watch = _DockParentWatch(self)
+        # Multi-screen: a panel (or a whole tab stack) dragged out past every
+        # aurantium window becomes a window of its own, a full docking area
+        # for a second monitor. instance_id -> the dock area it last lived in,
+        # so a drag released inside a window but on no drop target returns
+        # home instead of turning into a stray window.
+        self._home_areas: dict[str, object] = {}
+        self._pending_windows: set = set()  # made by a drag, not yet settled
+        self._opening_windows = 0  # >0 while code (not a drag) creates windows
+        self._tray_hidden_windows: list = []
         self._maximizing = False  # guard: hiding siblings is not a real close
         self._last_refresh_all = 0.0  # monotonic timestamp, debounces F5
         # OS full-screen (borderless, covers the taskbar). Distinct from the
@@ -155,10 +170,12 @@ class MainWindow(QMainWindow):
         self.setMenuWidget(self._wrap_menu_and_bar(bar))
 
         # Docking behaviour: a panel opened from the menu arrives as its own
-        # window; dragged into the layout it snaps in, and from then on docked
-        # panels move and snap but never tear off into windows (add_panel /
-        # _on_dock_top_level). Panel.FLOATABLE (the Day Brief) is the one
-        # class that may always float. Live splitter resize + even splits for free
+        # window; dragged into the layout it snaps in. Dragged out past the
+        # edge of every aurantium window it becomes a window again (that is
+        # how panels reach a second monitor), while a drag released inside a
+        # window but off any drop target goes back where it was, so moving
+        # panels around never leaves a stray window behind
+        # (_settle_new_window). Live splitter resize + even splits for free
         # arranging.
         _cfg = QtAds.CDockManager
         for _flag in (
@@ -182,9 +199,16 @@ class MainWindow(QMainWindow):
         from .theme import ADS_STYLESHEET
 
         self.dock_manager.setStyleSheet(ADS_STYLESHEET)
+        # a window holding several panels is titled after the app, not after
+        # whichever panel happens to be first
+        QtAds.CDockManager.setFloatingContainersTitle("Aurantium")
+        self.dock_manager.floatingWidgetCreated.connect(self._on_window_created)
         self._register_dock_icons()
 
         self._build_menus()
+        from . import guide
+
+        guide.open_guide_hook = self.show_guide  # every panel's ? opens here
         self._install_fullscreen()
         self._install_refresh_all()
         self._install_search_shortcut()
@@ -374,6 +398,12 @@ class MainWindow(QMainWindow):
             self.showFullScreen()  # un-hide back into full screen, not a small window
         else:
             self.showNormal()  # also un-hides a window closed to the tray
+        hidden, self._tray_hidden_windows = self._tray_hidden_windows, []
+        for fw in hidden:
+            try:
+                fw.show()
+            except RuntimeError:
+                pass
         self.raise_()
         self.activateWindow()
 
@@ -389,7 +419,41 @@ class MainWindow(QMainWindow):
             act.blockSignals(True)
             act.setChecked(True)
             act.blockSignals(False)
+        self._move_to_saved_screen()
         self.showFullScreen()
+
+    def _move_to_saved_screen(self) -> None:
+        """Open on the monitor the main window was last closed on, when that
+        monitor is still connected (panel windows keep their own monitor in
+        the layout). Otherwise Windows picks, which is the primary screen."""
+        name = QSettings().value(MAIN_SCREEN_KEY, "", type=str)
+        if not name:
+            return
+        screen = next((s for s in QApplication.screens() if s.name() == name), None)
+        if screen is None:
+            return
+        avail = screen.availableGeometry()
+        self.move(avail.topLeft())
+        handle = self.windowHandle()
+        if handle is not None:
+            handle.setScreen(screen)
+
+    def _on_fullscreen_toggled(self, on: bool) -> None:
+        """Shift+F11 acts on the window it is pressed in: a panel window on a
+        second monitor goes full screen on that monitor and leaves the main
+        window alone, along with the menu's check mark, which tracks it."""
+        fw = self._active_panel_window()
+        if fw is None:
+            self._set_window_fullscreen(on)
+            return
+        act = self._fullscreen_act
+        act.blockSignals(True)
+        act.setChecked(not on)  # undo the toggle: it describes the main window
+        act.blockSignals(False)
+        if fw.isFullScreen():
+            fw.showNormal()
+        else:
+            fw.showFullScreen()
 
     def _set_window_fullscreen(self, on: bool) -> None:
         """Settings ▸ Full Screen / Shift+F11 handler. Leaving full screen returns
@@ -535,9 +599,12 @@ class MainWindow(QMainWindow):
             self._exit_maximize()  # switch: restore, then maximize the new one
         self._pre_maximize_state = self.dock_manager.saveState()
         self._maximizing = True
+        # only within the panel's own window: maximizing on one monitor must
+        # not empty the others
+        home = target.dockContainer()
         try:
             for iid, dock in list(self._docks.items()):
-                if iid != instance_id:
+                if iid != instance_id and dock.dockContainer() is home:
                     dock.toggleView(False)
         finally:
             self._maximizing = False
@@ -562,10 +629,13 @@ class MainWindow(QMainWindow):
     def _restore_pre_maximize(self) -> None:
         state, self._pre_maximize_state = self._pre_maximize_state, None
         if state is not None:
+            self._opening_windows += 1
             try:
                 self.dock_manager.restoreState(state)
             except Exception:
                 pass
+            finally:
+                self._opening_windows -= 1
 
     def _sync_maximize_action(self, instance_id: str, is_max: bool) -> None:
         """Keep a panel's title-bar button in sync with its maximized state
@@ -652,17 +722,28 @@ class MainWindow(QMainWindow):
         pixmap = QPixmap(str(logo_path))
         if pixmap.isNull():
             return None
+        # The asset carries a wide transparent border (about a fifth of its
+        # height above and below the ink), which pushed the mark well in from
+        # the window corner whatever the QSS padding said. Trim to the ink so
+        # placement is the stylesheet's alone.
+        full_h = pixmap.height()
+        ink = QRegion(QBitmap.fromImage(pixmap.toImage().createAlphaMask())).boundingRect()
+        if not ink.isEmpty():
+            pixmap = pixmap.copy(ink)
         # Scale in physical pixels and tag the result with the screen's device
         # pixel ratio — scaling to N logical px directly renders blurry on any
         # HiDPI display, since Qt then upsamples an already-tiny bitmap.
         dpr = QApplication.primaryScreen().devicePixelRatio() if QApplication.primaryScreen() else 1.0
-        target_h_logical = max(1, max_height - 2)
+        # the ink at the size it always rendered, when the border was included
+        target_h_logical = max(1, round((max_height - 2) * pixmap.height() / full_h))
         scaled = pixmap.scaledToHeight(
             round(target_h_logical * dpr), Qt.TransformationMode.SmoothTransformation
         )
         scaled.setDevicePixelRatio(dpr)
         label = QLabel(parent)
         label.setObjectName("menuBarLogo")
+        # centred on the row, so the wordmark sits on the menu titles' line
+        label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         label.setPixmap(scaled)
         return label
 
@@ -737,7 +818,7 @@ class MainWindow(QMainWindow):
         # F11 is panel-maximize; Ctrl+Shift+F for F-row-less laptops
         a_fs.setShortcuts([QKeySequence("Shift+F11"), QKeySequence("Ctrl+Shift+F")])
         a_fs.setToolTip("Borderless full screen (covers the taskbar)")
-        a_fs.toggled.connect(self._set_window_fullscreen)
+        a_fs.toggled.connect(self._on_fullscreen_toggled)
         self._fullscreen_act = a_fs
         m.addAction(a_fs)
 
@@ -774,6 +855,10 @@ class MainWindow(QMainWindow):
         )
         a_guide.triggered.connect(self._show_onboarding)
         m.addAction(a_guide)
+        a_panel_guide = QAction("Guide to the Focused Panel…", self)
+        a_panel_guide.setShortcuts([QKeySequence("Shift+F1"), QKeySequence("Ctrl+Shift+G")])
+        a_panel_guide.triggered.connect(self._show_focused_panel_guide)
+        m.addAction(a_panel_guide)
         a_update = QAction("Check for Updates…", self)
         a_update.triggered.connect(self._check_for_updates)
         m.addAction(a_update)
@@ -906,9 +991,24 @@ class MainWindow(QMainWindow):
             )
 
     def _show_onboarding(self) -> None:
+        self.show_guide(None)
+
+    def show_guide(self, section: str | None) -> None:
+        """Open the F1 guide, on ``section``'s page when given (a panel id,
+        an alias, or a static page id). Every panel's ``?`` comes here."""
         from .onboarding_dialog import OnboardingDialog
 
-        OnboardingDialog(self).exec()
+        OnboardingDialog(self, section).exec()
+
+    def _show_focused_panel_guide(self) -> None:
+        """Shift+F1: the guide page of the focused panel, or the guide's
+        start page when no panel has focus."""
+        dock = self.dock_manager.focusedDockWidget()
+        panel = dock.widget() if dock is not None else None
+        if isinstance(panel, Panel):
+            panel.open_guide()
+        else:
+            self.show_guide(None)
 
     def maybe_show_onboarding(self) -> None:
         """First launch only (per QSettings flag): show the guide once."""
@@ -1235,20 +1335,135 @@ class MainWindow(QMainWindow):
 
     # -- panel management --------------------------------------------------------
 
-    def _on_dock_top_level(self, dock, is_floating: bool) -> None:
-        """A panel that arrived floating has been dragged into the layout:
-        from now on it moves and snaps like every docked panel and can't be
-        torn back out into a window."""
-        if not is_floating:
-            dock.setFeature(QtAds.CDockWidget.DockWidgetFloatable, False)
+    # -- extra windows (multi-screen) -----------------------------------------
 
-    def _lock_if_docked(self, dock) -> None:
+    def _remember_home(self, dock) -> None:
+        """Record the dock area a panel now lives in. Skipped while the panel
+        sits in a window a drag just made: that is not a home yet, and the
+        settle step may send it back to the old one."""
         try:
-            floating = dock.isFloating() or dock.isInFloatingContainer()
+            area = dock.dockAreaWidget()
+            container = dock.dockContainer()
         except RuntimeError:  # deleted while the check was queued
             return
-        if not floating:
-            self._on_dock_top_level(dock, False)
+        if area is None:
+            return
+        fw = container.floatingWidget() if container is not None else None
+        if fw is not None and fw in self._pending_windows:
+            return
+        self._home_areas[dock.objectName()] = area
+
+    def _on_window_created(self, container) -> None:
+        """Every new panel window gets the app's shortcuts; one a drag made
+        is then checked for whether it should exist at all."""
+        # Window-scoped shortcuts (F1, F5, F11, Ctrl+F, the menus' keys) only
+        # fire in a window their action belongs to; without this a panel on a
+        # second monitor would ignore every one of them.
+        container.addActions(self._shortcut_actions())
+        if self._opening_windows:
+            return  # a menu open or a layout restore placed it on purpose
+        self._pending_windows.add(container)
+        QTimer.singleShot(0, lambda c=container: self._settle_new_window(c))
+
+    def _shortcut_actions(self) -> list:
+        """Every main-window action that carries a keyboard shortcut."""
+        found: list = []
+
+        def walk(actions) -> None:
+            for act in actions:
+                if act.menu() is not None:
+                    walk(act.menu().actions())
+                elif act.shortcuts() and act not in found:
+                    found.append(act)
+
+        walk(self.actions())
+        walk(self.menuBar().actions())
+        return found
+
+    def _settle_new_window(self, container) -> None:
+        """A drag just tore panels off into ``container``. Released outside
+        every aurantium window, that is the user making a new window (for a
+        second monitor, say): keep it, on a screen. Released inside one but
+        off any drop target, it was a move that missed: send the panels back
+        to the area they came from, as a drag with nowhere to land always did."""
+        self._pending_windows.discard(container)
+        try:
+            docks = list(container.dockContainer().dockWidgets())
+        except RuntimeError:
+            return  # already gone (dropped into a window before this ran)
+        if not docks:
+            return
+        drop = QCursor.pos()
+        hosts = [self] + [
+            fw for fw in self.dock_manager.floatingWidgets()
+            if fw is not container and fw.isVisible()
+        ]
+        host = next((w for w in hosts if w.frameGeometry().contains(drop)), None)
+        if host is None:
+            self._keep_on_screen(container)
+            for d in docks:
+                self._remember_home(d)
+            return
+        target = None
+        for d in docks:
+            area = self._home_areas.get(d.objectName())
+            if self._area_alive(area, container):
+                target = area
+                break
+        if target is None:
+            where = self.dock_manager if host is self else host.dockContainer()
+            target = where.dockAreaAt(drop)
+        for d in docks:
+            if self._area_alive(target, container):
+                self.dock_manager.addDockWidget(
+                    QtAds.DockWidgetArea.CenterDockWidgetArea, d, target
+                )
+            else:
+                self.dock_manager.addDockWidget(QtAds.DockWidgetArea.RightDockWidgetArea, d)
+                target = d.dockAreaWidget()
+        docks[0].setAsCurrentTab()
+
+    @staticmethod
+    def _area_alive(area, container) -> bool:
+        """``area`` still exists and is not inside the window being settled."""
+        if area is None:
+            return False
+        try:
+            import shiboken6
+
+            if not shiboken6.isValid(area):
+                return False
+            owner = area.dockContainer()
+            return owner is not None and owner.floatingWidget() is not container
+        except RuntimeError:
+            return False
+
+    def _keep_on_screen(self, window) -> None:
+        """Pull a window back onto a connected screen. A layout saved with a
+        second monitor attached must not open its windows off in the void
+        once that monitor is gone."""
+        try:
+            geo = window.frameGeometry()
+        except RuntimeError:
+            return
+        if QApplication.screenAt(geo.center()) is not None:
+            return
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is None:
+            return
+        avail = screen.availableGeometry()
+        w = min(geo.width(), avail.width())
+        h = min(geo.height(), avail.height())
+        window.resize(w, h)
+        window.move(avail.center().x() - w // 2, avail.center().y() - h // 2)
+
+    def _active_panel_window(self):
+        """The panel window (not the main one) that has focus, if any."""
+        active = QApplication.activeWindow()
+        for fw in self.dock_manager.floatingWidgets():
+            if fw is active:
+                return fw
+        return None
 
     def _place_new_window(self, container, size: tuple[int, int] = (760, 540)) -> None:
         """Centre a newly opened panel's window over the main window, stepping
@@ -1320,14 +1535,13 @@ class MainWindow(QMainWindow):
 
         ``floating`` opens the panel as its own window instead of docking it.
         Docking a new panel into a tuned layout costs every other panel width,
-        so panels the user opens from the menu arrive floating. Once the user
-        drags one into the layout it loses the ability to float again (see
-        ``_on_dock_top_level``) — docked panels move and snap, never tear off —
-        unless its class sets ``FLOATABLE`` (the Day Brief).
+        so panels the user opens from the menu arrive floating. Any panel can
+        be dragged into the layout and back out into a window of its own (see
+        ``_settle_new_window``); a ``FLOATABLE`` class (the Day Brief) opens
+        parked at the screen edge instead of centred.
 
-        ``restore_floating`` is for layout restore: the panel was still a
-        window when the layout was saved, so it must be allowed to float for
-        ``restoreState`` to put it back in one."""
+        ``restore_floating`` is accepted for saved layouts and callers that
+        pass it; every panel can float now, so it changes nothing."""
         # a retired id (e.g. "key_metrics") opens its replacement on the
         # matching tab; explicit settings win over the alias defaults
         panel_id, alias_settings = PanelRegistry.resolve(panel_id)
@@ -1385,21 +1599,15 @@ class MainWindow(QMainWindow):
                 break
             wrapper = wrapper.parentWidget()
         dock.setFeature(QtAds.CDockWidget.DockWidgetDeleteOnClose, True)
-        # Movable (can be dragged to a new dock position). Floatable only for
-        # panels that opt in via Panel.FLOATABLE — for everything else dragging
-        # relocates and snaps, and never produces a free window. Read from the
-        # class, not the call, so a restored layout gets the same feature bits.
+        # FLOATABLE (read from the class, so a restored layout behaves the
+        # same) now only decides where a new window of that panel opens.
         always_float = bool(getattr(meta.cls, "FLOATABLE", False))
-        can_float = always_float or floating or restore_floating
         dock.setFeature(QtAds.CDockWidget.DockWidgetMovable, True)
-        dock.setFeature(QtAds.CDockWidget.DockWidgetFloatable, can_float)
-        if not always_float:
-            # A drop into the layout always re-parents the dock (whatever QtAds
-            # signals do or don't fire for that drop path), so watch for that.
-            dock.installEventFilter(self._dock_watch)
-            dock.topLevelChanged.connect(
-                lambda is_floating, d=dock: self._on_dock_top_level(d, is_floating)
-            )
+        # every panel can become a window, so it can live on another monitor
+        dock.setFeature(QtAds.CDockWidget.DockWidgetFloatable, True)
+        # A drop always re-parents the dock (whatever QtAds signals do or
+        # don't fire for that drop path): note where it landed.
+        dock.installEventFilter(self._dock_watch)
         # Let a panel be dragged down to a small size — size from the content's
         # own minimum (near-zero) rather than its full size hint.
         dock.setMinimumSizeHintMode(
@@ -1416,10 +1624,16 @@ class MainWindow(QMainWindow):
         self._maximize_actions[instance_id] = max_act
         dock.closed.connect(lambda iid=instance_id: self._on_dock_closed(iid))
         target = self._docks.get(target_instance) if target_instance else None
-        if floating and always_float:
-            self._place_floating(self.dock_manager.addDockWidgetFloating(dock))
-        elif floating:
-            self._place_new_window(self.dock_manager.addDockWidgetFloating(dock))
+        if floating:
+            self._opening_windows += 1
+            try:
+                container = self.dock_manager.addDockWidgetFloating(dock)
+            finally:
+                self._opening_windows -= 1
+            if always_float:
+                self._place_floating(container)
+            else:
+                self._place_new_window(container)
         elif target is not None:
             self.dock_manager.addDockWidget(area, dock, target.dockAreaWidget())
         else:
@@ -1516,10 +1730,15 @@ class MainWindow(QMainWindow):
         if state:
             from PySide6.QtCore import QByteArray
 
+            self._opening_windows += 1
             try:
                 self.dock_manager.restoreState(QByteArray.fromHex(state.encode()))
             except Exception:
                 pass
+            finally:
+                self._opening_windows -= 1
+            for fw in self.dock_manager.floatingWidgets():
+                self._keep_on_screen(fw)
         return True
 
     # -- layout file sharing (export a saved layout / import one) -------------
@@ -1634,6 +1853,12 @@ class MainWindow(QMainWindow):
         otherwise auto-save the arrangement and really close."""
         if self._close_to_tray_enabled() and not self._force_quit:
             event.ignore()
+            # panel windows on other monitors go to the tray with the app
+            self._tray_hidden_windows = [
+                fw for fw in self.dock_manager.floatingWidgets() if fw.isVisible()
+            ]
+            for fw in self._tray_hidden_windows:
+                fw.hide()
             self.hide()
             if self._tray is not None:
                 # QIcon overload → app icon in the toast, not the generic ⓘ
@@ -1647,6 +1872,9 @@ class MainWindow(QMainWindow):
             self.layout_store.set_last(self.serialize_layout())
         except Exception:
             pass
+        screen = self.screen()
+        if screen is not None:
+            QSettings().setValue(MAIN_SCREEN_KEY, screen.name())
         try:
             DataHub.instance()._flush_cache()  # persist latest values for next launch
         except Exception:

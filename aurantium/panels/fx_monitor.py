@@ -17,7 +17,8 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
-from ..components.fmt import num as _fmt_num
+from ..guide import LIST_EDITOR, PanelGuide
+from ..components.fmt import signed, signed_pct
 from ..components import (
     FX_ENTRIES,
     EditorColumn,
@@ -29,7 +30,7 @@ from ..components import (
 )
 from ..undo import UndoStack
 from ..panel import NULL_GLYPH, Panel, register_panel
-from ..theme import ACCENT, BG_HEADER, FG_DIM, apply_tick
+from ..theme import BG_HEADER, FG_DIM, apply_tick, LABEL
 from ..components.responsive_row import ResponsiveRow
 
 DEFAULT_MAJORS = [
@@ -67,12 +68,40 @@ def _fmt_price(value: Any) -> str:
         v = float(value)
     except (TypeError, ValueError):
         return NULL_GLYPH
-    decimals = 4 if abs(v) < 10 else 2
-    return f"{v:,.{decimals}f}"
+    return f"{v:,.{_decimals(v)}f}"
+
+
+def _decimals(price: float) -> int:
+    return 4 if abs(price) < 10 else 2
+
+
+def _fmt_change(change: Any, price: Any) -> str:
+    """A change at its pair's own precision. It used to be sized by its *own*
+    magnitude, so a 0.42 move on a 102.53 index printed as 0.4150 — four
+    decimals hanging off a two-decimal price."""
+    try:
+        decimals = _decimals(float(price))
+    except (TypeError, ValueError):
+        decimals = 2
+    return signed(change, decimals)
 
 
 @register_panel(id="fx", title="FX Monitor", category="Markets")
 class FXMonitorPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="Major and other currency pairs, the Dollar Index and two crypto pairs in a grouped monitor.",
+        links="Click a pair to send it to every panel in this link group.",
+        interactions=(
+            "Rates under 10 print four decimals; each change uses its pair's own precision.",
+            "Right-click a row to remove it, **Add to Majors…**, **Add to Other…** or **Edit panel…**.",
+        ),
+        fields=(
+            ("Last", "Latest rate"),
+            ("Chg / Chg%", "Change since the previous close"),
+        ),
+        sections=(LIST_EDITOR,),
+    )
+
     def build(self) -> None:
         self._majors: list = [list(row) for row in DEFAULT_MAJORS]
         self._other: list = [list(row) for row in DEFAULT_OTHER]
@@ -143,7 +172,7 @@ class FXMonitorPanel(Panel):
         self.table.insertRow(row)
         item = QTableWidgetItem(text)
         item.setFlags(Qt.ItemFlag.ItemIsEnabled)  # not selectable
-        item.setForeground(QColor(ACCENT))
+        item.setForeground(QColor(LABEL))
         font = item.font()
         font.setBold(True)
         item.setFont(font)
@@ -183,8 +212,8 @@ class FXMonitorPanel(Panel):
             return
 
         last_item.setText(_fmt_price(price))
-        chg_item.setText(_fmt_price(change))
-        pct_item.setText(f"{_fmt_num(change_pct)}%" if change_pct is not None else NULL_GLYPH)
+        chg_item.setText(_fmt_change(change, price))
+        pct_item.setText(signed_pct(change_pct))
 
         if change is not None:
             apply_tick(chg_item, change, glyph=False)

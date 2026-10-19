@@ -92,9 +92,69 @@ def _splash_pixmap(base, dpr: float, text: str):
         text,
     )
     p.end()
+    pix = _fit_to_window_px(pix, dpr)
     # Physical-size bitmap + screen DPR = shown 1:1, no scaling anywhere.
     pix.setDevicePixelRatio(dpr)
     return pix
+
+
+def splash_window_px(px: int, dpr: float) -> int:
+    """The physical extent of the window QSplashScreen builds for a bitmap
+    ``px`` wide (or tall) at ``dpr``: it sizes itself to the bitmap's logical
+    size rounded, and the platform rounds that back to physical pixels."""
+
+    def rnd(v: float) -> int:  # Qt's qRound, not Python's banker's rounding
+        return int(v + 0.5)
+
+    return rnd(rnd(px / dpr) * dpr)
+
+
+def splash_fit_px(px: int, dpr: float) -> int:
+    """The bitmap extent nearest ``px`` whose window is exactly that big.
+
+    Only an exact match is safe. Too small a bitmap leaves an unpainted sliver
+    (white, at 150%: 640px is 426.67 logical, the window rounds up to 427);
+    too big and the window crops the far edge, border and all (at 225% it
+    rounds *down*). Searched, not derived — no closed form survives both
+    roundings at every scale."""
+    for step in range(16):
+        for cand in (px + step, px - step):
+            if splash_window_px(cand, dpr) == cand:
+                return cand
+    return px
+
+
+def _fit_to_window_px(pix, dpr: float):
+    """Resize the card to exactly the window it gets at ``dpr`` without
+    rescaling anything: interior columns/rows are repeated or dropped just
+    inside the border, and the amber border column/row stays on the edge."""
+    from PySide6.QtGui import QPainter, QPixmap
+
+    w, h = pix.width(), pix.height()
+    fw, fh = splash_fit_px(w, dpr), splash_fit_px(h, dpr)
+    if (fw, fh) == (w, h):
+        return pix
+
+    def fit(src, horizontal: bool, n: int):
+        sw, sh = src.width(), src.height()
+        size = sw if horizontal else sh
+        out = QPixmap(n, sh) if horizontal else QPixmap(sw, n)
+        p = QPainter(out)
+        keep = min(size, n) - 1  # everything before the border
+        if horizontal:
+            p.drawPixmap(0, 0, src, 0, 0, keep, sh)
+            for x in range(keep, n - 1):  # repeat the last interior column
+                p.drawPixmap(x, 0, src, sw - 2, 0, 1, sh)
+            p.drawPixmap(n - 1, 0, src, sw - 1, 0, 1, sh)
+        else:
+            p.drawPixmap(0, 0, src, 0, 0, sw, keep)
+            for y in range(keep, n - 1):
+                p.drawPixmap(0, y, src, 0, sh - 2, sw, 1)
+            p.drawPixmap(0, n - 1, src, 0, sh - 1, sw, 1)
+        p.end()
+        return out
+
+    return fit(fit(pix, True, fw), False, fh)
 
 
 def _show_splash(app):

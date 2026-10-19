@@ -56,7 +56,8 @@
             "natgas"
           ]
         ]
-      }
+      },
+      "floating": false
     },
     {
       "instance": "cot_history#1",
@@ -64,7 +65,8 @@
       "link_group": "A",
       "settings": {
         "market": "gold"
-      }
+      },
+      "floating": false
     },
     {
       "instance": "chart#1",
@@ -91,7 +93,7 @@
             "params": {
               "window": 50
             },
-            "color": "#e91e63",
+            "color": "#0c699a",
             "on": true
           },
           {
@@ -99,7 +101,7 @@
             "params": {
               "window": 200
             },
-            "color": "#f8e71c",
+            "color": "#6e6b03",
             "on": true
           },
           {
@@ -107,14 +109,16 @@
             "params": {
               "window": 14
             },
-            "color": "#ffab2e",
+            "color": "#7035f5",
             "on": true
           }
         ],
         "annotations": [],
         "annotations_symbol": "^TNX",
-        "drawing_color": "#2196f3"
-      }
+        "drawing_color": "#2196f3",
+        "events_lane": true
+      },
+      "floating": false
     },
     {
       "instance": "news#1",
@@ -122,13 +126,15 @@
       "link_group": "A",
       "settings": {
         "read": []
-      }
+      },
+      "floating": false
     }
   ],
   "ads_state": "000002b278da8d52414ec33010bcf38a953997a449a1414a5255413d82505b382293ac5a8bc446f6b650c4e3b14308aa1a230e96bdb3e3995969d3d97b53c31eb5114a666c7c11324059aa4ac84dc6d6abc52861b33cbda779b5e7b2c4ea46952fb6b73c18c2061efa8f0cd606755f5b994249e2425ac4b5f3b4af61512b4ead4168f1e56b2d882c7ca7055a0ab5029f4e602729639197333ae2cc357258f1e7d60e8a9dd6e85a0d2fb53a77011e45b541825bdee02f0c45ad0c562e4a90a78113f95f248f5da9e8692b0c297d38353d6e0e5afb64b75cd38060070f4f213ed0e4577102eea4c1776def6eba1fc6e47a02f1e57490e18923f1cd9ca6e9d03fc28ca3690271140e7a05fd86d8b767e3f2b32f9b09dfb0",
   "symbols": {
     "A": "^TNX"
   },
+  "dates": {},
   "name": "Macro Desk",
   "description": "Rates, inflation and positioning \u2014 the macro starting point."
 }

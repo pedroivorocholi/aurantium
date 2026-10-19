@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QButtonGroup,
     QHBoxLayout,
@@ -19,10 +20,12 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from ..guide import PanelGuide
 from ..components.fmt import num as _fmt_num
+from ..components.fmt import signed_pct
 from ..components import MarketTable, NumericTableWidgetItem, make_filter_edit
 from ..panel import NULL_GLYPH, Panel, register_panel
-from ..theme import apply_tick
+from ..theme import apply_tick, LABEL
 from ..components.responsive_row import ResponsiveRow
 
 KINDS = [("Gainers", "gainers"), ("Losers", "losers"), ("Most Active", "actives")]
@@ -47,6 +50,21 @@ def _fmt_volume(value: Any) -> str:
 
 @register_panel(id="movers", title="Market Movers", category="Markets")
 class MoversPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="Today's biggest gainers, losers and most-active US stocks.",
+        links="Click a row to send that stock to every panel in this link group.",
+        interactions=(
+            "**Gainers**, **Losers** and **Most Active** switch the list.",
+            "Click a header to sort; the filter box matches symbols and names.",
+            "A narrow panel drops Volume, then Name, then Last; the symbol and Chg% always stay.",
+        ),
+        fields=(
+            ("Last", "Latest price"),
+            ("Chg%", "Move since the previous close"),
+            ("Volume", "Shares traded today"),
+        ),
+    )
+
     def build(self) -> None:
         self._kind = "gainers"
         self._kind_buttons: dict[str, QPushButton] = {}
@@ -57,6 +75,7 @@ class MoversPanel(Panel):
         for label, kind in KINDS:
             btn = QPushButton(label, self)
             btn.setCheckable(True)
+            btn.setObjectName("chartChip")  # the app's one selector style
             btn.clicked.connect(lambda _=False, k=kind: self._apply_kind(k))
             self._kind_group.addButton(btn)
             kind_row.addWidget(btn)
@@ -80,6 +99,9 @@ class MoversPanel(Panel):
         self.table.set_column_priority(
             keep=[COL_SYMBOL, COL_CHGPCT],
             droppable=[COL_VOLUME, COL_NAME, COL_LAST],
+            # the company name is the long text; it takes the slack, not the
+            # four-letter ticker
+            stretch=COL_NAME,
         )
         self.table.enable_sorting()
         self.table.enable_column_menu()
@@ -123,6 +145,7 @@ class MoversPanel(Panel):
 
                 sym_item = QTableWidgetItem(str(symbol) if symbol is not None else NULL_GLYPH)
                 sym_item.setFlags(sym_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                sym_item.setForeground(QColor(LABEL))  # tickers wear LABEL app-wide
                 self.table.setItem(row, COL_SYMBOL, sym_item)
 
                 name_item = QTableWidgetItem(str(name) if name is not None else NULL_GLYPH)
@@ -131,7 +154,7 @@ class MoversPanel(Panel):
 
                 last_item = NumericTableWidgetItem(_fmt_num(price))
                 chg_item = NumericTableWidgetItem(
-                    f"{_fmt_num(chg_pct)}%" if chg_pct is not None else NULL_GLYPH
+                    signed_pct(chg_pct)
                 )
                 vol_item = NumericTableWidgetItem(_fmt_volume(volume))
                 for item in (last_item, chg_item, vol_item):

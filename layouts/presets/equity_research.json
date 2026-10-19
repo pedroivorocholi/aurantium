@@ -93,10 +93,7 @@
             "period": "annual"
           },
           "earnings": {
-            "hidden_cols": [
-              1,
-              3
-            ]
+            "hidden_cols": []
           }
         }
       },

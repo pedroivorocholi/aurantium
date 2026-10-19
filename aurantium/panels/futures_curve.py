@@ -13,9 +13,10 @@ from __future__ import annotations
 from typing import Any, Optional
 
 import pyqtgraph as pg
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import QComboBox, QCompleter, QHBoxLayout, QLabel
 
+from ..guide import PanelGuide
 from ..commodities_meta import (
     CATEGORIES,
     COMMODITIES,
@@ -25,7 +26,7 @@ from ..commodities_meta import (
 )
 from ..components import attach_hover, clamp_view
 from ..panel import Panel, register_panel
-from ..theme import ACCENT, BG, FG, FG_DIM
+from ..theme import ACCENT, BG, FG, FG_DIM, FONT_SM
 from ..components.responsive_row import ResponsiveRow
 
 #: minimum horizontal pixels per contract before per-point price labels show
@@ -60,6 +61,19 @@ def make_commodity_combo(parent, commodities) -> QComboBox:
 
 @register_panel(id="futures_curve", title="Futures Curve", category="Markets")
 class FuturesCurvePanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="A commodity's futures curve: the price of each upcoming delivery month.",
+        links="Pick a commodity in the dropdown and linked panels follow; click a "
+        "commodity anywhere else (Commodities, Macro / Rates) and the curve switches to it.",
+        interactions=(
+            "The line under the chart says whether the curve slopes up (contango: later "
+            "deliveries cost more) or down (backwardation: nearer ones cost more), and "
+            "how far a later month sits from the front.",
+            "Hover a point for its month and price; the first point is marked **front**.",
+            "Covers metals, energy, agriculture and livestock.",
+        ),
+    )
+
     def build(self) -> None:
         self._meta: CommodityMeta = COMMODITIES[0]
         # (yahoo symbol, "Mon YY" label) pairs for the active commodity
@@ -77,6 +91,8 @@ class FuturesCurvePanel(Panel):
 
         # -- curve plot -------------------------------------------------------
         self.curve_widget = pg.PlotWidget()
+        self.curve_widget.installEventFilter(self)  # re-thin month labels on resize
+        self.curve_widget.setMenuEnabled(False)  # app menu (with Quick guide), not pyqtgraph's own
         self.curve_widget.setBackground(BG)
         self.curve_widget.showGrid(x=True, y=True, alpha=0.15)
         self.curve_widget.setLabel("left", "Price")
@@ -131,9 +147,8 @@ class FuturesCurvePanel(Panel):
         self.unsubscribe_all()
         self._contracts = contract_symbols(meta, CONTRACT_COUNT)
         self._prices = {sym: None for sym, _label in self._contracts}
-        axis = self.curve_widget.getAxis("bottom")
-        axis.setTicks([[(i, label) for i, (_s, label) in enumerate(self._contracts)]])
-        self.curve_widget.setTitle(meta.label, color=FG_DIM, size="9pt")
+        self._sync_ticks()
+        self.curve_widget.setTitle(meta.label, color=FG_DIM, size=f"{FONT_SM}px")
         self._redraw()
         for sym, _label in self._contracts:
             self.subscribe(f"quote:{sym}", lambda data, s=sym: self._on_quote(s, data))
@@ -145,6 +160,31 @@ class FuturesCurvePanel(Panel):
             return
         self._prices[symbol] = data.get("price")
         self._redraw()
+
+    #: room one month label ("Dec 26") needs on the axis, with its gap
+    _TICK_PX = 52
+
+    def _sync_ticks(self) -> None:
+        """Label every month that fits. All eight at once overlapped into
+        "Dec 26Jan 27Feb 27…" in a narrow dock; there, every second (or
+        third) month is labelled and the points still mark each one."""
+        contracts = getattr(self, "_contracts", [])
+        if not contracts:
+            return
+        width = max(self.curve_widget.width() - 60, 1)  # less the price axis
+        stride = max(1, -(-len(contracts) * self._TICK_PX // width))
+        ticks = [(i, label) for i, (_s, label) in enumerate(contracts) if i % stride == 0]
+        self.curve_widget.getAxis("bottom").setTicks([ticks])
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt override)
+        if obj is getattr(self, "curve_widget", None) and event.type() == QEvent.Type.Resize:
+            # the plot's own resize: the panel's arrives before the plot has
+            # its new width, so both of these read a stale size there
+            self._sync_ticks()
+            xs, ys = getattr(self, "_last_points", ([], []))
+            if xs:
+                self._update_point_labels(xs, ys)
+        return super().eventFilter(obj, event)
 
     def _redraw(self) -> None:
         xs: list[float] = []
@@ -183,12 +223,6 @@ class FuturesCurvePanel(Panel):
             lbl.setPos(x, y)
             self.curve_widget.addItem(lbl, ignoreBounds=True)
             self._point_labels.append(lbl)
-
-    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt override)
-        super().resizeEvent(event)
-        xs, ys = getattr(self, "_last_points", ([], []))
-        if xs:
-            self._update_point_labels(xs, ys)
 
     def _hover_text(self, x: float, _y: float) -> Optional[str]:
         """Readout for the contract nearest the cursor — 'Dec 26 · 4,182.50'."""

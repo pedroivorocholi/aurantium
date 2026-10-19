@@ -33,11 +33,12 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ..guide import PanelGuide
 from ..components import MarketTable, attach_hover, make_filter_edit
 from ..components.chip_bar import ChipBar
 from ..components.fmt import compact
 from ..panel import NULL_GLYPH, Panel, register_panel
-from ..theme import ACCENT, BG, BG_HEADER, FG_DIM, FG_MUTED
+from ..theme import ACCENT, BG, BG_HEADER, FG_DIM, FG_MUTED, LABEL
 from ..valuation import (
     CATALOGUE, DAYS, GROUPS, MONEY, NUM, PCT, RATIO, TEXT, history_rows, stats,
 )
@@ -117,7 +118,9 @@ class MetricHistoryDialog(QDialog):
             btn = QPushButton(label, self)
             btn.setCheckable(True)
             btn.setChecked(days == self._days)
-            btn.setFixedWidth(40)
+            # the app's one selector style, sized by its label: a fixed 40px
+            # clipped "10Y" and "Max"
+            btn.setObjectName("chartChip")
             self._range_group.addButton(btn, i)
             top.addWidget(btn)
         self._range_group.idClicked.connect(self._on_range)
@@ -327,7 +330,7 @@ class CustomMetricsDialog(QDialog):
         for g in GROUPS:
             top = QTreeWidgetItem(self.tree, [g])
             top.setFlags(Qt.ItemFlag.ItemIsEnabled)
-            top.setForeground(0, QColor(ACCENT))
+            top.setForeground(0, QColor(LABEL))
             groups[g] = top
         for mid, label, group, _kind, note in CATALOGUE:
             parent_item = groups.get(group)
@@ -375,6 +378,24 @@ class CustomMetricsDialog(QDialog):
 
 @register_panel(id="key_metrics", title="Key Metrics", category="Research", listed=False)
 class KeyMetricsPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="Valuation, growth, profitability, balance-sheet, dividend and risk ratios, each set against its own five years.",
+        links="Follows the Company panel's symbol; an open history chart redraws for a new symbol.",
+        interactions=(
+            "The chips across the top jump to one group; **All** shows every metric.",
+            "**Click a row** for its history chart, with a range picker (1Y to Max), "
+            "average and ±1σ lines, and **Copy**.",
+            "**Custom** holds your own pick: right-click a row ▸ **Add to Custom**, or "
+            "open Custom and press **Edit…**.",
+            "Hover a metric's name to see how it is calculated.",
+        ),
+        fields=(
+            ("TTM / NTM", "Trailing twelve months of results / the next twelve months' estimates"),
+            ("5Y Avg / Low / High", "The metric's own five-year average and range"),
+            ("5Y %ile", "Where today sits in that range: 100% is its highest"),
+        ),
+    )
+
     def build(self) -> None:
         self._data: dict = {}
         self._dialog: Optional[MetricHistoryDialog] = None
@@ -587,7 +608,7 @@ class KeyMetricsPanel(Panel):
         self.table.insertRow(r)
         item = QTableWidgetItem(text)
         item.setFlags(Qt.ItemFlag.ItemIsEnabled)
-        item.setForeground(QColor(ACCENT))
+        item.setForeground(QColor(LABEL))
         font = item.font()
         font.setBold(True)
         item.setFont(font)
@@ -624,7 +645,7 @@ class KeyMetricsPanel(Panel):
         cur_tip = ""
         if _differs(value, quote):
             cur_tip = f"Yahoo quotes {fmt_metric(quote, kind)} — see the method note on the metric name."
-        cell(COL_CUR, fmt_metric(value, kind), ACCENT, cur_tip)
+        cell(COL_CUR, fmt_metric(value, kind), LABEL, cur_tip)
         if kind == TEXT:
             for col in (COL_AVG, COL_LOW, COL_HIGH, COL_PCT):
                 cell(col, "")

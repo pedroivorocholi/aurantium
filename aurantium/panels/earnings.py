@@ -13,7 +13,9 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from ..guide import PanelGuide
 from ..components import MarketTable, NumericTableWidgetItem, make_filter_edit
+from ..components import fmt
 from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, Panel, register_panel
 from ..theme import ACCENT, FG_DIM, UP, apply_tick
 
@@ -42,8 +44,21 @@ def _fmt_pct(value: Any) -> str:
 
 @register_panel(id="earnings", title="Earnings", category="Research", listed=False)
 class EarningsPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="When the company reports next, and its earnings per share against estimates.",
+        links="Follows the Company panel's symbol.",
+        interactions=(
+            "Beats print green and misses red; the filter box narrows by date.",
+        ),
+        fields=(
+            ("EPS Est", "Analysts' consensus estimate of earnings per share"),
+            ("EPS Actual", "What the company reported"),
+            ("Surprise%", "How far the result beat (+) or missed (−) the estimate"),
+        ),
+    )
+
     def build(self) -> None:
-        self.next_lbl = QLabel("Next earnings: -", self)
+        self.next_lbl = QLabel(f"Next earnings: {NULL_GLYPH}", self)
         self.next_lbl.setObjectName("statValue")
         self.content_layout.addWidget(self.next_lbl)
 
@@ -67,7 +82,7 @@ class EarningsPanel(Panel):
     def on_symbol(self, symbol: str) -> None:
         self.set_loading(True)
         self.table.set_empty_text(f"No earnings history for {symbol}", "")
-        self.next_lbl.setText("Next earnings: -")
+        self.next_lbl.setText(f"Next earnings: {NULL_GLYPH}")
         self.table.setRowCount(0)
         self.unsubscribe_all()
         self.subscribe(f"earnings:{symbol}", self._on_earnings)
@@ -79,7 +94,7 @@ class EarningsPanel(Panel):
         data = data if isinstance(data, dict) else {}
 
         next_date = data.get("next_date")
-        self.next_lbl.setText(f"Next earnings: {next_date}" if next_date else "Next earnings: -")
+        self.next_lbl.setText(f"Next earnings: {fmt.date(next_date)}" if next_date else f"Next earnings: {NULL_GLYPH}")
 
         rows = data.get("rows")
         rows = rows if isinstance(rows, list) else []
@@ -92,7 +107,7 @@ class EarningsPanel(Panel):
                 r = self.table.rowCount()
                 self.table.insertRow(r)
 
-                date_item = QTableWidgetItem(str(date) if date is not None else NULL_GLYPH)
+                date_item = QTableWidgetItem(fmt.date(date))
                 date_item.setFlags(date_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 date_item.setForeground(QColor(FG_DIM))
                 self.table.setItem(r, 0, date_item)

@@ -16,7 +16,9 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from ..guide import LIST_EDITOR, PanelGuide
 from ..components.fmt import num as _fmt_num
+from ..components.fmt import signed, signed_pct
 from ..components import (
     EditorColumn,
     EditorSection,
@@ -28,7 +30,7 @@ from ..components import (
 )
 from ..panel import NULL_GLYPH, Panel, register_panel
 from ..undo import UndoStack
-from ..theme import ACCENT, BG_HEADER, FG_DIM, apply_tick
+from ..theme import BG_HEADER, FG_DIM, apply_tick, LABEL
 from ..components.responsive_row import ResponsiveRow
 
 #: display groups in table order — keys are the settings keys, titles match
@@ -75,6 +77,22 @@ def _fmt_range(low: Any, high: Any) -> str:
 
 @register_panel(id="commodities", title="Commodities", category="Markets")
 class CommoditiesPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="Energy and metals futures in one grouped monitor: price, change and the day's range.",
+        links="Click a commodity to send its futures symbol (e.g. CL=F) to every "
+        "panel in this link group. Group headers aren't clickable.",
+        interactions=(
+            "The filter box narrows the rows by name.",
+            "Right-click a row to remove it, **Add commodity…** or **Edit panel…**.",
+        ),
+        fields=(
+            ("Last", "Latest futures price"),
+            ("Chg / Chg%", "Change since the previous settlement"),
+            ("Range (1D)", "Today's low – high"),
+        ),
+        sections=(LIST_EDITOR,),
+    )
+
     def build(self) -> None:
         self._groups: dict[str, list] = {
             key: [list(row) for row in DEFAULT_GROUPS[key]] for key, _t in GROUP_KEYS
@@ -147,7 +165,7 @@ class CommoditiesPanel(Panel):
         self.table.insertRow(row)
         item = QTableWidgetItem(text)
         item.setFlags(Qt.ItemFlag.ItemIsEnabled)  # not selectable
-        item.setForeground(QColor(ACCENT))
+        item.setForeground(QColor(LABEL))
         font = item.font()
         font.setBold(True)
         item.setFont(font)
@@ -190,8 +208,8 @@ class CommoditiesPanel(Panel):
             return
 
         last_item.setText(_fmt_num(price))
-        chg_item.setText(_fmt_num(change))
-        pct_item.setText(f"{_fmt_num(change_pct)}%" if change_pct is not None else NULL_GLYPH)
+        chg_item.setText(signed(change))
+        pct_item.setText(signed_pct(change_pct))
         range_item.setText(_fmt_range(day_low, day_high))
 
         if change is not None:

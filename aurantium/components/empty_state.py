@@ -16,7 +16,7 @@ from PySide6.QtCore import QEvent, QRect, Qt
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter
 from PySide6.QtWidgets import QWidget
 
-from ..theme import FG_DIM, FG_MUTED, MONO_FONT, UI_FONT
+from ..theme import ACCENT, FG_DIM, FG_MUTED, FONT_LG, FONT_MD, MONO_FONT, SPACE_MD, SPACE_XL, UI_FONT
 
 
 class EmptyState(QWidget):
@@ -34,6 +34,7 @@ class EmptyState(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.title = title
         self.hint = hint
+        self._loading = False
         self.hide()
 
     # -- attaching to a plain item view -------------------------------------
@@ -76,6 +77,7 @@ class EmptyState(QWidget):
         )
         self.setGeometry(view.viewport().rect())
         self.setVisible(not visible)
+        self.update()
         if not visible:
             self.raise_()
             self.update()
@@ -90,6 +92,20 @@ class EmptyState(QWidget):
             self.setGeometry(view.viewport().rect())
         return super().eventFilter(obj, event)
 
+    # -- loading --------------------------------------------------------------
+
+    def set_loading(self, on: bool) -> None:
+        """While a fetch is in flight, say so instead of "no data".
+
+        A news panel switching symbols cleared its table and showed "No recent
+        headlines for AAPL" for the whole fetch — a false statement, beside a
+        header that said loading. Panels forward ``set_loading`` here once this
+        overlay is registered as a state target; the wording matches the
+        MarketTable veil.
+        """
+        self._loading = bool(on)
+        self.sync()
+
     # -- content ------------------------------------------------------------
 
     def set_text(self, title: str, hint: str = "") -> None:
@@ -103,28 +119,39 @@ class EmptyState(QWidget):
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
         rect = self.rect()
 
+        # pixel sizes off the theme scale; these were 10.5pt and 8.5pt, two
+        # sizes that appeared nowhere else in the app
         title_font = QFont(MONO_FONT)
-        title_font.setPointSizeF(10.5)
+        title_font.setPixelSize(FONT_LG)
         line_h = QFontMetrics(title_font).height()
-        gap = 5 if self.hint else 0
-        block_h = line_h * (2 if self.hint else 1) + gap
+        hint = "" if self._loading else self.hint
+        gap = SPACE_MD if hint else 0
+        # The hint wraps inside the panel: drawn as one line it was clipped at
+        # both ends in a narrow dock ("ne above: a symbol, price or ch…").
+        flags = Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap
+        hint_font = QFont(UI_FONT)
+        hint_font.setPixelSize(FONT_MD)
+        text_w = max(rect.width() - 2 * SPACE_XL, 40)
+        hint_h = (
+            QFontMetrics(hint_font).boundingRect(QRect(0, 0, text_w, 10_000), flags, hint).height()
+            if hint else 0
+        )
+        block_h = line_h + gap + hint_h
         top = rect.center().y() - block_h // 2
 
         p.setFont(title_font)
-        p.setPen(QColor(FG_DIM))
+        p.setPen(QColor(ACCENT if self._loading else FG_DIM))
         p.drawText(
             QRect(rect.left(), top, rect.width(), line_h),
             Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
-            self.title,
+            "Loading…" if self._loading else self.title,
         )
-        if self.hint:
-            hint_font = QFont(UI_FONT)
-            hint_font.setPointSizeF(8.5)
+        if hint:
             p.setFont(hint_font)
             p.setPen(QColor(FG_MUTED))
             p.drawText(
-                QRect(rect.left(), top + line_h + gap, rect.width(), line_h),
-                Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
-                self.hint,
+                QRect(rect.left() + (rect.width() - text_w) // 2, top + line_h + gap, text_w, hint_h),
+                flags,
+                hint,
             )
         p.end()

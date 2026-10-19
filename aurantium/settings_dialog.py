@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from .paths import EXT_DIR
+from .theme import SPACE_LG, SPACE_XL, SPACE_XS
 
 ENV_PATH = EXT_DIR / ".env"
 
@@ -101,11 +102,14 @@ class ApiKeysDialog(QDialog):
         root.addWidget(intro)
 
         grid = QGridLayout()
-        grid.setHorizontalSpacing(12)
-        grid.setVerticalSpacing(4)
+        grid.setHorizontalSpacing(SPACE_XL)
+        grid.setVerticalSpacing(SPACE_XS)
         grid.setColumnStretch(1, 1)
         for row, (env, name, blurb, url) in enumerate(API_KEYS):
-            r = row * 2
+            # three grid rows per provider: field, its hint, and a gap, so a
+            # hint reads as belonging to the field above it rather than
+            # running straight into the next provider's name
+            r = row * 3
             grid.addWidget(QLabel(name, self), r, 0)
             field = QLineEdit(self)
             field.setEchoMode(QLineEdit.EchoMode.Password)
@@ -116,11 +120,13 @@ class ApiKeysDialog(QDialog):
             hint = QLabel(
                 f'{blurb} — <a href="{url}">get a free key</a>', self
             )
+            hint.setObjectName("secondary")
             hint.setOpenExternalLinks(True)
             hint.setTextInteractionFlags(
                 Qt.TextInteractionFlag.TextBrowserInteraction
             )
             grid.addWidget(hint, r + 1, 1)
+            grid.setRowMinimumHeight(r + 2, SPACE_LG)
         root.addLayout(grid)
 
         show = QCheckBox("Show keys", self)

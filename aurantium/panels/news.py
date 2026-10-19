@@ -8,12 +8,24 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..guide import PanelGuide
 from ..panel import register_panel
 from ._news_common import NewsPanelBase
 
 
 @register_panel(id="news", title="News", category="News")
 class NewsPanel(NewsPanelBase):
+    GUIDE = PanelGuide(
+        purpose="Headlines for the linked symbol, newest first.",
+        links="Follows the link group's symbol.",
+        interactions=(
+            "Single-click a headline for a preview below the list; it dims once read.",
+            "Double-click to open the article in your browser.",
+            "The filter box narrows the headlines as you type; read state is saved with the layout.",
+            "Only your reading languages appear (Settings ▸ News Languages…).",
+        ),
+    )
+
     def build(self) -> None:
         self._build_news_ui()
 

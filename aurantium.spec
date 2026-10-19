@@ -99,6 +99,10 @@ hiddenimports += [
     # else in this block.
     "aurantium.icons",
     "aurantium.onboarding_dialog",
+    # The F1 guide's content model (PanelGuide, the shortcut table, the static
+    # pages). Imported by panel.py today, but listed on the same rule as every
+    # first-party module: the onboarding dialog reaches it lazily.
+    "aurantium.guide",
     "aurantium.language_dialog",
     "aurantium.languages",
     "aurantium.alerts",

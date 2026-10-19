@@ -30,7 +30,6 @@ class WorkspaceChooser(QDialog):
     def __init__(self, presets: list[Preset], parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Choose a workspace")
-        self.resize(420, 320)
         self._presets = list(presets)
 
         layout = QVBoxLayout(self)
@@ -43,16 +42,25 @@ class WorkspaceChooser(QDialog):
         layout.addWidget(blurb)
 
         self._list = QListWidget(self)
+        # names, not data: the UI face, and only as tall as the list itself —
+        # a fixed dialog height left a tall empty well under three entries
+        self._list.setObjectName("choiceList")
         for preset in self._presets:
             self._list.addItem(preset.name)
         if self._presets:
             self._list.setCurrentRow(0)
         self._list.itemDoubleClicked.connect(lambda _item: self.accept())
-        layout.addWidget(self._list, 1)
+        rows = max(self._list.count(), 1)
+        self._list.setFixedHeight(
+            rows * self._list.sizeHintForRow(0) + 2 * self._list.frameWidth() + 4
+        )
+        layout.addWidget(self._list)
 
         self._detail = QLabel(self)
+        self._detail.setObjectName("secondary")
         self._detail.setWordWrap(True)
         layout.addWidget(self._detail)
+        layout.addStretch(1)
         self._list.currentRowChanged.connect(self._show_detail)
         self._show_detail(self._list.currentRow())
 
@@ -66,6 +74,7 @@ class WorkspaceChooser(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+        self.resize(420, self.sizeHint().height())
 
     def _show_detail(self, row: int) -> None:
         if 0 <= row < len(self._presets):

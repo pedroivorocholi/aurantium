@@ -19,28 +19,14 @@ from __future__ import annotations
 from typing import Any
 
 import shiboken6
-from PySide6.QtCore import QPointF, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QPainter, QPen
+from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtWidgets import QButtonGroup, QComboBox, QPushButton, QSizePolicy, QWidget
 
 class _ChevronCombo(QComboBox):
-    """The collapsed bar's dropdown, with a visible chevron. The app theme
-    styles ``QComboBox::drop-down`` but draws no arrow in it, so a collapsed
-    bar read as a plain text box — nothing said it opens."""
-
-    def paintEvent(self, event) -> None:  # noqa: N802 (Qt override)
-        super().paintEvent(event)
-        from ..theme import FG_DIM
-
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        pen = QPen(QColor(FG_DIM), 1.6)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-        p.setPen(pen)
-        cx, cy = self.width() - 11, self.height() / 2
-        p.drawPolyline([QPointF(cx - 4, cy - 2), QPointF(cx, cy + 2), QPointF(cx + 4, cy - 2)])
-        p.end()
+    """The collapsed bar's dropdown. Its chevron used to be painted here,
+    because the theme drew no combo arrow anywhere; the theme now draws one
+    for every combo (``theme._arrow_sheet``), so this is a plain combo kept
+    under its old name for callers and tests."""
 
 
 #: gap between chips

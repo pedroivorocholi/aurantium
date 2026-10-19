@@ -14,16 +14,18 @@ from typing import Any, Callable, Optional
 
 import numpy as np
 import pyqtgraph as pg
-from PySide6.QtCore import QDate, QEvent, QPointF, QRectF, Qt
+from PySide6.QtCore import QDate, QEvent, QPointF, QRectF, QSize, Qt
 from PySide6.QtGui import (
     QAction,
     QActionGroup,
     QColor,
-    QFont,
     QFontMetrics,
+    QIcon,
     QKeySequence,
     QPainter,
+    QPen,
     QPicture,
+    QPixmap,
     QShortcut,
 )
 from PySide6.QtWidgets import (
@@ -40,6 +42,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ..guide import GuideSection, PanelGuide
 from ..components.empty_state import EmptyState
 from ..date_context import DateContext
 from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, COMPACT, WIDE, Panel, register_panel
@@ -49,13 +52,10 @@ from ..undo import UndoStack
 from ..theme import (
     ACCENT,
     BG,
-    BG_ELEV,
     DOWN,
     FG,
     FG_DIM,
     FG_MUTED,
-    MONO_FONT,
-    RADIUS_SM,
     THEMES,
     UP,
     current_theme,
@@ -93,6 +93,14 @@ PREFERRED_INTERVAL = {
     "1h": "1m", "4h": "5m", "1d": "5m", "5d": "15m", "1mo": "1h",
     "3mo": "1d", "6mo": "1d", "1y": "1d", "2y": "1d", "5y": "1wk", "max": "1mo",
 }
+
+#: Width of the price axis, and of every pane stacked under it (indicator
+#: panes and the events lane). The panes share the price plot's time range, so
+#: they must also share its left edge: with each axis sized to its own labels
+#: ("350" vs "80") and the events lane showing none, the same date landed a few
+#: — or, for the lane, thirty — pixels apart, and an event mark sat beside the
+#: candle it explains instead of under it.
+LEFT_AXIS_PX = 54
 
 INTERVALS = ["1m", "5m", "15m", "30m", "1h", "1d", "1wk", "1mo"]
 
@@ -222,6 +230,17 @@ _THEME_DEFAULT_VALUES = {
     key: {defaults[key].lower() for defaults in _CHART_DEFAULTS_BY_THEME.values()}
     for key in DEFAULT_COLORS
 }
+#: Defaults of earlier light palettes. A layout saved under one stores these
+#: hexes; without them here they would pass for the user's own picks and pin
+#: the chart to a palette that no longer exists.
+_RETIRED_CHART_DEFAULTS = {
+    "line": {"#b45309", "#a34e00"},
+    "grid": {"#5b636d", "#4b535e"},
+    "up": {"#0a8f3c"},
+    "down": {"#d32f2f"},
+}
+for _key, _vals in _RETIRED_CHART_DEFAULTS.items():
+    _THEME_DEFAULT_VALUES.setdefault(_key, set()).update(_vals)
 
 
 def _mark_too_low_contrast(color: "QColor") -> bool:
@@ -442,6 +461,34 @@ def _annotation_geometry(
 # Adding a new indicator = one _IndicatorSpec entry + a render function.
 # ``pane`` is "price" (overlay on the price plot) or "osc" (own sub-panel).
 
+#: logical size of the legend swatch drawn before an indicator chip's label
+_SWATCH_SIZE = (12, 8)
+
+
+def _chip_swatch(color: str, widget, dashed: bool = False) -> QIcon:
+    """A short rounded line in ``color``: the indicator's legend mark, painted
+    at the widget's device-pixel ratio so it stays crisp at any scaling."""
+    from .. import icons
+
+    dpr = icons.device_pixel_ratio(widget)
+    w, h = _SWATCH_SIZE
+    pix = QPixmap(round(w * dpr), round(h * dpr))
+    pix.fill(Qt.GlobalColor.transparent)
+    p = QPainter(pix)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    pen = QPen(QColor(color), 2.5 * dpr)
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    if dashed:  # a comparison: dashed on the chart, so dashed in its legend
+        pen.setCapStyle(Qt.PenCapStyle.FlatCap)
+        pen.setDashPattern([1.6, 1.2])
+    p.setPen(pen)
+    y = h * dpr / 2
+    p.drawLine(QPointF(1.5 * dpr, y), QPointF((w - 1.5) * dpr, y))
+    p.end()
+    pix.setDevicePixelRatio(dpr)
+    return QIcon(pix)
+
+
 class _IndicatorSpec:
     def __init__(
         self,
@@ -518,6 +565,49 @@ class _IndicatorInstance:
     def label(self) -> str:
         w = self.params.get("window")
         return f"{self.spec.label} {w}" if w else self.spec.label
+
+
+#: How many symbols one chart compares against at once. Past four the lines
+#: stop being readable against each other, which is the whole point.
+MAX_COMPARES = 4
+
+
+class _Compare:
+    """One symbol overlaid on the price for comparison (a sector ETF, the
+    index, a peer).
+
+    Drawn rebased: at the first bar in view it sits exactly on the price, and
+    from there it moves by its own percentage. Where the two lines part is
+    where one out- or under-performed the other, read straight off the price
+    axis with no second scale. Re-anchored on every pan and zoom, so the
+    comparison always starts at the left edge of what is on screen."""
+
+    def __init__(self, symbol: str, color: str, on: bool = True) -> None:
+        self.symbol = symbol
+        self.color = color
+        self.on = on
+        self.t: list[float] = []  # its own bars, as fetched
+        self.c: list[float] = []
+        self.aligned: list[Optional[float]] = []  # its close at each chart bar
+        self.curve: Optional[pg.PlotDataItem] = None
+        self.chip: Optional[QPushButton] = None
+
+
+def align_closes(
+    bar_t: list, other_t: list, other_c: list, bar_seconds: float
+) -> list[Optional[float]]:
+    """``other``'s close at each of the chart's bars: the latest close at or
+    before the bar, so a series that trades different hours (an index, a
+    foreign listing) still lines up. None before its first bar or long after
+    its last one, rather than a flat line pretending to be data."""
+    out: list[Optional[float]] = []
+    if not other_t:
+        return [None] * len(bar_t)
+    stale = other_t[-1] + 2 * bar_seconds
+    for t in bar_t:
+        j = bisect.bisect_right(other_t, t) - 1
+        out.append(other_c[j] if 0 <= j and t <= stale else None)
+    return out
 
 
 # -- chart items ------------------------------------------------------------
@@ -660,7 +750,9 @@ class _SpacedAxis(pg.AxisItem):
 
         def inside(step: float) -> list[float]:
             first = np.ceil(lo / step) * step
-            return [float(v) for v in np.arange(first, hi + step * 1e-9, step)]
+            # "+ 0.0" folds -0.0 into 0.0: ceil() of a hair-negative bound is
+            # -0.0, which pyqtgraph printed as a "-0" tick under RSI
+            return [float(v) + 0.0 for v in np.arange(first, hi + step * 1e-9, step)]
 
         # aim for ~3 text-heights between labels, or pyqtgraph's own spacing
         # if that's tighter; a short pane settles for anything >= min_px
@@ -702,6 +794,145 @@ class _CompactAxis(_SpacedAxis):
                     break
             else:
                 out.append(f"{v:g}")
+        return out
+
+
+# -- bar-slot time axis -------------------------------------------------------
+#
+# The chart places bar i at x = i, not at its timestamp. On clock time, every
+# night, weekend and holiday was a stretch of empty plot: a 5-day 15-minute
+# chart spent two thirds of its width on hours the market was shut. One slot
+# per bar closes those gaps, and the bottom axis maps slots back to dates.
+
+#: Calendar units the time axis can label by, finest first: (name, key).
+#: A tick goes on the first bar of each new key; the finest unit whose ticks
+#: still clear each other wins.
+_TICK_UNITS: tuple[tuple[str, Callable[[datetime], Any]], ...] = (
+    ("1min", lambda d: (d.date(), d.hour, d.minute)),
+    ("5min", lambda d: (d.date(), d.hour, d.minute // 5)),
+    ("15min", lambda d: (d.date(), d.hour, d.minute // 15)),
+    ("30min", lambda d: (d.date(), d.hour, d.minute // 30)),
+    ("1h", lambda d: (d.date(), d.hour)),
+    ("2h", lambda d: (d.date(), d.hour // 2)),
+    ("4h", lambda d: (d.date(), d.hour // 4)),
+    ("day", lambda d: d.date()),
+    ("week", lambda d: d.isocalendar()[:2]),
+    ("month", lambda d: (d.year, d.month)),
+    ("quarter", lambda d: (d.year, (d.month - 1) // 3)),
+    ("year", lambda d: d.year),
+    ("5y", lambda d: d.year // 5),
+)
+#: Minimum gap between two time labels, in pixels (a "14 Oct" label is ~40).
+_TICK_MIN_PX = 80
+
+
+class _BarClock:
+    """Bar timestamps plus the per-unit tick positions derived from them,
+    shared by every bottom axis on the chart. Recomputed only when the bars
+    change (``times`` is replaced, never mutated in place)."""
+
+    def __init__(self, times_of: Callable[[], list]) -> None:
+        self._times_of = times_of
+        self._key: tuple = ()
+        self._dts: list[datetime] = []
+        self._bounds: dict[str, list[int]] = {}
+
+    def _sync(self) -> list[datetime]:
+        t = self._times_of()
+        key = (id(t), len(t))
+        if key != self._key:
+            self._key = key
+            dts = []
+            for v in t:
+                try:
+                    dts.append(datetime.fromtimestamp(v))
+                except (ValueError, OSError, OverflowError, TypeError):
+                    dts.append(dts[-1] if dts else datetime(1970, 1, 1))
+            self._dts = dts
+            self._bounds = {}
+        return self._dts
+
+    def datetimes(self) -> list[datetime]:
+        return self._sync()
+
+    def boundaries(self, unit: str, keyfn: Callable[[datetime], Any]) -> list[int]:
+        """Indices of the bars that open a new ``unit`` (bar 0 included)."""
+        dts = self._sync()
+        if unit not in self._bounds:
+            out: list[int] = []
+            prev = object()
+            for i, d in enumerate(dts):
+                k = keyfn(d)
+                if k != prev:
+                    out.append(i)
+                    prev = k
+            self._bounds[unit] = out
+        return self._bounds[unit]
+
+
+class _BarTimeAxis(pg.AxisItem):
+    """Bottom axis for a bar-slot x: ticks on calendar boundaries (session
+    open, day, month, year), labelled with the bar's real date or time."""
+
+    def __init__(self, clock: _BarClock, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("orientation", "bottom")
+        super().__init__(*args, **kwargs)
+        self._clock = clock
+        self._unit = "day"
+
+    def tickValues(self, minVal: float, maxVal: float, size: float):  # noqa: N802
+        dts = self._clock.datetimes()
+        n = len(dts)
+        if not n or size <= 0 or maxVal <= minVal:
+            return []
+        i0 = max(0, math.ceil(minVal))
+        i1 = min(n - 1, math.floor(maxVal))
+        if i1 < i0:
+            return []
+        px_per_bar = size / (maxVal - minVal)
+        budget = max(1, int(size // _TICK_MIN_PX))
+        chosen: list[int] = []
+        for unit, keyfn in _TICK_UNITS:
+            b = self._clock.boundaries(unit, keyfn)
+            lo, hi = bisect.bisect_left(b, i0), bisect.bisect_right(b, i1)
+            chosen, self._unit = b[lo:hi], unit
+            if hi - lo <= budget:
+                break
+        # boundaries are uneven (a short session, a holiday week), so a unit
+        # that fits on count can still crowd locally — drop any label that
+        # would land on its neighbour
+        ticks: list[float] = []
+        last = None
+        for i in chosen:
+            if last is None or (i - last) * px_per_bar >= _TICK_MIN_PX:
+                ticks.append(float(i))
+                last = i
+        return [(1.0, ticks)]
+
+    def tickStrings(self, values, scale, spacing) -> list[str]:  # noqa: N802
+        dts = self._clock.datetimes()
+        out: list[str] = []
+        for v in values:
+            i = int(round(v))
+            if not 0 <= i < len(dts):
+                out.append("")
+                continue
+            d = dts[i]
+            before = dts[i - 1] if i > 0 else None
+            unit = self._unit
+            if unit in ("year", "5y"):
+                s = d.strftime("%Y")
+            elif unit in ("month", "quarter"):
+                # the year where it turns over, so a long chart stays dated
+                new_year = before is None or before.year != d.year
+                s = d.strftime("%Y") if new_year else d.strftime("%b")
+            elif unit in ("day", "week"):
+                s = d.strftime("%d %b")
+            else:
+                # intraday: the first bar of each session carries the date
+                new_day = before is None or before.date() != d.date()
+                s = d.strftime("%d %b") if new_day else d.strftime("%H:%M")
+            out.append(s)
         return out
 
 
@@ -752,6 +983,59 @@ class _RangeDialog(QDialog):
 
 @register_panel(id="chart", title="Chart", category="Markets")
 class ChartPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="Price chart for the linked symbol, with indicators, drawings and an events lane.",
+        links="Follows the link group's symbol. A click on a mark in the EVENTS "
+        "lane opens the Day Brief on that date.",
+        interactions=(
+            "**RANGE** sets the window, 1h to max or **custom…** dates; **INTERVAL** "
+            "sets the bar size. A range the interval can't serve switches the interval for you. "
+            "Bars sit side by side, so nights, weekends and holidays leave no gaps.",
+            "Hover for a crosshair with the bar's date and open/high/low/close. Drag to "
+            "scroll through time, wheel to zoom, double-click to reset.",
+            "**INDICATORS**: **+** adds SMA, EMA, Bollinger Bands, VWAP, Volume, RSI or "
+            "MACD. Click a chip to switch it off and on; right-click it to recolor, "
+            "change its period or remove it.",
+            "Right-click the chart for chart type, colors, grid, log scale, the events "
+            "lane, drawing tools, **Export PNG…** and reset options.",
+        ),
+        fields=(
+            ("SMA / EMA", "Simple and exponential moving averages of the close over N bars"),
+            ("BB", "Bollinger Bands: a moving average with bands N standard deviations away"),
+            ("VWAP", "Average price weighted by traded volume"),
+            ("RSI", "Momentum oscillator from 0 to 100, with dashed lines at 70 and 30"),
+            ("MACD", "Trend momentum from the difference of two EMAs"),
+        ),
+        shortcuts=(("D", "Explain the day under the crosshair in the Day Brief"),),
+        sections=(
+            GuideSection("Drawing", "Right-click ▸ **Drawing** offers a trendline, a "
+                "horizontal line, and parallel, flat-bottom or disjoint channels. Click "
+                "to place each point; points snap to the nearest candle. Drawings are "
+                "saved with the layout for that symbol. **Drawing color…**, **Remove last "
+                "drawing** and **Clear drawings** sit in the same menu, and Ctrl+Z undoes."),
+            GuideSection("Compare", "**vs** in the indicator row (or right-click ▸ "
+                "**Compare**) overlays another symbol as a dashed line: the stock's **sector ETF**, its "
+                "**index**, or any **other symbol**. Each line starts level with the "
+                "price at the left edge of the view and moves by its own percentage, so "
+                "where the lines part is where one beat the other; panning or zooming "
+                "re-levels them. Its chip shows its move across the bars in view; hover "
+                "for the gap to the chart's symbol, click to hide it, right-click to "
+                "recolor or remove. Up to four at once, saved with the layout."),
+            GuideSection("Events lane", "The strip under the price marks days worth "
+                "explaining: **E** earnings, **D** ex-dividend, **S** split, ▲/▼ an "
+                "analyst upgrade or downgrade, and ● a session whose move was unusually "
+                "large for this stock. Hover a mark for its date; click it to open the "
+                "Day Brief. Marks too close to tell apart merge into one showing how many "
+                "it holds: hover it for the list, click it to zoom in until they separate. "
+                "Right-click ▸ **Events lane** shows or hides the strip."),
+            GuideSection("Asking the Day Brief", "Hover a bar and press **D**, or "
+                "right-click a bar and choose **What happened on …?**, to explain that "
+                "session in the Day Brief, which opens if it isn't already up."),
+            GuideSection("Narrow panels", "Squeezed narrow, the range and interval rows "
+                "keep the common choices; widen the panel and the rest come back."),
+        ),
+    )
+
     def build(self) -> None:
         # range is either {"preset": "6mo"} or {"start": iso, "end": iso}
         self._range: dict = {"preset": "6mo"}
@@ -763,6 +1047,9 @@ class ChartPanel(Panel):
         self._hist_hi: list = []
         self._hist_lo: list = []
         self._hist_v: list = []
+        # x is the bar's slot, not its timestamp (see _BarClock); every bottom
+        # axis reads the real times through this one clock
+        self._clock = _BarClock(lambda: self._hist_t)
 
         self._chart_type = "candles"  # candles | bars | line | area
         self._grid_on = True
@@ -770,6 +1057,8 @@ class ChartPanel(Panel):
         self._colors = dict(DEFAULT_COLORS)
         self._indicators: list[_IndicatorInstance] = []
         self._palette_iter = 0
+        self._compares: list[_Compare] = []
+        self._sector_wanted = False  # "compare with sector ETF" awaits the profile
 
         # crosshair readout + drawings (#23). Each annotation is
         # {"type": <tool>, "points": [[x, y], ...]}; all share one drawing color.
@@ -797,23 +1086,16 @@ class ChartPanel(Panel):
         title_row = ResponsiveRow()
         title_row.setContentsMargins(2, 2, 2, 2)
         title_row.setSpacing(10)
+        # Styled by role (theme.py). These were setFont() point sizes, which the
+        # app sheet's blanket QWidget font rule overrode — the "headline" came
+        # out at body size, and the price in the proportional face.
         self.title_lbl = QLabel("", self)
+        self.title_lbl.setObjectName("chartTicker")
         self.title_lbl.setVisible(False)  # shown once a symbol arrives
-        tf = QFont()
-        tf.setPointSize(15)
-        tf.setBold(True)
-        self.title_lbl.setFont(tf)
-        self.title_lbl.setStyleSheet(f"color: {ACCENT};")
         self.price_lbl = QLabel("", self)
-        pf = QFont(MONO_FONT)
-        pf.setPointSize(14)
-        self.price_lbl.setFont(pf)
-        self.price_lbl.setStyleSheet(f"color: {FG};")
+        self.price_lbl.setObjectName("chartPrice")
         self.chg_lbl = QLabel("", self)
-        cf = QFont(MONO_FONT)
-        cf.setPointSize(12)
-        cf.setBold(True)
-        self.chg_lbl.setFont(cf)
+        self.chg_lbl.setObjectName("chartChange")
         title_row.addWidget(self.title_lbl)
         title_row.addWidget(self.price_lbl)
         title_row.addWidget(self.chg_lbl)
@@ -886,16 +1168,26 @@ class ChartPanel(Panel):
         self._add_btn.setToolTip("Add an indicator")
         self._add_btn.clicked.connect(self._show_add_menu)
         chips_row.addWidget(self._add_btn)
+        self._cmp_btn = QPushButton("vs", self)
+        self._cmp_btn.setObjectName("chartChip")
+        self._cmp_btn.setToolTip("Compare with another symbol: its sector ETF, the index, a peer")
+        self._cmp_btn.clicked.connect(
+            lambda: self._build_compare_menu(self).exec(
+                self._cmp_btn.mapToGlobal(self._cmp_btn.rect().bottomLeft())
+            )
+        )
+        chips_row.addWidget(self._cmp_btn)
         chips_row.addStretch(1)
         self.content_layout.addLayout(chips_row)
 
         # -- price plot --------------------------------------------------------
         self.plot_widget = pg.PlotWidget(
-            axisItems={"bottom": pg.DateAxisItem(orientation="bottom")}
+            axisItems={"bottom": _BarTimeAxis(self._clock)}
         )
         self.plot_widget.setBackground(self._colors["bg"])
         self.plot_widget.showGrid(x=True, y=True, alpha=0.15)
         self.plot_widget.getAxis("left").setTextPen(FG_DIM)
+        self.plot_widget.getAxis("left").setWidth(LEFT_AXIS_PX)
         self.plot_widget.getAxis("bottom").setTextPen(FG_DIM)
         self.candle_item = CandlestickItem()
         self.plot_widget.addItem(self.candle_item)
@@ -915,8 +1207,9 @@ class ChartPanel(Panel):
         # Deliberately its own x-linked strip rather than marks inside the price
         # plot: nothing to reposition on zoom, no fight with auto-range, and a
         # far bigger click target. See _events_lane.py for the full argument.
-        lane_pane = pg.PlotWidget(axisItems={"bottom": pg.DateAxisItem(orientation="bottom")})
+        lane_pane = pg.PlotWidget(axisItems={"bottom": _BarTimeAxis(self._clock)})
         lane_pane.setXLink(self.plot_widget)
+        lane_pane.getAxis("left").setWidth(LEFT_AXIS_PX)  # gutter under the price axis
         self._lane = EventsLane(lane_pane, self._pick_date, self._colors["bg"])
         self.content_layout.addWidget(lane_pane)
 
@@ -1006,6 +1299,10 @@ class ChartPanel(Panel):
                 inst.pane.setVisible(not empty)
         self.plot_widget.getAxis("left").setVisible(not empty)
         self.plot_widget.getAxis("bottom").setVisible(not empty)
+        # the lane's gutter carries only its EVENTS caption: with nothing
+        # plotted it would label an empty strip, so it goes with the axes
+        # (its width stays, keeping the lane in the price plot's time column)
+        self._lane.pane.getAxis("left").setStyle(showValues=not empty)
         if empty:
             if self.current_symbol:
                 self._empty.set_text(
@@ -1239,6 +1536,7 @@ class ChartPanel(Panel):
 
     def _build_chip(self, inst: _IndicatorInstance) -> None:
         chip = QPushButton(inst.label(), self)
+        chip.setObjectName("indicatorChip")
         chip.setCheckable(True)
         chip.setChecked(inst.on)
         chip.toggled.connect(lambda checked, i=inst: self._on_chip_toggled(i, checked))
@@ -1254,16 +1552,20 @@ class ChartPanel(Panel):
         self._style_chip(inst)
 
     def _style_chip(self, inst: _IndicatorInstance) -> None:
+        """The chip is the indicator's legend: a short line in the series
+        colour before the label, the way a chart legend shows it.
+
+        Two earlier versions put the colour on the chip itself — as label ink
+        (olive and blue text was near illegible at chip size) and then as a
+        coloured frame with a thick left edge, which read as an uneven border
+        and made these chips taller than the range and interval chips above.
+        Now they share those chips' metrics and neutral edge (QSS role
+        ``indicatorChip``), and only the swatch carries the colour; an off
+        indicator mutes both swatch and label."""
         if inst.chip is None:
             return
-        if inst.on:
-            inst.chip.setStyleSheet(
-                f"QPushButton {{ background: {BG_ELEV}; color: {inst.color};"
-                f" border: 1px solid {inst.color}; border-radius: {RADIUS_SM}px;"
-                " padding: 4px 11px; font-size: 11px; font-weight: 600; }"
-            )
-        else:
-            inst.chip.setStyleSheet("")
+        inst.chip.setIcon(_chip_swatch(inst.color if inst.on else FG_MUTED, inst.chip))
+        inst.chip.setIconSize(QSize(*_SWATCH_SIZE))
 
     def _show_chip_menu(self, inst: _IndicatorInstance, pos) -> None:
         menu = QMenu(self)
@@ -1316,6 +1618,10 @@ class ChartPanel(Panel):
         self._teardown_indicator_items(inst)
         if inst.chip is not None:
             self._chips_row.removeWidget(inst.chip)
+            # hidden now, deleted later: until the deferred delete runs, a chip
+            # out of its layout still paints at its last position — over the
+            # readout, when a restored layout replaced the default indicators
+            inst.chip.hide()
             inst.chip.deleteLater()
         self._indicators.remove(inst)
 
@@ -1328,10 +1634,11 @@ class ChartPanel(Panel):
 
     def _make_pane(self, compact_y: bool = False) -> pg.PlotWidget:
         axes: dict = {
-            "bottom": pg.DateAxisItem(orientation="bottom"),
+            "bottom": _BarTimeAxis(self._clock),
             "left": (_CompactAxis if compact_y else _SpacedAxis)(orientation="left"),
         }
         pane = pg.PlotWidget(axisItems=axes)
+        pane.getAxis("left").setWidth(LEFT_AXIS_PX)  # one time column: see LEFT_AXIS_PX
         pane.setBackground(self._colors["bg"])
         pane.showGrid(x=self._grid_on, y=self._grid_on, alpha=0.15)
         pane.getAxis("left").setTextPen(FG_DIM)
@@ -1341,6 +1648,14 @@ class ChartPanel(Panel):
         # is visible (a fixed-scale pane like RSI's 0–100 overrides this).
         pane.setMouseEnabled(x=True, y=False)
         pane.hideButtons()
+        # indicator panes share the chart's own menu (type, colors, drawing…)
+        pane.setMenuEnabled(False)
+        pane.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        pane.customContextMenuRequested.connect(
+            lambda pos, w=pane: self._show_chart_menu(
+                self.plot_widget.mapFromGlobal(w.mapToGlobal(pos))
+            )
+        )
         pane.getViewBox().setAutoVisible(y=True)
         pane.getViewBox().state["wheelScaleFactor"] = WHEEL_SCALE_FACTOR
         pane.scene().sigMouseClicked.connect(self._on_pane_clicked)
@@ -1358,6 +1673,7 @@ class ChartPanel(Panel):
         inst.items = []
         if inst.pane is not None:
             self.content_layout.removeWidget(inst.pane)
+            inst.pane.hide()  # see _remove_indicator: gone from view at once
             inst.pane.deleteLater()  # destroys the pane's scene and its pane_items
             inst.pane = None
         inst.pane_items = []
@@ -1421,7 +1737,7 @@ class ChartPanel(Panel):
     def _refresh_indicator(self, inst: _IndicatorInstance) -> None:
         """Recompute and apply one indicator's data from stored history."""
         self._apply_indicator_visibility(inst)
-        t, c = self._hist_t, self._hist_c
+        t, c = self._hist_x, self._hist_c
         if not inst.on:
             return
 
@@ -1521,7 +1837,9 @@ class ChartPanel(Panel):
         # capture the bar before the menu grabs the mouse and the crosshair
         # stops tracking, so the entry can name the date the user pointed at
         self._menu_bar_date = self._date_under_cursor()
-        self._build_chart_menu().exec(self.plot_widget.mapToGlobal(pos))
+        menu = self._build_chart_menu()
+        self.add_guide_action(menu)
+        menu.exec(self.plot_widget.mapToGlobal(pos))
 
     def _build_chart_menu(self) -> QMenu:
         menu = QMenu(self.plot_widget)
@@ -1576,6 +1894,7 @@ class ChartPanel(Panel):
         menu.addAction(log_act)
 
         menu.addSeparator()
+        menu.addMenu(self._build_compare_menu(menu))
         draw_menu = menu.addMenu("Drawing")
         for tid, label, _n in DRAW_TOOLS:
             act = QAction(label, draw_menu)
@@ -1627,7 +1946,7 @@ class ChartPanel(Panel):
                 self.line_curve.setFillBrush(pg.mkBrush(fill_color))
             else:
                 self.line_curve.setFillLevel(None)
-            self.line_curve.setData(self._hist_t, self._hist_c)
+            self.line_curve.setData(self._hist_x, self._hist_c)
         else:
             self.line_curve.setData([])
 
@@ -1780,16 +2099,47 @@ class ChartPanel(Panel):
         for item in (self._cross_v, self._cross_h, self._cross_text):
             item.setVisible(False)
 
-    def _nearest_index(self, x: float) -> Optional[int]:
+    @property
+    def _hist_x(self) -> list[int]:
+        """Plot x of each loaded bar: its slot, so closed hours take no room."""
+        return list(range(len(self._hist_t)))
+
+    def _x_of_time(self, ts: float) -> float:
+        """Epoch seconds -> plot x. Exact on a bar, linear between two bars,
+        and extended at the bar spacing past either end (a drawing's free
+        point can sit beyond the data)."""
         t = self._hist_t
-        if not t:
+        n = len(t)
+        if not n:
+            return float(ts)
+        bar = self._bar_seconds()
+        if ts <= t[0]:
+            return (ts - t[0]) / bar
+        if ts >= t[-1]:
+            return (n - 1) + (ts - t[-1]) / bar
+        j = bisect.bisect_right(t, ts)
+        a, b = t[j - 1], t[j]
+        return (j - 1) + ((ts - a) / (b - a) if b > a else 0.0)
+
+    def _time_of_x(self, x: float) -> float:
+        """Plot x -> epoch seconds; the inverse of :meth:`_x_of_time`."""
+        t = self._hist_t
+        n = len(t)
+        if not n:
+            return float(x)
+        bar = self._bar_seconds()
+        if x <= 0:
+            return t[0] + x * bar
+        if x >= n - 1:
+            return t[-1] + (x - (n - 1)) * bar
+        i = int(math.floor(x))
+        return t[i] + (x - i) * (t[i + 1] - t[i])
+
+    def _nearest_index(self, x: float) -> Optional[int]:
+        n = len(self._hist_t)
+        if not n:
             return None
-        j = bisect.bisect_left(t, x)
-        if j <= 0:
-            return 0
-        if j >= len(t):
-            return len(t) - 1
-        return j if (t[j] - x) < (x - t[j - 1]) else j - 1
+        return min(max(int(round(x)), 0), n - 1)
 
     def _on_mouse_moved(self, pos) -> None:
         if not self._hist_t:
@@ -1805,7 +2155,7 @@ class ChartPanel(Panel):
             self._hide_crosshair()
             return
         self._cross_index = i  # the `D` shortcut reads the bar from here
-        self._cross_v.setPos(self._hist_t[i])
+        self._cross_v.setPos(i)
         self._cross_h.setPos(mp.y())
         self._cross_v.setVisible(True)
         self._cross_h.setVisible(True)
@@ -1822,11 +2172,19 @@ class ChartPanel(Panel):
         fmt = "%Y-%m-%d" if self._interval in ("1d", "1wk", "1mo") else "%Y-%m-%d %H:%M"
         col = self._colors["up"] if c >= o else self._colors["down"]
         vol = f"  V {_fmt_compact_num(v)}" if v else ""
+        cmp_lines = ""
+        for cmp in self._compares:
+            if not cmp.on or i >= len(cmp.aligned) or cmp.aligned[i] is None:
+                continue
+            pct = self._compare_pct(cmp, i)
+            pct_txt = f" ({pct:+.2f}%)" if pct is not None else ""
+            cmp_lines += (f'<br><span style="color:{cmp.color};">{cmp.symbol}</span> '
+                          f'{cmp.aligned[i]:,.2f}{pct_txt}')
         self._cross_text.setHtml(
             f'<div style="font-family:monospace;font-size:11px;color:{FG};">'
             f'{when.strftime(fmt)}<br>'
             f'O {o:,.2f}&nbsp; H {h:,.2f}&nbsp; L {l:,.2f}&nbsp; '
-            f'<span style="color:{col};">C {c:,.2f}</span>{vol}</div>'
+            f'<span style="color:{col};">C {c:,.2f}</span>{vol}{cmp_lines}</div>'
         )
         # pin the readout to the top-left corner of the current view
         (xmin, _xmax), (_ymin, ymax) = self.plot_widget.getViewBox().viewRange()
@@ -1839,7 +2197,7 @@ class ChartPanel(Panel):
         """X span for horizontal drawings — the loaded bars, or the current
         view when there's no data yet."""
         if self._hist_t:
-            return self._hist_t[0], self._hist_t[-1]
+            return 0.0, float(len(self._hist_t) - 1)
         (xlo, xhi), _ = self.plot_widget.getViewBox().viewRange()
         return xlo, xhi
 
@@ -1858,7 +2216,9 @@ class ChartPanel(Panel):
         candle; the channel width/height controls move freely so the user can
         size a channel to any height."""
         free = index in DRAW_TOOL_FREE_POINTS.get(self._draw_tool, ())
-        return (mp.x(), mp.y()) if free else self._snap_point(mp)
+        # stored as (time, price), so a drawing survives a reload that brings
+        # back a different number of bars
+        return (self._time_of_x(mp.x()), mp.y()) if free else self._snap_point(mp)
 
     def _snapshot_drawings(self) -> tuple:
         return (
@@ -1948,7 +2308,10 @@ class ChartPanel(Panel):
         return fb
 
     def _add_geometry_items(self, atype, pts, *, preview: bool) -> None:
+        if not self._hist_t:
+            return  # points are times: nothing to place them against yet
         x_lo, x_hi = self._data_x_range()
+        pts = [(self._x_of_time(p[0]), p[1]) for p in pts]
         lines, fill = _annotation_geometry(atype, pts, x_lo, x_hi)
         target = self._preview_items if preview else self._annotation_items
         if fill is not None:
@@ -2025,6 +2388,8 @@ class ChartPanel(Panel):
         self._hist_hi, self._hist_lo, self._hist_v = [], [], []
         self._refresh_all_indicators()
         self._apply_chart_type()
+        self._sector_wanted = False
+        self._realign_compares()
         self._resubscribe(symbol)
         self._update_title()
 
@@ -2071,6 +2436,13 @@ class ChartPanel(Panel):
         topic = f"history:{symbol}:{period_token}:{interval}"
         self.subscribe(topic, self._on_history)
         self.subscribe(f"quote:{symbol}", self._on_quote)
+        for cmp in self._compares:
+            self.subscribe(
+                f"history:{cmp.symbol}:{period_token}:{interval}",
+                lambda data, c=cmp: self._on_compare_history(c, data),
+            )
+        if self._sector_wanted:
+            self.subscribe(f"profile:{symbol}", self._on_profile_for_sector)
         if self._lane_on:
             # All three already exist with long TTLs, so these are usually
             # cache hits rather than new network work.
@@ -2204,6 +2576,298 @@ class ChartPanel(Panel):
         else:
             self.set_status("hover a bar, then press D")
 
+    # -- compare (overlay another symbol) --------------------------------------
+
+    def _build_compare_menu(self, parent) -> QMenu:
+        from ..sector_meta import benchmark_for, sector_proxy_for
+
+        menu = QMenu("Compare", parent)
+        menu.setToolTipsVisible(True)
+        sym = self.current_symbol
+        full = len(self._compares) >= MAX_COMPARES
+
+        sector = self._known_sector()
+        etf = sector_proxy_for(sym, sector) if sym and sector else None
+        if etf:
+            text = f"Sector ETF · {etf} ({sector})"
+        elif sym and not sector:
+            text = "Sector ETF"
+        else:
+            text = "Sector ETF (none for this listing)"
+        act = QAction(text, menu)
+        act.setToolTip("The SPDR sector fund for this stock's sector (US listings)")
+        act.setEnabled(bool(sym) and not full and (etf is not None or not sector))
+        act.triggered.connect(self._compare_with_sector)
+        menu.addAction(act)
+
+        bench = benchmark_for(sym) if sym else None
+        act = QAction(f"Index · {bench}" if bench else "Index", menu)
+        act.setToolTip("The broad index this listing trades against")
+        act.setEnabled(bench is not None and not full)
+        act.triggered.connect(lambda _=False, b=bench: self._add_compare(b))
+        menu.addAction(act)
+
+        act = QAction("Other symbol…", menu)
+        act.setEnabled(not full)
+        act.triggered.connect(self._compare_with_other)
+        menu.addAction(act)
+
+        if self._compares:
+            menu.addSeparator()
+            clear = QAction("Clear comparisons", menu)
+            clear.triggered.connect(self._clear_compares)
+            menu.addAction(clear)
+        if full:
+            menu.addSeparator()
+            note = QAction(f"Up to {MAX_COMPARES} at a time", menu)
+            note.setEnabled(False)
+            menu.addAction(note)
+        return menu
+
+    def _known_sector(self) -> Optional[str]:
+        sym = self.current_symbol
+        if not sym:
+            return None
+        try:
+            from ..datahub import DataHub
+
+            prof = DataHub.instance().peek(f"profile:{sym}")
+        except Exception:
+            return None
+        if isinstance(prof, dict) and prof.get("sector"):
+            return str(prof["sector"])
+        return None
+
+    def _compare_with_sector(self) -> None:
+        from ..sector_meta import sector_proxy_for
+
+        sym = self.current_symbol
+        if not sym:
+            return
+        sector = self._known_sector()
+        if sector:
+            etf = sector_proxy_for(sym, sector)
+            if etf:
+                self._add_compare(etf)
+            else:
+                self.set_status(f"no sector ETF for {sym}")
+            return
+        # not fetched yet: ask for the profile and finish when it lands
+        self._sector_wanted = True
+        self.set_status(f"looking up {sym}'s sector…")
+        self.subscribe(f"profile:{sym}", self._on_profile_for_sector)
+
+    def _on_profile_for_sector(self, data: Any) -> None:
+        if not self._sector_wanted or not isinstance(data, dict):
+            return
+        from ..sector_meta import sector_proxy_for
+
+        self._sector_wanted = False
+        etf = sector_proxy_for(self.current_symbol, data.get("sector"))
+        if etf:
+            self._add_compare(etf)
+        else:
+            self.set_status(f"no sector ETF for {self.current_symbol}")
+
+    def _compare_with_other(self) -> None:
+        text, ok = QInputDialog.getText(
+            self, "Compare", "Symbol to compare with (e.g. SPY, MSFT, ^IXIC):"
+        )
+        if ok and text.strip():
+            self._add_compare(text.strip().upper())
+
+    def _add_compare(
+        self, symbol: Optional[str], color: Optional[str] = None,
+        on: bool = True, subscribe: bool = True,
+    ) -> Optional[_Compare]:
+        if not symbol:
+            return None
+        symbol = symbol.strip().upper()
+        if any(c.symbol == symbol for c in self._compares):
+            self.set_status(f"already comparing with {symbol}")
+            return None
+        if len(self._compares) >= MAX_COMPARES:
+            self.set_status(f"up to {MAX_COMPARES} comparisons at a time")
+            return None
+        if symbol == (self.current_symbol or "").upper():
+            self.set_status("that is the symbol on the chart")
+            return None
+        cmp = _Compare(symbol, color or self._least_used_color(), on)
+        cmp.curve = pg.PlotDataItem(
+            pen=self._compare_pen(cmp.color), antialias=True, connect="finite"
+        )
+        cmp.curve.setZValue(6)
+        self.plot_widget.addItem(cmp.curve)
+        chip = QPushButton("", self)
+        chip.setObjectName("indicatorChip")
+        chip.setCheckable(True)
+        chip.setChecked(on)
+        chip.toggled.connect(lambda checked, c=cmp: self._on_compare_toggled(c, checked))
+        chip.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        chip.customContextMenuRequested.connect(
+            lambda pos, c=cmp: self._show_compare_chip_menu(c, pos)
+        )
+        self._chips_row.insertWidget(self._chips_row.indexOf(self._add_btn), chip)
+        cmp.chip = chip
+        self._compares.append(cmp)
+        self._style_compare_chip(cmp)
+        if subscribe and self.current_symbol:
+            period_token, interval = self._fetch_spec()
+            self.subscribe(
+                f"history:{symbol}:{period_token}:{interval}",
+                lambda data, c=cmp: self._on_compare_history(c, data),
+            )
+        return cmp
+
+    @staticmethod
+    def _compare_pen(color: str):
+        """Dashed: the series palette has four colours and a chart can carry
+        three indicators and four comparisons, so colour alone can't keep a
+        comparison apart from an SMA. The dash says "another symbol"."""
+        return pg.mkPen(color, width=1.5, style=Qt.PenStyle.DashLine)
+
+    def _least_used_color(self) -> str:
+        """The palette colour fewest lines on this chart already wear."""
+        palette = indicator_palette()
+        used = [i.color.lower() for i in self._indicators if i.on]
+        used += [c.color.lower() for c in self._compares]
+        return min(palette, key=lambda col: (used.count(col.lower()), palette.index(col)))
+
+    def _on_compare_history(self, cmp: _Compare, data: Any) -> None:
+        if cmp not in self._compares or not isinstance(data, dict):
+            return
+        t, c = data.get("t") or [], data.get("c") or []
+        pairs = [(float(a), float(b)) for a, b in zip(t, c) if a is not None and b is not None]
+        cmp.t = [a for a, _ in pairs]
+        cmp.c = [b for _, b in pairs]
+        self._realign_compares()
+        if not cmp.t:
+            self.set_status(f"no data for {cmp.symbol}")
+
+    def _realign_compares(self) -> None:
+        bar = self._bar_seconds()
+        for cmp in self._compares:
+            cmp.aligned = align_closes(self._hist_t, cmp.t, cmp.c, bar)
+        self._render_compares()
+        self._fit_y_to_visible()
+
+    def _anchor_index(self) -> Optional[int]:
+        """The first chart bar in view: where every comparison starts level."""
+        n = len(self._hist_t)
+        if not n:
+            return None
+        (x0, _x1), _ = self.plot_widget.getViewBox().viewRange()
+        return min(max(0, math.ceil(x0)), n - 1)
+
+    def _compare_base(self, cmp: _Compare) -> Optional[tuple[int, float]]:
+        """(bar, its close) the overlay is rebased on: the anchor bar, or the
+        first bar after it where the compared symbol has a close."""
+        a = self._anchor_index()
+        if a is None:
+            return None
+        for i in range(a, len(cmp.aligned)):
+            if cmp.aligned[i]:
+                return i, cmp.aligned[i]
+        return None
+
+    def _compare_values(self, cmp: _Compare) -> list[Optional[float]]:
+        """The overlay's y per chart bar, in the chart's price units."""
+        base = self._compare_base(cmp) if cmp.on else None
+        if base is None:
+            return []
+        i, base_c = base
+        price = self._hist_c[i]
+        return [v * price / base_c if v is not None else None for v in cmp.aligned]
+
+    def _compare_pct(self, cmp: _Compare, i: int) -> Optional[float]:
+        base = self._compare_base(cmp)
+        if base is None or i >= len(cmp.aligned) or cmp.aligned[i] is None:
+            return None
+        return (cmp.aligned[i] / base[1] - 1.0) * 100.0
+
+    def _visible_last_index(self) -> Optional[int]:
+        n = len(self._hist_t)
+        if not n:
+            return None
+        (_x0, x1), _ = self.plot_widget.getViewBox().viewRange()
+        return min(max(0, math.floor(x1)), n - 1)
+
+    def _render_compares(self) -> None:
+        last = self._visible_last_index()
+        for cmp in self._compares:
+            if cmp.curve is None:
+                continue
+            ys = self._compare_values(cmp)
+            if not ys:
+                cmp.curve.setData([])
+            else:
+                cmp.curve.setData(
+                    self._hist_x, [np.nan if y is None else y for y in ys]
+                )
+            cmp.curve.setVisible(cmp.on)
+            self._style_compare_chip(cmp, last)
+
+    def _style_compare_chip(self, cmp: _Compare, last: Optional[int] = None) -> None:
+        """The chip is the overlay's legend and its scoreboard: how far it
+        moved across the bars in view, beside how far the chart's symbol did."""
+        if cmp.chip is None:
+            return
+        cmp.chip.setIcon(_chip_swatch(cmp.color if cmp.on else FG_MUTED, cmp.chip, dashed=True))
+        cmp.chip.setIconSize(QSize(*_SWATCH_SIZE))
+        if last is None:
+            last = self._visible_last_index()
+        pct = self._compare_pct(cmp, last) if (last is not None and cmp.on) else None
+        cmp.chip.setText(f"vs {cmp.symbol}" + (f" {pct:+.1f}%" if pct is not None else ""))
+        tip = "Click: show / hide · right-click: color / remove"
+        base = self._compare_base(cmp) if cmp.on else None
+        if pct is not None and base is not None and self._hist_c and last is not None:
+            own = (self._hist_c[last] / self._hist_c[base[0]] - 1.0) * 100.0
+            tip = (f"Across the bars in view: {self.current_symbol} {own:+.2f}%, "
+                   f"{cmp.symbol} {pct:+.2f}% ({own - pct:+.2f} pts)\n{tip}")
+        cmp.chip.setToolTip(tip)
+
+    def _on_compare_toggled(self, cmp: _Compare, checked: bool) -> None:
+        cmp.on = checked
+        self._render_compares()
+        self._fit_y_to_visible()
+
+    def _show_compare_chip_menu(self, cmp: _Compare, pos) -> None:
+        menu = QMenu(self)
+        color_act = QAction("Color…", menu)
+        color_act.triggered.connect(lambda: self._recolor_compare(cmp))
+        menu.addAction(color_act)
+        menu.addSeparator()
+        rm_act = QAction("Remove", menu)
+        rm_act.triggered.connect(lambda: self._remove_compare(cmp))
+        menu.addAction(rm_act)
+        menu.exec(cmp.chip.mapToGlobal(pos))
+
+    def _recolor_compare(self, cmp: _Compare) -> None:
+        picked = QColorDialog.getColor(QColor(cmp.color), self, f"{cmp.symbol} color")
+        if not picked.isValid():
+            return
+        if _mark_too_low_contrast(picked):
+            self.set_status(f"{_mark_reject_msg()} — keeping old color")
+            return
+        cmp.color = picked.name()
+        if cmp.curve is not None:
+            cmp.curve.setPen(self._compare_pen(cmp.color))
+        self._style_compare_chip(cmp)
+
+    def _remove_compare(self, cmp: _Compare) -> None:
+        if cmp.curve is not None:
+            self.plot_widget.removeItem(cmp.curve)
+        if cmp.chip is not None:
+            self._chips_row.removeWidget(cmp.chip)
+            cmp.chip.hide()  # see _remove_indicator: hidden now, deleted later
+            cmp.chip.deleteLater()
+        self._compares.remove(cmp)
+        self._fit_y_to_visible()
+
+    def _clear_compares(self) -> None:
+        for cmp in list(self._compares):
+            self._remove_compare(cmp)
+
     # -- navigation ------------------------------------------------------------
     #
     # pyqtgraph's default ViewBox scaled price and time together around the
@@ -2217,7 +2881,7 @@ class ChartPanel(Panel):
         self.plot_widget.hideButtons()  # the stray "A" auto-range button
         vb.state["wheelScaleFactor"] = WHEEL_SCALE_FACTOR
         self._fitting_y = False
-        vb.sigXRangeChanged.connect(lambda *_: self._fit_y_to_visible())
+        vb.sigXRangeChanged.connect(lambda *_: self._on_view_x_changed())
 
     def _bar_seconds(self) -> float:
         t = self._hist_t
@@ -2235,15 +2899,18 @@ class ChartPanel(Panel):
         if not t:
             vb.setLimits(xMin=None, xMax=None, minXRange=None, maxXRange=None)
             return
-        bar = self._bar_seconds()
-        x_min = t[0] - 2 * bar
-        x_max = t[-1] + 8 * bar
+        x_min = -2.0
+        x_max = (len(t) - 1) + 8.0
         vb.setLimits(
             xMin=x_min,
             xMax=x_max,
-            minXRange=min(MIN_VISIBLE_BARS * bar, x_max - x_min),
+            minXRange=min(float(MIN_VISIBLE_BARS), x_max - x_min),
             maxXRange=x_max - x_min,
         )
+
+    def _on_view_x_changed(self) -> None:
+        self._render_compares()  # re-anchor before y fits to what is drawn
+        self._fit_y_to_visible()
 
     def _fit_y_to_visible(self) -> None:
         """Fit price to the bars currently in view (log-aware)."""
@@ -2251,13 +2918,16 @@ class ChartPanel(Panel):
             return
         vb = self.plot_widget.getViewBox()
         (x0, x1), _ = vb.viewRange()
-        t = self._hist_t
-        i0 = bisect.bisect_left(t, x0)
-        i1 = bisect.bisect_right(t, x1)
+        i0 = max(0, math.ceil(x0))
+        i1 = min(len(self._hist_t), math.floor(x1) + 1)
         if i1 <= i0:
             return
         lo = min(self._hist_lo[i0:i1])
         hi = max(self._hist_hi[i0:i1])
+        for cmp in self._compares:
+            ys = [y for y in self._compare_values(cmp)[i0:i1] if y is not None]
+            if ys:
+                lo, hi = min(lo, min(ys)), max(hi, max(ys))
         if self._log_on:
             if lo <= 0:
                 return
@@ -2291,7 +2961,9 @@ class ChartPanel(Panel):
             end = (
                 datetime.fromisoformat(self._range["end"]) + timedelta(days=1)
             ).timestamp()
-        self.plot_widget.setXRange(start, end, padding=0.02)
+        self.plot_widget.setXRange(
+            self._x_of_time(start), self._x_of_time(end), padding=0.02
+        )
         # explicit: an unchanged X range emits no sigXRangeChanged
         self._fit_y_to_visible()
 
@@ -2316,11 +2988,9 @@ class ChartPanel(Panel):
             self._refresh_all_indicators()
             self._apply_x_limits()
             self._render_lane()
+            self._realign_compares()
             self._sync_empty()
             return
-        self.candle_item.set_ohlc(t, o, h, l, c)
-        self.bar_item.set_ohlc(t, o, h, l, c)
-
         n = min(len(t), len(o), len(h), len(l), len(c))
         valid_t: list = []
         valid_o: list = []
@@ -2341,12 +3011,16 @@ class ChartPanel(Panel):
             valid_v.append(float(vi) if vi is not None else 0.0)
         self._hist_t, self._hist_o, self._hist_c = valid_t, valid_o, valid_c
         self._hist_hi, self._hist_lo, self._hist_v = valid_h, valid_l, valid_v
+        xs = self._hist_x
+        self.candle_item.set_ohlc(xs, valid_o, valid_h, valid_l, valid_c)
+        self.bar_item.set_ohlc(xs, valid_o, valid_h, valid_l, valid_c)
         self._refresh_all_indicators()
         self._apply_chart_type()
         self._apply_x_limits()
         self._frame_window(valid_t, valid_h, valid_l)
         self._render_annotations()  # keep horizontal drawings spanning the bars
         self._render_lane()  # unusual-move flags depend on the loaded closes
+        self._realign_compares()
 
         rng = self._range.get("preset") or (
             f"{self._range.get('start')}→{self._range.get('end')}"
@@ -2376,7 +3050,7 @@ class ChartPanel(Panel):
             color = self._colors["up"] if change_pct >= 0 else self._colors["down"]
             sign = "+" if change_pct >= 0 else ""
             self.chg_lbl.setText(f"{sign}{change_pct:.2f}%")
-            self.chg_lbl.setStyleSheet(f"color: {color}; font-weight: 700;")
+            self.chg_lbl.setStyleSheet(f"color: {color};")  # weight and face: the role
 
     # -- persistence -------------------------------------------------------------
 
@@ -2404,6 +3078,10 @@ class ChartPanel(Panel):
             "annotations_symbol": self._annotations_symbol,
             "drawing_color": self._drawing_color,
             "events_lane": self._lane_on,
+            "compare": [
+                {"symbol": c.symbol, "color": c.color, "on": c.on}
+                for c in self._compares
+            ],
         }
 
     def restore(self, settings: dict) -> None:
@@ -2476,6 +3154,18 @@ class ChartPanel(Panel):
                     f"⚠ {substituted} indicator colour(s) were invisible on this "
                     "theme — reset to the palette"
                 )
+
+        compares = settings.get("compare")
+        if isinstance(compares, list):
+            self._clear_compares()
+            for entry in compares[:MAX_COMPARES]:
+                if not isinstance(entry, dict) or not isinstance(entry.get("symbol"), str):
+                    continue
+                color = entry.get("color")
+                if not (isinstance(color, str) and QColor(color).isValid()):
+                    color = None
+                self._add_compare(entry["symbol"], color=color,
+                                  on=bool(entry.get("on", True)), subscribe=False)
 
         lane = settings.get("events_lane")
         if isinstance(lane, bool):

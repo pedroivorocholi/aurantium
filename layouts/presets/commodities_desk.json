@@ -53,7 +53,8 @@
         "agriculture": [],
         "livestock": [],
         "hidden_cols": []
-      }
+      },
+      "floating": false
     },
     {
       "instance": "futures_curve#1",
@@ -61,7 +62,8 @@
       "link_group": "A",
       "settings": {
         "root": "CL"
-      }
+      },
+      "floating": false
     },
     {
       "instance": "cot_history#1",
@@ -69,7 +71,8 @@
       "link_group": "A",
       "settings": {
         "market": "crude_oil"
-      }
+      },
+      "floating": false
     },
     {
       "instance": "chart#1",
@@ -96,7 +99,7 @@
             "params": {
               "window": 50
             },
-            "color": "#e91e63",
+            "color": "#0c699a",
             "on": true
           },
           {
@@ -104,7 +107,7 @@
             "params": {
               "window": 200
             },
-            "color": "#f8e71c",
+            "color": "#6e6b03",
             "on": true
           },
           {
@@ -112,20 +115,23 @@
             "params": {
               "window": 14
             },
-            "color": "#ffab2e",
+            "color": "#7035f5",
             "on": true
           }
         ],
         "annotations": [],
         "annotations_symbol": "CL=F",
-        "drawing_color": "#2196f3"
-      }
+        "drawing_color": "#2196f3",
+        "events_lane": true
+      },
+      "floating": false
     }
   ],
   "ads_state": "0000031278da8d525d4f8330147df757dce0f3640c749000cb82d9a3c6ecc3c7a5c2756b84d6b417e28c3fde16273113a64fedbde7f47c248d676f55090d2acda5481cef6aec008a5c165cec1267bd5a8c426796c60f342f1a26722c6e65fe62b0e5411356b0e91e3ab0d6a8bad9c8645210e3c26c2c9cc6dd0c8b52326a0dc666bf7c2d399159df2b8e8642adc08715a80525ce649033ea38de3f75e60a19acd8531b09b25a29b4502eabca54268efad24a3df262870477acc25310b2526a2c6c74378d5d2bf877bc33d6cf35d50af536af5583bfcd4fe15efbc156b4dd734d521dfa5afd04fb5bf177d4697013821ffa10bb5fb3398f6dbf19fe248069748e115ef7a343c1f74c514fe4e3fa4c58cff32208a651af9bdbfd40731ff8d1e9c527adf40287",
   "symbols": {
     "A": "CL=F"
   },
+  "dates": {},
   "name": "Commodities Desk",
   "description": "Curves, prices and COT positioning for commodities."
 }

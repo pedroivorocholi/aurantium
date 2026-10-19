@@ -58,6 +58,9 @@ def isolated_settings(qapp, tmp_path, monkeypatch):
     """
     from PySide6.QtCore import QSettings
 
+    # the harness override would win over the saved setting these tests read
+    monkeypatch.delenv("AURANTIUM_THEME", raising=False)
+
     def _tmp_settings() -> QSettings:
         return QSettings(
             QSettings.Format.IniFormat,

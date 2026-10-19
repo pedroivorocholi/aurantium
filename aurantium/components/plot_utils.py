@@ -96,3 +96,39 @@ def attach_hover(
     plot_widget._hover_proxy = pg.SignalProxy(  # noqa: SLF001 (deliberate attach)
         plot_widget.scene().sigMouseMoved, rateLimit=45, slot=lambda ev: on_move(ev[0])
     )
+
+
+def compact_tick(value: float) -> str:
+    """One axis label for a big number: ``300K``, ``1.5M``, ``206.2K``.
+
+    Five- and six-digit figures (net contracts, index levels) either printed
+    raw — ``300000``, no separators, beside ``+201,579`` in the same panel — or
+    did not fit a narrow axis at all, and pyqtgraph silently dropped every
+    label. A suffix keeps them short enough for any axis this app draws.
+    """
+    av = abs(value)
+    # K starts at five digits: 7,200 still reads fine in full
+    for suffix, div, floor in (("T", 1e12, 1e12), ("B", 1e9, 1e9), ("M", 1e6, 1e6), ("K", 1e3, 1e4)):
+        if av >= floor:
+            s = f"{value / div:,.1f}"
+            if s.endswith(".0"):
+                s = s[:-2]
+            return s + suffix
+    return f"{value:,.10g}" if av >= 1 or value == 0 else f"{value:.4g}"
+
+
+class CompactAxis(pg.AxisItem):
+    """A value axis whose labels never overflow: thousands and up get a
+    K/M/B/T suffix (see :func:`compact_tick`)."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.enableAutoSIPrefix(False)
+        # pyqtgraph lets a vertical axis's end labels run past the axis, where
+        # the plot clips them: a short Chart Grid cell printed half of "48K".
+        # A label that can't fit whole is dropped instead.
+        self.setStyle(hideOverlappingLabels=True)
+
+    def tickStrings(self, values, scale, spacing) -> list[str]:  # noqa: N802
+        return [compact_tick(v * scale) for v in values]
+

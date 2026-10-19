@@ -9,12 +9,13 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QGridLayout,
-    QHeaderView,
     QLabel,
     QTableWidgetItem,
 )
 
+from ..guide import PanelGuide
 from ..components import MarketTable
+from ..components import fmt
 from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, Panel, register_panel
 from ..theme import ACCENT, FG_DIM
 
@@ -42,6 +43,20 @@ def _fmt_pct(value: Any) -> str:
 
 @register_panel(id="dividends", title="Dividends", category="Research")
 class DividendsPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="The linked stock's dividend profile and payment history, with its splits.",
+        links="Follows the link group's symbol.",
+        interactions=(
+            "Payments are listed oldest first; splits follow under the **— Splits —** row.",
+        ),
+        fields=(
+            ("Yield%", "Annual dividend as a share of the price"),
+            ("Rate", "Annual dividend per share"),
+            ("Ex-Date", "Buy before this day to receive the next dividend"),
+            ("Payout Ratio", "Dividends as a share of earnings"),
+        ),
+    )
+
     def build(self) -> None:
         # -- stats strip: 2x2 grid of label pairs ---------------------------
         self.stats_grid = QGridLayout()
@@ -57,6 +72,9 @@ class DividendsPanel(Panel):
             self.stats_grid.addWidget(k_lbl, row, col * 2)
             self.stats_grid.addWidget(v_lbl, row, col * 2 + 1)
             self._stat_labels[key] = v_lbl
+        # pairs stay together at the left; the slack goes to a last empty
+        # column instead of pushing each value a quarter-panel from its label
+        self.stats_grid.setColumnStretch(4, 1)
         self.content_layout.addLayout(self.stats_grid)
 
         # -- history / splits table -------------------------------------------
@@ -67,7 +85,8 @@ class DividendsPanel(Panel):
             EMPTY_NO_SYMBOL,
             EMPTY_NO_SYMBOL_HINT,
         )
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        # the date takes the slack; amounts sit tight under their header
+        self.table.set_column_priority(keep=[0, 1], droppable=[])
         self.content_layout.addWidget(self.table, 1)
 
     def on_symbol(self, symbol: str) -> None:
@@ -87,8 +106,12 @@ class DividendsPanel(Panel):
 
         self._stat_labels["Yield%"].setText(_fmt_pct(data.get("yield_pct")))
         self._stat_labels["Rate"].setText(_fmt_money(data.get("rate")))
-        self._stat_labels["Ex-Date"].setText(data.get("ex_date") or NULL_GLYPH)
-        self._stat_labels["Payout Ratio"].setText(_fmt_pct(data.get("payout_ratio")))
+        self._stat_labels["Ex-Date"].setText(fmt.date(data.get("ex_date")))
+        # the feed gives payout as a fraction (0.1214), yield already in %
+        payout = data.get("payout_ratio")
+        self._stat_labels["Payout Ratio"].setText(
+            _fmt_pct(payout * 100.0) if isinstance(payout, (int, float)) else NULL_GLYPH
+        )
 
         history = data.get("history")
         history = history if isinstance(history, list) else []
@@ -102,7 +125,7 @@ class DividendsPanel(Panel):
             date, amount = entry[0], entry[1]
             r = self.table.rowCount()
             self.table.insertRow(r)
-            self._set_ro_item(r, 0, str(date) if date is not None else NULL_GLYPH)
+            self._set_ro_item(r, 0, fmt.date(date))
             self._set_ro_item(r, 1, _fmt_money(amount), align_right=True)
 
         if splits:
@@ -121,7 +144,7 @@ class DividendsPanel(Panel):
                 date, ratio = entry[0], entry[1]
                 r = self.table.rowCount()
                 self.table.insertRow(r)
-                self._set_ro_item(r, 0, str(date) if date is not None else NULL_GLYPH)
+                self._set_ro_item(r, 0, fmt.date(date))
                 self._set_ro_item(r, 1, str(ratio) if ratio is not None else NULL_GLYPH, align_right=True)
 
         sym = self.current_symbol or "—"

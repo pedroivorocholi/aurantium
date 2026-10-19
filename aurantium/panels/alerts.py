@@ -7,22 +7,20 @@ isn't open) and persist in QSettings. The tray shows a balloon when one fires.
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
-    QAbstractItemView,
     QComboBox,
     QDoubleSpinBox,
-    QHBoxLayout,
-    QHeaderView,
     QLineEdit,
     QPushButton,
-    QTableWidget,
     QTableWidgetItem,
 )
 
+from ..guide import PanelGuide
 from ..alerts import AlertEngine
-from ..components import attach_suggestions
-from ..components.fit_width import fit_columns
+from ..components import MarketTable, attach_suggestions
 from ..panel import Panel, register_panel
+from ..theme import LABEL
 from ..components.responsive_row import ResponsiveRow
 
 HEADERS = ["Symbol", "Field", "Cond", "Threshold", "On"]
@@ -34,6 +32,19 @@ _OP_TEXT = {"gt": "above", "lt": "below"}
 
 @register_panel(id="alerts", title="Price Alerts", category="Analytics")
 class AlertsPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="Price alerts that raise a tray notification when a symbol crosses a threshold.",
+        links="Doesn't follow the link group: each rule names its own symbol.",
+        interactions=(
+            "Pick a symbol, **Price** or **Change %**, **above** or **below**, and a "
+            "threshold, then **Add**.",
+            "Rules run in the background while aurantium is open — even with this "
+            "panel closed — and each fires once until its condition resets.",
+            "Untick **On** to pause a rule; select one and **Remove selected** to delete it.",
+            "Turn on **Close to tray** (Settings) to keep alerts running with the window closed.",
+        ),
+    )
+
     def build(self) -> None:
         self._engine = AlertEngine.instance()
 
@@ -58,20 +69,24 @@ class AlertsPanel(Panel):
         add_row.addWidget(self.symbol_edit)
         add_row.addWidget(self.field_combo)
         add_row.addWidget(self.op_combo)
-        add_row.addWidget(self.threshold_spin, 1)
+        # a threshold is a short number: a field stretched across a wide
+        # panel pushed Add a thousand pixels from the inputs it submits
+        self.threshold_spin.setMaximumWidth(140)
+        add_row.addWidget(self.threshold_spin)
         add_row.addWidget(add_btn)
+        add_row.addStretch(1)
         self.content_layout.addLayout(add_row)
 
         # -- rules table -----------------------------------------------------
-        self.table = QTableWidget(0, len(HEADERS), self)
-        fit_columns(self.table)
+        # MarketTable, like every other table panel: it brings the shared empty
+        # state (a panel with no rules used to be a blank black table)
+        self.table = MarketTable(0, len(HEADERS), self)
         self.table.setHorizontalHeaderLabels(HEADERS)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.table.setAlternatingRowColors(True)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.set_column_priority(keep=list(range(len(HEADERS))), droppable=[])
+        self.table.set_empty_text(
+            "No alert rules",
+            "Add one above: a symbol, price or change %, above or below a threshold",
+        )
         self.table.itemChanged.connect(self._on_item_changed)
         self.content_layout.addWidget(self.table, 1)
 
@@ -99,6 +114,10 @@ class AlertsPanel(Panel):
                 self._set_cell(r, 1, _FIELD_TEXT.get(rule["field"], rule["field"]))
                 self._set_cell(r, 2, _OP_TEXT.get(rule["op"], rule["op"]))
                 self._set_cell(r, 3, f"{rule['threshold']:,.2f}")
+                self.table.item(r, 0).setForeground(QColor(LABEL))
+                self.table.item(r, 3).setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                )
                 on_item = QTableWidgetItem()
                 on_item.setFlags(
                     (Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)

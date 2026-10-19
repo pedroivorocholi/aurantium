@@ -42,6 +42,7 @@ from PySide6.QtWidgets import (
 
 from . import motion
 from .datahub import DataHub
+from .guide import GuideSection, PanelGuide  # noqa: F401 (re-exported for panels)
 from .theme import (
     BG,
     BORDER,
@@ -247,6 +248,24 @@ COMPACT_MAX = 460
 REGULAR_MAX = 820
 
 
+def owning_panel(widget) -> Optional["Panel"]:
+    """The innermost Panel a widget lives in, or None."""
+    w = widget
+    while w is not None:
+        if isinstance(w, Panel):
+            return w
+        w = w.parentWidget()
+    return None
+
+
+def add_guide_action(menu: QMenu, widget) -> None:
+    """Shared components (MarketTable, …) call this on their context menus:
+    the panel they sit in appends its "Quick guide" entry."""
+    panel = owning_panel(widget)
+    if panel is not None:
+        panel.add_guide_action(menu)
+
+
 def size_class_for(width: int) -> str:
     """The size class for a panel content width."""
     if width <= COMPACT_MAX:
@@ -436,20 +455,26 @@ class Panel(QWidget):
     panel_title: str = ""
     panel_category: str = "General"
 
-    #: May this panel exist as a free-floating window?
+    #: Is this panel read-and-close, opened as a window parked at the screen edge?
     #:
-    #: Aurantium's rule is that panels move and snap but never tear off
-    #: (app.py sets DockWidgetFloatable False), because a workspace of
-    #: overlapping windows stops being a terminal. A panel opts out of that
-    #: rule only when docking would actively harm it -- the Day Brief is the
-    #: case that earned it: auto-docking a brief into the side of a tuned
-    #: layout squeezes every other panel to open something the user will read
-    #: once and close.
-    #:
-    #: This is a class attribute rather than an add_panel() argument on
-    #: purpose: the dock feature has to be set identically when a saved layout
-    #: is restored, and the layout spec carries no such flag.
+    #: Every panel can be dragged out into a window of its own (that is how
+    #: panels reach a second monitor; see MainWindow._settle_new_window). A
+    #: FLOATABLE panel additionally opens parked against the right edge of the
+    #: screen rather than centred over the workspace -- the Day Brief is the
+    #: case that earned it: it opens in response to a click on the chart, and
+    #: landing on top of the chart would hide what the user is asking about.
     FLOATABLE: bool = False
+
+    #: This panel's quick guide — purpose, linking, key interactions, fields
+    #: and shortcuts (see ``guide.PanelGuide``). Required for every registered
+    #: panel: the F1 window builds the panel's page from it, the header's ``?``
+    #: opens that page, and ``tests/test_panel_guides.py`` fails without it.
+    GUIDE: Optional[PanelGuide] = None
+
+    #: ``(key, tab label, panel class)`` for a host whose tabs are themselves
+    #: panels (the Company panel). Each hosted class's GUIDE becomes a page
+    #: nested under the host's in the F1 window.
+    HOSTED_TABS: tuple = ()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -527,10 +552,18 @@ class Panel(QWidget):
             act.triggered.connect(lambda _=False, g=g: self.set_link_group(g))
             menu.addAction(act)
         self._badge.setMenu(menu)
+        # The panel's own quick guide, one click from the panel itself. Beside
+        # the badge because both are about the panel rather than its data.
+        self._guide_btn = QToolButton(header)
+        self._guide_btn.setObjectName("guideButton")
+        self._guide_btn.setText("?")
+        self._guide_btn.setToolTip("Quick guide to this panel (Shift+F1)")
+        self._guide_btn.clicked.connect(self.open_guide)
         hl.addWidget(self._symbol_lbl)
         hl.addWidget(self._status_lbl)
         hl.addWidget(self._state_lbl)
         hl.addStretch(1)
+        hl.addWidget(self._guide_btn)
         hl.addWidget(self._badge)
         outer.addWidget(header)
 
@@ -542,6 +575,46 @@ class Panel(QWidget):
 
         self._ctx.symbol_changed.connect(self._on_ctx_changed)
         self._update_badge()
+
+    # -- quick guide -----------------------------------------------------------
+
+    def guide_section(self) -> str:
+        """The F1 page for this panel. A hosted tab answers with its host's
+        page for that tab; a host may override to point at its current tab."""
+        if self._host is not None:
+            return f"{self._host.panel_id}:{self.panel_id}"
+        return self.panel_id
+
+    def open_guide(self) -> None:
+        """Open the F1 window on this panel's page."""
+        from . import guide
+
+        section = self.guide_section()
+        if guide.open_guide_hook is not None:
+            guide.open_guide_hook(section)
+            return
+        from .onboarding_dialog import OnboardingDialog
+
+        OnboardingDialog(self.window(), section).exec()
+
+    def add_guide_action(self, menu: QMenu) -> None:
+        """Append the "Quick guide" entry to a context menu this panel builds.
+        Every panel menu ends with it, so help is one right-click away."""
+        title = self.panel_title or "this panel"
+        if self._host is not None:
+            title = self._host.panel_title or title
+        if menu.actions():
+            menu.addSeparator()
+        act = menu.addAction(f"Quick guide: {title}")
+        act.triggered.connect(self.open_guide)
+
+    def contextMenuEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        """Right-click anywhere a child doesn't claim: the panel's own menu.
+        Widgets with their own menus (tables, charts, tiles) add the same
+        guide entry through :func:`add_guide_action`."""
+        menu = QMenu(self)
+        self.add_guide_action(menu)
+        menu.exec(event.globalPos())
 
     # -- lifecycle (subclass API) -------------------------------------------
 

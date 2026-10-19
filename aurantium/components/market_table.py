@@ -42,7 +42,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import glossary, motion
-from ..theme import ACCENT, BG, tick_color
+from ..theme import ACCENT, BG, FONT_LG, tick_color
 from .empty_state import EmptyState
 from .fit_width import fit_columns
 
@@ -134,7 +134,7 @@ class _LoadingOverlay(QWidget):
         veil.setAlpha(self.VEIL_ALPHA)
         p.fillRect(self.rect(), veil)
         f = self.font()
-        f.setPointSizeF(max(f.pointSizeF() + 1.0, 10.0))
+        f.setPixelSize(FONT_LG)  # the theme scale, not a point size
         f.setBold(True)
         p.setFont(f)
         p.setPen(QColor(ACCENT))
@@ -155,6 +155,11 @@ _FLASH_ALPHA = 90
 _DECAY = QEasingCurve(motion.EASE_OUT)
 
 
+#: ``set_column_priority(stretch=STRETCH_ALL)``: every visible column shares
+#: the width
+STRETCH_ALL = "all"
+
+
 class MarketTable(QTableWidget):
     """QTableWidget with aurantium defaults, loading + empty overlays, a
     tick flash, and CSV export."""
@@ -173,6 +178,7 @@ class MarketTable(QTableWidget):
         self._droppable_columns: list[int] = []
         self._user_hidden: set[int] = set()
         self._stretch_column: int | None = None
+        self._fit_height = False
 
         # -- tick flash: list of [item, intensity 0..1, QColor] --------------
         # One shared timer decays every flashing cell rather than one animation
@@ -227,6 +233,16 @@ class MarketTable(QTableWidget):
         ):
             signal.connect(self._sync_empty)
         self._sync_empty()  # a table built empty says so from the first paint
+
+        # Which columns fit depends on what is in them: a table laid out while
+        # empty kept every column, then elided all of them when rows arrived
+        # in a narrow dock. Re-decide once per burst of row changes.
+        self._columns_timer = QTimer(self)
+        self._columns_timer.setSingleShot(True)
+        self._columns_timer.setInterval(0)
+        self._columns_timer.timeout.connect(self._sync_columns)
+        for signal in (model.rowsInserted, model.modelReset):
+            signal.connect(lambda *_a: self._columns_timer.start())
 
         # never scroll sideways: whatever columns survive a narrow panel shrink
         # to fit it (see components/fit_width.py)
@@ -345,6 +361,29 @@ class MarketTable(QTableWidget):
         self._empty_hint = hint
         self._sync_empty()
 
+    #: rows of room a height-fitted table keeps for its empty / loading message
+    _FIT_MIN_ROWS = 2
+
+    def fit_height_to_rows(self) -> None:
+        """Cap this table's height at its rows.
+
+        For a short list sharing a panel with something that can use the room:
+        Macro's one-row Monitor table held a hundred pixels of empty stripes
+        while the Positioning table under it scrolled. Opt-in; re-fitted
+        whenever rows change. Keeps room for two rows so its empty and loading
+        messages still have somewhere to sit.
+        """
+        self._fit_height = True
+        self._sync_height()
+
+    def _sync_height(self) -> None:
+        if not self._fit_height:
+            return
+        rows = max(self._visible_row_count(), self._FIT_MIN_ROWS)
+        row_h = self.verticalHeader().defaultSectionSize()
+        head = self.horizontalHeader().sizeHint().height()
+        self.setMaximumHeight(head + rows * row_h + 2 * self.frameWidth())
+
     def _visible_row_count(self) -> int:
         return sum(
             1 for r in range(self.rowCount()) if not self.isRowHidden(r)
@@ -355,6 +394,7 @@ class MarketTable(QTableWidget):
         at — not while a fetch is in flight (the loading veil owns that moment),
         and with a filter-specific message when the rows exist but are all
         filtered out."""
+        self._sync_height()
         if self._loading or self._visible_row_count():
             # isHidden(), not isVisible(): isVisible() is False whenever any
             # ancestor is hidden, so during layout restore — every panel built
@@ -485,7 +525,9 @@ class MarketTable(QTableWidget):
         ``stretch`` is the column that absorbs leftover width on a wide panel
         — the text one, so numbers stay tight under their headers. Defaults to
         the first ``keep`` column, which is the name or symbol in every panel
-        here.
+        here. ``stretch=STRETCH_ALL`` shares the width evenly instead, for a
+        table with no text column (an options chain: every column a figure,
+        so any single stretched one leaves a hole in the middle of the row).
 
         Opt-in. A table that never calls this keeps Qt's default behaviour of
         squeezing every column, which is right for panels whose columns are all
@@ -535,7 +577,7 @@ class MarketTable(QTableWidget):
         for col in range(self.columnCount()):
             wanted = (
                 QHeaderView.ResizeMode.Stretch
-                if col == grow
+                if col == grow or grow == STRETCH_ALL
                 else QHeaderView.ResizeMode.ResizeToContents
             )
             if header.sectionResizeMode(col) != wanted:
@@ -583,12 +625,35 @@ class MarketTable(QTableWidget):
         self._column_menu = True
 
     def hidden_columns(self) -> list[int]:
-        return [c for c in range(self.columnCount()) if self.isColumnHidden(c)]
+        """The columns the *user* has hidden, for saving into a layout.
+
+        A column the responsive layout dropped for width is not one of them.
+        Saving those too made a width decision permanent: a panel that was
+        narrow when its layout was saved (or when a preset was generated)
+        came back with columns that never reappeared however wide it was.
+        """
+        droppable = set(self._droppable_columns)
+        return [
+            c for c in range(self.columnCount())
+            if self.isColumnHidden(c) and (c in self._user_hidden or c not in droppable)
+        ]
 
     def set_hidden_columns(self, cols) -> None:
+        """Restore hidden columns. On a responsive table they become user
+        choices, so the width logic leaves them alone; the rest are shown or
+        dropped by width as usual."""
         wanted = {int(c) for c in cols} if isinstance(cols, (list, tuple, set)) else set()
+        droppable = set(self._droppable_columns)
         for c in range(self.columnCount()):
-            self.setColumnHidden(c, c in wanted)
+            if c in droppable:
+                if c in wanted:
+                    self._user_hidden.add(c)
+                    self.setColumnHidden(c, True)
+                else:
+                    self._user_hidden.discard(c)
+            else:
+                self.setColumnHidden(c, c in wanted)
+        self._sync_columns()
 
     # -- panel-provided row actions -----------------------------------------
 
@@ -628,6 +693,9 @@ class MarketTable(QTableWidget):
                 act.setChecked(not self.isColumnHidden(c))
                 col_actions[act] = c
 
+        from ..panel import add_guide_action  # lazy: panel.py sits above components
+
+        add_guide_action(menu, self)
         chosen = menu.exec(self.viewport().mapToGlobal(pos))
         if chosen is None:
             return

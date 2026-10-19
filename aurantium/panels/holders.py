@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from ..guide import PanelGuide
 from ..components import MarketTable, NumericTableWidgetItem, make_filter_edit
 from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, Panel, register_panel
 from ..theme import ACCENT
@@ -48,11 +49,24 @@ def _fmt_pct(value: Any) -> str:
 
 @register_panel(id="holders", title="Holders", category="Research")
 class HoldersPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="Who owns the linked stock: insider and institutional ownership, and the largest holders.",
+        links="Follows the link group's symbol.",
+        interactions=(
+            "Sort by any column; the filter box matches holder names.",
+        ),
+        fields=(
+            ("Shares", "Shares the holder reported"),
+            ("% Held", "That stake as a share of shares outstanding"),
+            ("Value", "Market value of the stake"),
+        ),
+    )
+
     def build(self) -> None:
         header_row = ResponsiveRow()
-        self.insiders_lbl = QLabel("Insiders: -", self)
+        self.insiders_lbl = QLabel(f"Insiders: {NULL_GLYPH}", self)
         self.insiders_lbl.setObjectName("statValue")
-        self.institutions_lbl = QLabel("Institutions: -", self)
+        self.institutions_lbl = QLabel(f"Institutions: {NULL_GLYPH}", self)
         self.institutions_lbl.setObjectName("statValue")
         header_row.addWidget(self.insiders_lbl)
         header_row.addSpacing(24)
@@ -80,8 +94,8 @@ class HoldersPanel(Panel):
     def on_symbol(self, symbol: str) -> None:
         self.set_loading(True)
         self.table.set_empty_text(f"No holder data for {symbol}", "")
-        self.insiders_lbl.setText("Insiders: -")
-        self.institutions_lbl.setText("Institutions: -")
+        self.insiders_lbl.setText(f"Insiders: {NULL_GLYPH}")
+        self.institutions_lbl.setText(f"Institutions: {NULL_GLYPH}")
         self.table.setRowCount(0)
         self.unsubscribe_all()
         self.subscribe(f"holders:{symbol}", self._on_holders)

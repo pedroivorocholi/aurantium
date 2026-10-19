@@ -17,13 +17,14 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QHBoxLayout,
-    QHeaderView,
     QLabel,
     QPushButton,
     QTableWidgetItem,
 )
 
+from ..guide import LIST_EDITOR, PanelGuide
 from ..components.fmt import num as _fmt_num
+from ..components.fmt import signed, signed_pct
 from ..commodities_meta import COMMODITIES, by_cftc_market, by_symbol
 from ..components import (
     FRED_ENTRIES,
@@ -111,6 +112,27 @@ def _tenor_row_from_entry(entry: CatalogEntry) -> list:
 
 @register_panel(id="macro", title="Macro / Rates", category="Analytics")
 class MacroPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="A weekly macro check: the US Treasury yield curve, a macro monitor and CFTC positioning.",
+        links="Click a monitor instrument or a positioning row to drive this link "
+        "group. The market matching the group's symbol is highlighted in Positioning.",
+        interactions=(
+            "Hover the curve for each tenor's yield; the line under it gives the "
+            "10Y–3M spread in basis points.",
+            "**MACRO MONITOR** lists instruments — the Dollar Index by default — and "
+            "can hold FRED data series such as the 10-year real yield, which need a "
+            "free FRED key (Settings ▸ API Keys…).",
+            "Right-click a row to remove it or add an instrument or market. **Edit…** "
+            "edits the curve's tenors, the monitor and the CFTC markets together.",
+        ),
+        fields=(
+            ("Net Spec", "Large speculators' net futures position: long minus short contracts"),
+            ("W/W Chg", "Change in that position since the previous weekly report"),
+            ("Bias", "bullish when speculators are net long, bearish when net short"),
+        ),
+        sections=(LIST_EDITOR,),
+    )
+
     def build(self) -> None:
         self._tenors: list = [list(r) for r in DEFAULT_TENORS]
         self._instruments: list = [list(r) for r in DEFAULT_INSTRUMENTS]
@@ -122,12 +144,15 @@ class MacroPanel(Panel):
         self._cftc_row_of_market: dict[str, int] = {}
 
         # -- (a) US Treasury yield curve ------------------------------------------
-        curve_title = QLabel("US Treasury Yield Curve", self)
-        curve_title.setObjectName("statValue")
+        # section titles take the shared eyebrow role (Profile's ABOUT, the Day
+        # Brief's EVENTS); they were the only amber headings in any panel
+        curve_title = QLabel("US TREASURY YIELD CURVE", self)
+        curve_title.setObjectName("panelEyebrow")
         self.content_layout.addWidget(curve_title)
 
         self.curve_widget = pg.PlotWidget()
         self.curve_widget.setBackground(BG)
+        self.curve_widget.setMenuEnabled(False)  # app menu (with Quick guide), not pyqtgraph's own
         self.curve_widget.showGrid(x=True, y=True, alpha=0.15)
         self.curve_widget.setLabel("left", "Yield (%)")
         self.curve_widget.getAxis("bottom").setTextPen(FG_DIM)
@@ -141,31 +166,34 @@ class MacroPanel(Panel):
         )
         self.curve_widget.addItem(self.yield_curve)
         attach_hover(self.curve_widget, self._curve_hover_text)
-        self.content_layout.addWidget(self.curve_widget, 2)
+        # an even split with the Positioning table: at 2:1 the curve kept a
+        # tall empty plot while the five CFTC markets scrolled
+        self.content_layout.addWidget(self.curve_widget, 1)
 
         self.spread_lbl = QLabel("", self)
         self.spread_lbl.setObjectName("secondary")
         self.content_layout.addWidget(self.spread_lbl)
 
         # -- (b) macro instrument monitor -------------------------------------------
-        inst_title = QLabel("Macro Monitor", self)
-        inst_title.setObjectName("statValue")
+        inst_title = QLabel("MACRO MONITOR", self)
+        inst_title.setObjectName("panelEyebrow")
         self.content_layout.addWidget(inst_title)
 
         self.inst_table = MarketTable(0, len(INST_HEADERS), self)
         self.register_state_target(self.inst_table)
         self.inst_table.setHorizontalHeaderLabels(INST_HEADERS)
-        header = self.inst_table.horizontalHeader()
-        header.setSectionResizeMode(INST_COL_NAME, QHeaderView.ResizeMode.ResizeToContents)
-        for col in (INST_COL_LAST, INST_COL_CHG, INST_COL_CHGPCT):
-            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
+        # numbers pack under their headers; the name takes the slack
+        self.inst_table.set_column_priority(
+            keep=[INST_COL_NAME, INST_COL_LAST], droppable=[INST_COL_CHG, INST_COL_CHGPCT]
+        )
+        self.inst_table.fit_height_to_rows()
         self.inst_table.itemSelectionChanged.connect(self._on_inst_selected)
         self.inst_table.set_row_actions(self._inst_row_actions)
-        self.content_layout.addWidget(self.inst_table, 1)
+        self.content_layout.addWidget(self.inst_table)
 
         # -- (c) CFTC positioning ---------------------------------------------------
-        cftc_title = QLabel("Positioning (CFTC)", self)
-        cftc_title.setObjectName("statValue")
+        cftc_title = QLabel("POSITIONING (CFTC)", self)
+        cftc_title.setObjectName("panelEyebrow")
         cftc_title.setToolTip(
             "Net futures position of large speculative traders — weekly CFTC\n"
             "Commitments of Traders data. Click a row to drive linked panels."
@@ -175,10 +203,9 @@ class MacroPanel(Panel):
         self.cftc_table = MarketTable(0, len(CFTC_HEADERS), self)
         self.register_state_target(self.cftc_table)
         self.cftc_table.setHorizontalHeaderLabels(CFTC_HEADERS)
-        header = self.cftc_table.horizontalHeader()
-        header.setSectionResizeMode(CFTC_COL_MARKET, QHeaderView.ResizeMode.ResizeToContents)
-        for col in (CFTC_COL_NETSPEC, CFTC_COL_WOW, CFTC_COL_BIAS):
-            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
+        self.cftc_table.set_column_priority(
+            keep=[CFTC_COL_MARKET, CFTC_COL_NETSPEC], droppable=[CFTC_COL_BIAS, CFTC_COL_WOW]
+        )
         self.cftc_table.itemSelectionChanged.connect(self._on_cftc_selected)
         self.cftc_table.set_row_actions(self._cftc_row_actions)
         self.content_layout.addWidget(self.cftc_table, 1)
@@ -342,9 +369,9 @@ class MacroPanel(Panel):
         change = data.get("change")
         last_item.setText(_fmt_num(data.get("price")))
         last_item.setToolTip("")
-        chg_item.setText(_fmt_num(change))
+        chg_item.setText(signed(change))
         change_pct = data.get("change_pct")
-        pct_item.setText(f"{_fmt_num(change_pct)}%" if change_pct is not None else NULL_GLYPH)
+        pct_item.setText(signed_pct(change_pct))
         if change is not None:
             apply_tick(chg_item, change, glyph=False)
             apply_tick(pct_item, change)
@@ -365,9 +392,9 @@ class MacroPanel(Panel):
         last_item.setText(_fmt_num(last))
         last_item.setToolTip(str(data.get("title") or ""))
         change = (last - prev) if (last is not None and prev is not None) else None
-        chg_item.setText(_fmt_num(change))
+        chg_item.setText(signed(change))
         pct = (change / prev * 100.0) if (change is not None and prev) else None
-        pct_item.setText(f"{_fmt_num(pct)}%" if pct is not None else NULL_GLYPH)
+        pct_item.setText(signed_pct(pct))
         if change is not None:
             apply_tick(chg_item, change, glyph=False)
             apply_tick(pct_item, change)

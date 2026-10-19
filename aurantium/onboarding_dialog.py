@@ -1,29 +1,61 @@
-"""First-run onboarding / help modal.
+"""The F1 guide: a navigable help window.
 
-A tabbed dialog with a keyboard & mouse cheat sheet and a short dashboard
-guide. Shown automatically on first launch (gated by a ``QSettings`` flag) and
-on demand from ``Settings ▸ Keyboard Shortcuts & Guide…`` or the F1 key.
+A section list on the left — Getting Started, Shortcuts, Linking & Workspaces,
+Settings, then one entry per panel grouped by category (the Company panel's
+tabs nested under it) — and a content pane on the right. Each page is short;
+its detail sits in collapsed ``▸`` blocks that expand on click. The search box
+filters the list and opens every block that mentions the query.
 
-The cheat sheet is hand-audited against the codebase — every shortcut listed is
-one the app actually binds (see ``app.py`` and ``panels/watchlist.py``) plus the
-PyQtGraph default chart controls; nothing aspirational.
+It used to be two ``QTextBrowser`` tabs of long HTML: a cheat sheet and a guide
+that read top to bottom, which users found overwhelming and which drifted out of
+step with the panels it described. Panel pages are now generated from each
+panel's own ``GUIDE`` declaration (see ``guide.py``), so content lives in one
+place and a panel without a guide fails ``tests/test_panel_guides.py``.
+
+Shown automatically on first launch (gated by a ``QSettings`` flag), on F1 /
+Settings ▸ Keyboard Shortcuts & Guide…, and from every panel's ``?`` button,
+which passes its panel id so the window opens on that panel's page.
 """
 
 from __future__ import annotations
 
-from PySide6.QtCore import QSettings, QUrl
-from PySide6.QtGui import QTextDocument
+import html
+
+from PySide6.QtCore import QSettings, Qt, QUrl
+from PySide6.QtGui import QColor, QDesktopServices, QFont, QTextDocument
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
     QDialogButtonBox,
-    QTabWidget,
+    QHBoxLayout,
+    QLineEdit,
     QTextBrowser,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
-from .theme import ACCENT, BG_ELEV, CHROME_TEXT, FG, FG_DIM, RADIUS_SM
+from . import guide, motion
+from .theme import (
+    ACCENT,
+    LABEL,
+    BG_ELEV,
+    BORDER,
+    CHROME_TEXT,
+    FG,
+    FG_DIM,
+    FG_MUTED,
+    FONT_LG,
+    FONT_MD,
+    FONT_SM,
+    FONT_TITLE,
+    MONO_FONT,
+    SPACE_LG,
+    SPACE_SM,
+    SPACE_XL,
+    WEIGHT_BOLD,
+)
 
 #: bump the suffix if the content changes enough to warrant re-showing everyone
 _SETTINGS_KEY = "has_seen_onboarding_v1"
@@ -33,16 +65,25 @@ _SETTINGS_KEY = "has_seen_onboarding_v1"
 #: after the app keeps it obvious in the HTML that it resolves locally.
 _GLYPH_SCHEME = "aurantium-glyph"
 
+#: painted icons a guide may name inline as ``[[grip]]`` / ``[[close]]``
+_GLYPHS = ("grip", "close")
+
+#: nav item roles
+_ROLE_ID = Qt.ItemDataRole.UserRole
+
+#: width of the section list — fits the longest panel title at FONT_MD
+_NAV_WIDTH = 212
+
 
 def _glyph(kind: str) -> str:
     """One painted affordance icon, inline in the guide's prose.
 
-    Sized to the surrounding 13px text rather than to the family's 16px grid:
-    here the icon is a word in a sentence, so it takes the sentence's optical
-    size the way a character would have.
+    Sized to the surrounding text rather than to the family's 16px grid: here
+    the icon is a word in a sentence, so it takes the sentence's optical size
+    the way a character would have.
     """
     return (
-        f'<img src="{_GLYPH_SCHEME}:{kind}" width="13" height="13"'
+        f'<img src="{_GLYPH_SCHEME}:{kind}" width="{FONT_LG}" height="{FONT_LG}"'
         ' style="vertical-align: middle;">'
     )
 
@@ -50,432 +91,278 @@ def _glyph(kind: str) -> str:
 def _page_css() -> str:
     return f"""
     <style>
-      body {{ color: {FG}; font-size: 13px; }}
-      h2 {{ color: {ACCENT}; font-size: 15px; margin: 14px 0 4px 0; }}
-      p  {{ color: {FG_DIM}; margin: 2px 0 10px 0; }}
-      table {{ border-collapse: collapse; margin: 2px 0 12px 0; width: 100%; }}
-      td {{ padding: 3px 10px 3px 0; vertical-align: top; }}
-      td.k {{ white-space: nowrap; width: 34%; }}
-      kbd {{
-        background: {BG_ELEV}; color: {CHROME_TEXT};
-        border-radius: {RADIUS_SM}px; padding: 1px 6px; font-family: monospace;
-      }}
+      body {{ color: {FG}; font-size: {FONT_LG}px; }}
+      h2 {{ color: {ACCENT}; font-size: {FONT_TITLE}px; font-weight: {WEIGHT_BOLD};
+            margin: 0 0 {SPACE_LG}px 0; }}
+      h3 {{ color: {FG_MUTED}; font-size: {FONT_SM}px; font-weight: {WEIGHT_BOLD};
+            letter-spacing: 1.5px; margin: {SPACE_XL}px 0 2px 0; }}
+      p  {{ color: {FG}; margin: 0 0 {SPACE_LG}px 0; }}
+      p.purpose {{ color: {CHROME_TEXT}; }}
+      p.note {{ color: {FG_DIM}; font-size: {FONT_MD}px; margin-top: {SPACE_XL}px; }}
+      p.crumb {{ color: {FG_MUTED}; font-size: {FONT_SM}px; font-weight: {WEIGHT_BOLD};
+                 letter-spacing: 1.5px; margin: 0 0 2px 0; }}
+      span.label {{ color: {FG_MUTED}; font-size: {FONT_SM}px; font-weight: {WEIGHT_BOLD};
+                    letter-spacing: 1.5px; }}
+      ul {{ margin: 0 0 {SPACE_LG}px 0; }}
+      li {{ margin: 0 0 2px 0; }}
+      a {{ color: {LABEL}; text-decoration: none; }}
+      p.more {{ margin: {SPACE_LG}px 0 2px 0; font-weight: {WEIGHT_BOLD}; }}
+      div.detail {{ margin: 0 0 0 14px; }}
+      table {{ border-collapse: collapse; margin: 0 0 {SPACE_LG}px 0; }}
+      td {{ padding: 3px {SPACE_XL}px 3px 0; vertical-align: middle; }}
+      table.keys td.k {{ white-space: nowrap; }}
+      table.fields td {{ vertical-align: top; }}
       td.d {{ color: {FG}; }}
+      table.fields td.k {{ white-space: nowrap; color: {CHROME_TEXT}; }}
+      kbd {{ background: {BG_ELEV}; color: {CHROME_TEXT}; font-family: "{MONO_FONT}";
+             font-size: {FONT_MD}px; }}
+      span.gesture {{ color: {CHROME_TEXT}; }}
+      span.or {{ color: {FG_MUTED}; }}
+      code {{ font-family: "{MONO_FONT}"; color: {CHROME_TEXT}; font-size: {FONT_MD}px;
+              white-space: nowrap; }}
     </style>
     """
 
 
-def _kbd(*keys: str) -> str:
-    return " ".join(f"<kbd>{k}</kbd>" for k in keys)
-
-
-def _row(keys_html: str, desc: str) -> str:
-    return f'<tr><td class="k">{keys_html}</td><td class="d">{desc}</td></tr>'
-
-
-_SHORTCUTS_HTML = _page_css() + f"""
-<body>
-<h2>Global</h2>
-<table>
-  {_row(_kbd("Ctrl", "F"), "Jump to the SYMBOL box and select its text")}
-  {_row(_kbd("Enter"), "In the SYMBOL box: send the ticker (or run a /command)")}
-  {_row(_kbd("↑") + " / " + _kbd("↓"), "In the SYMBOL box: recall previous entries")}
-  {_row(_kbd("Tab") + " / " + _kbd("Shift", "Tab"), "In a symbol box: cycle through the suggestions popup")}
-  {_row(_kbd("F5") + " / " + _kbd("Ctrl", "R"), "Refresh all live feeds (quotes, news, charts, financials)")}
-  {_row(_kbd("F11") + " / " + _kbd("Ctrl", "Shift", "M"), "Maximize the focused panel — press again to restore")}
-  {_row(_kbd("Esc"), "Restore a maximized panel")}
-  {_row(_kbd("Shift", "F11") + " / " + _kbd("Ctrl", "Shift", "F"), "Toggle borderless full screen (Aurantium opens in full screen)")}
-  {_row(_kbd("Ctrl", "W"), "Close the focused panel")}
-  {_row(_kbd("Ctrl", "Shift", "T"), "Reopen the last panel you closed")}
-  {_row(_kbd("F1") + " / " + _kbd("Ctrl", "Shift", "H"), "Open this Keyboard Shortcuts &amp; Guide window")}
-  {_row(_kbd("Ctrl", "Z"), "Undo the last edit — drawing, watchlist / portfolio / monitor change")}
-  {_row(_kbd("Ctrl", "S"), "Save the current layout under a name")}
-  {_row(_kbd("Ctrl", "Q"), "Quit Aurantium")}
-</table>
-<p>On many laptops (Lenovo, HP) the F-row controls volume and brightness
-unless you hold <b>Fn</b> — use the Ctrl alternates above, or press
-<b>Fn + Esc</b> on most Lenovos to lock the F-keys on.</p>
-
-<h2>Panels &amp; symbols</h2>
-<table>
-  {_row("Click a row", "Set that symbol for the panel's link group — linked panels follow")}
-  {_row("Link badge (top-right)", "Change a panel's link group, or unlink it")}
-  {_row(_kbd("Ctrl", "1") + "–" + _kbd("Ctrl", "4"), "Set the focused panel's link group (A/B/C/D)")}
-  {_row("Drag a panel tab", "Move &amp; snap it into a new position (panels never float free)")}
-  {_row("Middle-click a tab", "Close that panel")}
-</table>
-
-<h2>Charts</h2>
-<table>
-  {_row("Move the mouse", "Crosshair snaps to the nearest bar with a date + O/H/L/C readout")}
-  {_row("Left-drag", "Scroll through time — the price axis refits to the visible bars")}
-  {_row("Mouse wheel", "Zoom time in / out around the cursor")}
-  {_row("Double-click", "Reset the view to the selected range")}
-  {_row("RANGE 1h / 4h", "Look at less than a day — the interval switches to minute bars")}
-  {_row("Right-click", "Chart menu — type, colors, drawing tools, export image")}
-  {_row("Right-click &#9656; Drawing", "Trendline, horizontal line, or channels — points snap to candles; saved with the layout")}
-</table>
-
-<h2>Day Brief — why did it move?</h2>
-<table>
-  {_row("Click a mark in the EVENTS lane", "Open the Day Brief on that date — the strip under the price marks days with something to explain")}
-  {_row(_kbd("D"), "Explain the day the crosshair is on (hover a bar first)")}
-  {_row("Right-click a bar", "“What happened on …?” — the menu names the exact date under your cursor")}
-  {_row("Right-click &#9656; Events lane", "Show or hide the marks strip")}
-  {_row("<code>/day 2026-03-14</code>", "Jump the Day Brief to a date — opens the panel if it isn’t already up")}
-  {_row("<code>/day 2026-03-09..2026-03-15</code>", "Same, for a span — it centres on the middle and widens the sweep")}
-  {_row("<code>AAPL 2026-03-14</code>", "Symbol and date in one entry, straight from the SYMBOL box")}
-</table>
-
-<h2>Tables</h2>
-<table>
-  {_row("Filter box (above a table)", "Type to show only matching rows — live substring match")}
-  {_row("Click a header", "Sort by that column; click again to reverse (sortable tables)")}
-  {_row("Right-click", "Export to CSV, or show/hide individual columns")}
-  {_row(_kbd("↑"), "/ " + _kbd("↓") + " — move the row selection")}
-</table>
-
-<h2>Watchlist</h2>
-<table>
-  {_row(_kbd("Delete"), "/ " + _kbd("Backspace") + " — remove the selected watchlist row")}
-</table>
-</body>
-"""
-
-
-# f-string only so the two inline affordance icons below can be interpolated;
-# the guide's prose contains no other braces.
-_GUIDE_HTML = _page_css() + f"""
-<body>
-<h2>Getting started</h2>
-<p>Type a ticker (e.g. <b>AAPL</b>, <b>MSFT</b>, <b>ES=F</b>) in the SYMBOL box
-at the top and press Enter. Every panel in the same <i>link group</i> updates to
-that symbol at once. A fresh install opens to an empty workspace — add panels
-from the <b>Panels</b> menu.</p>
-
-<h2>The command bar</h2>
-<p>The SYMBOL box up top is also a command line. Type a ticker and press Enter to
-drive the linked panels, or type a <b>/command</b>: <code>/add &lt;panel&gt;</code>
-opens a panel, <code>/layout &lt;name&gt;</code> loads a saved layout,
-<code>/save &lt;name&gt;</code> saves the current one, and <code>/refresh</code>
-reloads every feed. As you type, a popup suggests matching instruments — search
-by <b>name</b>, not just ticker: "nvidia", "gold", "10 year treasury", "cattle"
-all work, mixing the curated catalog (commodities, indices, FX, rates, sector
-ETFs) with a live Yahoo Finance lookup for any listed company. Press
-<b>Tab</b> / <b>Shift+Tab</b> to cycle the suggestions, <b>Enter</b> or click to
-jump straight to one, <b>Esc</b> to dismiss. The same suggestions appear in the
-Watchlist, Alerts, Portfolio and Performance symbol boxes. Press <b>↑ / ↓</b>
-to recall what you typed before (remembered across sessions).</p>
-
-<h2>Arranging your workspace</h2>
-<p>Drag a panel by its tab to move and snap it beside, above, or below another
-panel; drop it onto a tab strip to stack them as tabs. Panels relocate and snap
-but never tear off into free-floating windows. Pin a panel to a window edge to
-turn it into a slide-out tab. Press <b>F11</b> to focus on one panel full-window,
-Esc or F11 to bring the rest back.</p>
-
-<h2>Settings</h2>
-<p>Everything except <b>Panels</b> now lives under the <b>Settings</b> menu —
-theme, color-blind mode, layouts, news languages, API keys, the guide, updates,
-and quit.</p>
-
-<h2>Theme &amp; accessibility</h2>
-<p>Switch between the <b>dark</b> (default) and <b>light</b> theme under
-<b>Settings &#9656; Theme</b>. Aurantium restarts to apply it, so the whole
-interface — charts included — matches the theme you pick. <b>Settings &#9656;
-Color-blind mode</b> swaps the green/red up-down colors for a deuteranopia-safe
-blue/orange pair and adds <b>▲ / ▼</b> direction marks to change values, so
-direction reads without relying on color; it also restarts to apply.</p>
-<p><b>Keyboard focus</b> is marked with a bright outline as you move through the
-interface with <b>Tab</b> / <b>Shift+Tab</b>, so you can always see which
-control will react to the next keystroke. The outline appears only for keyboard
-navigation — clicking with the mouse does not leave one behind.</p>
-
-<h2>Symbol search &amp; link groups</h2>
-<p>Each panel carries a colored <b>link badge</b> in its top-right corner. Panels
-in the same group share a symbol, so clicking a name in one (a mover, a holding,
-a commodity) drives the others. Use the badge to move a panel to another group,
-or Unlink it so it navigates on its own.</p>
-<p>Every panel prints the symbol it is currently showing at the <b>left of its
-header strip</b>, so you can tell at a glance which name each panel is on — and
-spot a panel that has fallen out of the group. When a symbol arrives from
-another panel, that header briefly <b>flashes the group's color</b>, so you can
-see the click propagate across the workspace.</p>
-<p>In the watchlist, a price that moves briefly <b>flashes green or red</b> in
-place, so you can see which row just ticked without watching every number.
-Both effects follow your system's <i>reduce motion</i> setting.</p>
-
-<h2>Panel sizes</h2>
-<p>Panels reorganize for whatever size you drag them to. Squeeze one narrow and
-its table <b>drops its least important columns</b> rather than squashing all of
-them — the symbol and its price always survive — and the chart trims its range
-and interval chips to the common set. Widen it and everything comes back.
-Columns you switch off yourself in the right-click <b>Columns</b> menu stay off
-at every size.</p>
-
-<h2>Charts</h2>
-<p>Hover the price chart to read any bar: a <b>crosshair</b> snaps to the nearest
-candle and shows its date and open/high/low/close in the corner. The mouse moves
-<b>time</b>, never price: drag to scroll, wheel to zoom, and the price axis
-always refits to the bars in view; double-click to snap back. Ranges go down to
-<b>1h</b> and <b>4h</b>, and picking a range the current interval can't serve
-switches the interval for you. Right-click the
-chart for type (candles, bars, line, area), colors, indicators, and
-<b>Drawing</b> tools: a <i>trendline</i>, a <i>horizontal line</i>, or a
-<i>channel</i> (parallel, flat-bottom, disjoint). Pick a tool, then click to place
-its points — each click <b>snaps to the nearest candle</b>, and the shape follows
-your cursor between clicks. Drawings are <b>blue</b> by default (change it under
-Drawing &#9656; Drawing color…) and are saved with the layout for that symbol.</p>
-<p>Each indicator gets a <b>colored chip</b> above the chart in its own line
-color, so the chip doubles as the legend — right-click a chip to recolor, edit,
-or remove it. The default colors are chosen to stay apart under red-green color
-blindness and to stay clear of the green/red/amber that mean gain, loss, and
-price, so an indicator is never mistaken for a signal. There are four; a chart
-with more indicators than that reuses them, and the chips tell them apart.</p>
-
-<h2>Day Brief — why did it move?</h2>
-<p>When a chart shows a spike or a gap, the <b>Day Brief</b> panel answers what
-happened that day. Under every price chart runs a thin <b>EVENTS</b> lane
-marking the days that have something to explain:
-<b>E</b>&nbsp;earnings, <b>D</b>&nbsp;ex-dividend, <b>S</b>&nbsp;split,
-<b>&#9650;/&#9660;</b>&nbsp;an analyst upgrade or downgrade, and
-<b>&#9679;</b>&nbsp;a session whose move was unusually large for that stock.
-Hover a mark to see its date, click it to open the brief. Nothing else on the
-chart opens a panel, so you can click around freely.</p>
-<p>You can also hover any bar and press <b>D</b>, right-click a bar (the menu
-names the date you are pointing at), or type <code>/day 2026-03-14</code> —
-or just <code>AAPL 2026-03-14</code> — in the SYMBOL box.</p>
-<p>The brief shows that session's open/high/low/close, its volume against the
-stock's own 30-day average, and — the useful part — the same day's move for the
-broad index and the stock's sector, with the <b>EXCESS</b> between them. That
-one line tells you whether the move was the company or the whole market, which
-the chart alone can never say. Below it are the corporate events that landed in
-the window and the headlines from it.</p>
-<p>The <b>1D / 3D / 1W / 1M</b> chips set how many days of events and news to
-gather, <i>centred on</i> the chosen day — <b>1W</b> is seven days, three either
-side, not a week in each direction. The day's own numbers never change, only how
-wide the sweep is, and the resolved dates and day count are always printed under
-the date box so you can see exactly what you are looking at. The default is
-<b>3D</b>, because news explaining a Monday gap often breaks over the weekend.
-If a date wasn't a trading day the panel snaps to the session before it and says
-so.</p>
-
-<h2>News</h2>
-<p>In a News or Topic News panel, <b>single-click</b> a headline for a quick
-preview snippet below the list — the headline dims once you've read it.
-<b>Double-click</b> to open the full article in your browser. The filter box
-narrows the headlines live, and read/unread state is remembered with the
-layout.</p>
-
-<h2>News languages</h2>
-<p>On first launch Aurantium asks for your <b>main language</b> plus any others
-you read; change it anytime under <b>Settings &#9656; News Languages…</b>.
-Headlines appear <i>only</i> in the languages you picked — everything else is
-filtered out before it reaches a panel — and your main language is listed first.
-Adding a language also adds that language's market feeds, so you get more
-coverage, not just less noise.</p>
-
-<h2>Price alerts &amp; the tray</h2>
-<p>Add a <b>Price Alerts</b> panel to set threshold rules (e.g. <i>AAPL price
-above 200</i>, or <i>TSLA change% below −5</i>). When a rule triggers, Aurantium
-shows a tray notification — rules keep running in the background as long as the
-app is open, and each fires once until the condition resets. Right-click the tray
-icon to Show/Hide/Quit; turn on <b>Close to tray</b> — there or under
-<b>Settings</b> — if you'd like the window's ✕ to minimize to the tray instead of
-quitting (off by default, so ✕ quits as usual).</p>
-
-<h2>Customizing panels</h2>
-<p>Configurable panels (Commodities, FX, World Indices, Sector Heatmap, Chart
-Grid, Macro/Rates) share one <b>Edit…</b> dialog: rows drag to reorder by the
-{_glyph("grip")} grip, {_glyph("close")} removes one, and <b>+ Add…</b> opens
-a search — type a plain
-name ("10 year", "cattle", "euro") and pick the instrument, no ticker
-memorization needed (free-text symbols still work and are verified live).
-Preset chips add common setups in one click. Quicker still:
-<b>right-click a row, tile, or mini chart</b> to remove it, add another, or
-jump into the full dialog — and <b>Ctrl+Z</b> undoes any edit.</p>
-
-<h2>Macro, commodities &amp; positioning</h2>
-<p>The <b>Macro / Rates</b> panel is built for a weekly macro check: a US
-Treasury <b>yield curve</b> (hover it for per-tenor yields), a <b>Macro
-Monitor</b> (Dollar Index by default), and weekly <b>CFTC positioning</b> for
-gold, silver, copper, Brent, and natural gas. All three lists are configurable
-via <b>Edit…</b> or right-click — including FRED data series like the 10-year
-real yield, searchable by name (needs a free FRED key under Settings &#9656;
-API Keys…). Click an instrument or positioning row to drive the linked
-panels.</p>
-<p>The <b>Futures Curve</b> panel plots the price of each upcoming delivery
-month for a commodity and says in plain words whether the curve slopes
-<i>upward</i> (contango: later deliveries cost more) or <i>downward</i>
-(backwardation: nearer deliveries cost more); hover a point for its price and
-month. The <b>Positioning History (CFTC)</b> panel charts the weekly net
-position of large speculative traders on a real date axis — hover for any
-week's reading, and use the <b>6M / 1Y / All</b> buttons to zoom the range.
-Both cover the full commodity universe (metals, energy, agriculture,
-livestock): pick one in the searchable dropdown — linked panels follow — or
-click a commodity anywhere else (Commodities, Macro/Rates) and these panels
-re-center on it. Charts stay clamped to their data, so you can't zoom off
-into empty space.</p>
-
-<h2>Portfolio</h2>
-<p>In the <b>Positions</b> tab add a holding: symbol, <b>Qty</b>, <b>Price</b>,
-and a <b>Buy date</b>. Leave Price on <i>market</i> to use the current quote as
-your cost basis. Positions mark to live quotes with running P&amp;L; select one
-and <b>Mark sold</b> to close it as of today. The analytics tabs read the book:
-<b>Allocation</b> shows a sector pie of open positions, <b>Performance</b> charts
-the portfolio value <i>from your earliest buy date</i> (counting each position
-only while held) rebased to 100 against SPY, and <b>Risk</b> reports weighted
-beta, largest-position concentration, and max drawdown. Those tabs start pulling
-data only when first opened.</p>
-
-<h2>Options &amp; Greeks</h2>
-<p>The Options Chain panel shows calls and puts around the spot, with the ATM
-strike highlighted. Greek columns — <b>Δ</b> delta, <b>Γ</b> gamma, <b>Θ</b>
-theta (per day) and <b>Vega</b> (per 1% vol) — are computed with Black–Scholes
-and hidden by default; right-click a table header and use <b>Columns</b> to show
-them (the choice is saved with the layout).</p>
-
-<h2>Tables: sort, filter &amp; columns</h2>
-<p>Flat tables (Watchlist, Movers, Holders, Earnings, Analyst) <b>sort</b> when
-you click a column header — click again to reverse. Numbers sort as numbers, so
-<b>1.2M</b> ranks above <b>900K</b>. Grouped monitors (Commodities, FX, World
-Indices) and the Financials statement keep their natural order and aren't
-sortable, but <i>every</i> table has a <b>filter box</b> above it: start typing
-to show only the rows that match. Right-click any table to
-<b>Export Table to CSV…</b> or to <b>show/hide columns</b> (your choice is
-remembered with the layout). The Company panel's Financials tab additionally offers styled
-Excel export and clipboard copy (<b>Download</b>, <b>Copy</b>). In a narrow
-panel the statement and period pickers (and the Key Metrics groups) fold into
-dropdowns, and Browser / Download / Copy into one <b>&#8943;</b> menu, so the
-table keeps its height.</p>
-
-<h2>Plain-language glossary</h2>
-<p>Not sure what a line means? <b>Hover any statement line</b> on the Financials
-tab (e.g. <i>Minority Interest</i>, <i>Gains Losses Not Affecting Retained
-Earnings</i>) or a jargon column header (<i>IV%</i>, <i>OI</i>, <i>Surprise%</i>,
-<i>5Y %ile</i>) for a short explanation.</p>
-
-<h2>Debt analysis</h2>
-<p>The Financials tab's <b>Debt</b> view derives a credit view from the
-statements: total, short- and long-term debt, leases, cash and <b>net debt</b>;
-interest expense and cash interest paid; the <b>implied cost of debt</b>
-(interest ÷ average debt, with and without leases); interest coverage,
-<b>Debt/EBITDA</b>, Net Debt/EBITDA, Debt/Equity and Debt/Capital; and debt
-issued and repaid. Quarterly figures are annualized ×4 for rates and multiples.
-The implied rates are <i>estimates</i>. Hover a line to see its formula, and use
-<b>Browser &#9656; Company filings (SEC EDGAR)</b> for the company's reported weighted-average
-rate in its 10-K debt note.</p>
-
-<h2>Company panel &amp; Key Metrics</h2>
-<p>The <b>Company</b> panel (Research) gathers single-name research into
-four tabs: <b>Profile</b>, <b>Key Metrics</b>, <b>Financials</b> and
-<b>Earnings</b>. The Profile tab shows the live price, the 52-week range and the
-business description; <b>click a stat tile</b> (P/E, market cap, beta, EPS,
-dividend yield) to jump to the tab that explains it. Old layouts that had
-these as separate panels open them as one Company panel.</p>
-<p>The <b>Key Metrics</b> tab lists valuation, earnings,
-profitability, dividend and risk ratios for the linked symbol: P/E on trailing
-(<b>TTM</b>) and next-twelve-month (<b>NTM</b>) earnings, P/B, P/S, EV/EBITDA,
-FCF yield, EBITDA and Adj. EBITDA, margins, ROE, dividend yield (TTM and NTM),
-payout, beta, alpha and volatility. The <b>tabs</b> across the top jump
-straight to one group (Valuation, Growth, Risk&hellip;) instead of scrolling.
-The <b>Custom</b> tab holds only the metrics you pick: right-click any row
-&#9656; <b>Add to Custom</b>, or open the Custom tab and press <b>Edit&hellip;</b>
-to tick metrics from the full list. Each metric is set against its own five-year
-<b>average, low, high and percentile</b>. <b>Click any row</b> to open its
-history chart, with a range picker, average and &plusmn;1&sigma; lines, and a
-Copy button. The chart follows the panel's link group, so it redraws when you
-switch symbols. Hover a metric's name to see how it is calculated.</p>
-
-<h2>Workspaces</h2>
-<p>Aurantium ships curated starter workspaces — <b>Macro Desk</b>,
-<b>Commodities Desk</b> and <b>Equity Research</b> — each a ready-made
-arrangement of linked panels. Load one anytime from <b>Settings &#9656;
-Workspaces</b>. On a fresh install you are offered the list at startup; choose
-<b>Start empty</b> if you would rather build your own. Loading a workspace
-replaces the current arrangement, so save anything you want to keep first
-(<b>Ctrl+S</b>).</p>
-
-<h2>Layouts</h2>
-<p>Use <b>Settings &#9656; Layout</b> to save the current arrangement under a name
-(<b>Ctrl+S</b>), reload a saved one, or reset to the default. Layouts can be
-exported to a shareable <code>.aurantiumlayout</code> file and imported on another
-machine. Your last arrangement is auto-saved and restored on the next launch.</p>
-
-<h2>Data sources</h2>
-<p>Aurantium runs out of the box on free, keyless sources (Yahoo Finance, Google
-News — delayed). Connect optional free API keys from <b>Settings &#9656; API
-Keys…</b> (Finnhub, Twelve Data, FRED, EIA, NewsAPI) for richer, faster data. Press
-<b>F5</b> anytime to force-refresh every live feed. Recently-seen data is cached
-locally, so panels fill in instantly on the next launch — even offline — before
-a fresh refresh runs.</p>
-</body>
-"""
-
-
-from . import motion
-
 class OnboardingDialog(QDialog):
-    """Tabbed shortcuts + guide modal with a 'don't auto-show' preference."""
+    """The F1 guide. ``section`` opens a page directly: a static page id
+    (``"shortcuts"``), a panel id (``"watchlist"``), or a retired alias that
+    resolves to its host's tab (``"key_metrics"`` → Company ▸ Key Metrics)."""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, section: str | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Aurantium — Keyboard Shortcuts & Guide")
-        self.resize(660, 580)
+        self.resize(900, 620)
+
+        self._pages = {p.id: p for p in guide.build_pages()}
+        self._order = list(self._pages)
+        self._expanded: set[tuple[str, int]] = set()
+        self._current = ""
+        self._rendered = ""
 
         layout = QVBoxLayout(self)
-        tabs = QTabWidget(self)
-        tabs.addTab(self._browser(_SHORTCUTS_HTML), "Shortcuts")
-        tabs.addTab(self._browser(_GUIDE_HTML), "Dashboard Guide")
-        layout.addWidget(tabs, 1)
+        layout.setContentsMargins(SPACE_XL, SPACE_XL, SPACE_XL, SPACE_XL)
+        layout.setSpacing(SPACE_LG)
 
-        self._dont_show = QCheckBox(
-            "Don't show this automatically on startup", self
-        )
+        self._search = QLineEdit(self)
+        self._search.setObjectName("guideSearch")
+        self._search.setPlaceholderText("Search the guide — a panel, a key, a term…")
+        self._search.setClearButtonEnabled(True)
+        self._search.textChanged.connect(self._on_search)
+        layout.addWidget(self._search)
+
+        body = QHBoxLayout()
+        body.setSpacing(0)
+        self._nav = QTreeWidget(self)
+        self._nav.setObjectName("guideNav")
+        self._nav.setHeaderHidden(True)
+        self._nav.setRootIsDecorated(False)
+        self._nav.setIndentation(14)
+        self._nav.setFixedWidth(_NAV_WIDTH)
+        self._nav.setUniformRowHeights(True)
+        self._nav.currentItemChanged.connect(self._on_nav)
+        body.addWidget(self._nav)
+
+        self._browser = QTextBrowser(self)
+        self._browser.setObjectName("guidePage")
+        self._browser.setOpenLinks(False)
+        self._browser.anchorClicked.connect(self._on_link)
+        self._register_glyphs(self._browser)
+        # bullets just inside the text column, not Qt's default 40px out
+        self._browser.document().setIndentWidth(SPACE_XL + SPACE_SM)
+        body.addWidget(self._browser, 1)
+        layout.addLayout(body, 1)
+
+        foot = QHBoxLayout()
+        foot.setSpacing(SPACE_LG)
+        self._dont_show = QCheckBox("Don't show this automatically on startup", self)
         # pre-checked: first-run shows it once, then it stays out of the way
-        # unless the user opens it via F1 / the Help menu.
+        # unless the user opens it via F1, a panel's ?, or the Settings menu.
         self._dont_show.setChecked(True)
-        layout.addWidget(self._dont_show)
-
+        foot.addWidget(self._dont_show)
+        foot.addStretch(1)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, self)
         buttons.rejected.connect(self.reject)  # Close is the only button
-        layout.addWidget(buttons)
+        foot.addWidget(buttons)
+        layout.addLayout(foot)
 
-    def _browser(self, html: str) -> QTextBrowser:
-        browser = QTextBrowser(self)
-        browser.setOpenExternalLinks(True)
-        self._register_glyphs(browser)
-        browser.setHtml(html)
-        return browser
+        self._items: dict[str, QTreeWidgetItem] = {}
+        self._headers: list[tuple[QTreeWidgetItem, list[str]]] = []
+        self._build_nav()
+        self.show_section(section or "getting-started")
+
+    # -- public ----------------------------------------------------------------
+
+    def section_ids(self) -> list[str]:
+        """Every page id, in nav order."""
+        return list(self._order)
+
+    def current_section(self) -> str:
+        return self._current
+
+    def show_section(self, section: str) -> bool:
+        """Open a page by id (aliases resolved). False if there is no such page."""
+        page_id = guide.resolve_section(section)
+        item = self._items.get(page_id or "")
+        if item is None:
+            return False
+        if item.isHidden():
+            self._search.clear()
+        self._nav.setCurrentItem(item)
+        self._render(page_id)
+        return True
+
+    # -- nav -------------------------------------------------------------------
+
+    def _build_nav(self) -> None:
+        nav = self._nav
+        group_items: dict[str, list[str]] = {}
+        header: QTreeWidgetItem | None = None
+        last_group = None
+        for page in self._pages.values():
+            if page.parent:
+                parent = self._items[page.parent]
+                item = QTreeWidgetItem(parent, [page.title])
+                parent.setExpanded(True)
+            else:
+                if page.group and page.group != last_group:
+                    header = self._header_item(page.group.upper())
+                    group_items[page.group] = []
+                    self._headers.append((header, group_items[page.group]))
+                    last_group = page.group
+                item = QTreeWidgetItem(nav, [page.title])
+            item.setData(0, _ROLE_ID, page.id)
+            self._items[page.id] = item
+            if page.group:
+                group_items.setdefault(page.group, []).append(page.id)
+        nav.expandAll()
+
+    def _header_item(self, text: str) -> QTreeWidgetItem:
+        item = QTreeWidgetItem(self._nav, [text])
+        item.setFlags(Qt.ItemFlag.NoItemFlags)
+        font = QFont(self._nav.font())
+        font.setPixelSize(FONT_SM)
+        font.setWeight(QFont.Weight(WEIGHT_BOLD))
+        font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.5)
+        item.setFont(0, font)
+        item.setForeground(0, QColor(FG_MUTED))
+        return item
+
+    def _on_nav(self, item: QTreeWidgetItem | None, _prev=None) -> None:
+        if item is None:
+            return
+        page_id = item.data(0, _ROLE_ID)
+        if page_id and page_id != self._current:
+            self._render(page_id)
+
+    # -- search ------------------------------------------------------------------
+
+    def _query(self) -> list[str]:
+        return [w for w in self._search.text().lower().split() if w]
+
+    def _matches(self, page: guide.Page, words: list[str]) -> bool:
+        haystack = f"{page.title} {page.search} {page.lead} " + " ".join(
+            f"{d.title} {d.body}" for d in page.details)
+        haystack = html.unescape(haystack).lower()
+        return all(w in haystack for w in words)
+
+    def _on_search(self, _text: str) -> None:
+        words = self._query()
+        visible: list[str] = []
+        for page_id, item in self._items.items():
+            page = self._pages[page_id]
+            hit = not words or self._matches(page, words)
+            item.setHidden(not hit)
+            if hit:
+                visible.append(page_id)
+        # a hosted tab that matches keeps its host visible
+        for page_id in list(visible):
+            parent = self._pages[page_id].parent
+            if parent and self._items[parent].isHidden():
+                self._items[parent].setHidden(False)
+        for header, ids in self._headers:
+            header.setHidden(all(self._items[i].isHidden() for i in ids))
+        if self._current in visible:
+            self._render(self._current)
+        elif visible:
+            self._nav.setCurrentItem(self._items[visible[0]])
+
+    # -- page ------------------------------------------------------------------
+
+    def _render(self, page_id: str) -> None:
+        self._current = page_id
+        page = self._pages[page_id]
+        words = self._query()
+        parts = [_page_css(), "<body>"]
+        if page.parent:
+            parts.append(f"<p class='crumb'>{html.escape(self._pages[page.parent].title.upper())}</p>")
+        elif page.group:
+            parts.append(f"<p class='crumb'>{html.escape(page.group.upper())}</p>")
+        parts.append(f"<h2>{html.escape(page.title)}</h2>")
+        parts.append(self._with_glyphs(page.lead))
+        for i, detail in enumerate(page.details):
+            hay = html.unescape(f"{detail.title} {detail.body}").lower()
+            open_ = (page_id, i) in self._expanded or (
+                words and all(w in hay for w in words))
+            mark = "▾" if open_ else "▸"
+            parts.append(
+                f"<p class='more'><a href='more:{i}'>{mark}&nbsp;{html.escape(detail.title)}</a></p>")
+            if open_:
+                parts.append(f"<div class='detail'>{self._with_glyphs(detail.body)}</div>")
+        parts.append("</body>")
+        # expanding a block re-renders the same page: keep the reader's place
+        bar = self._browser.verticalScrollBar()
+        keep = bar.value() if page_id == self._rendered else 0
+        self._browser.setHtml("".join(parts))
+        self._rendered = page_id
+        bar.setValue(keep)
+
+    @staticmethod
+    def _with_glyphs(body: str) -> str:
+        for kind in _GLYPHS:
+            body = body.replace(f"[[{kind}]]", _glyph(kind))
+        return body
+
+    def _on_link(self, url: QUrl) -> None:
+        target = url.toString()
+        if target.startswith("more:"):
+            key = (self._current, int(target.split(":", 1)[1]))
+            self._expanded ^= {key}
+            self._render(self._current)
+        elif target.startswith("guide:"):
+            self.show_section(target.split(":", 1)[1])
+        elif url.scheme() in ("http", "https"):
+            QDesktopServices.openUrl(url)
 
     def _register_glyphs(self, browser: QTextBrowser) -> None:
         """Make the painted affordance icons available to the page as images.
 
-        The guide describes two controls by drawing them inline — the row grip
-        and the row-delete mark. Those used to be the characters ``⠿`` and
-        ``✕``, which is fine while the dialog they describe also uses
-        characters. It stopped being fine when the dialog started painting
-        them: the cheat sheet would have shown a braille-fallback glyph beside
-        a sentence about a mark that no longer looks like that.
+        Guides describe two controls by drawing them inline — the list
+        editor's row grip and row-delete mark. Those used to be the characters
+        ``⠿`` and ``✕``, which stopped being right when the dialog they describe
+        started painting them: the guide would have shown a braille-fallback
+        glyph beside a sentence about a mark that no longer looks like that.
 
         A QTextDocument resolves ``<img src="…">`` through its own resource
-        table, so the guide can embed the real icon rather than an
-        approximation of it, and it stays correct automatically the next time
-        the family is redrawn.
+        table, so the guide embeds the real icon rather than an approximation
+        of it, and it stays correct automatically the next time the family is
+        redrawn.
         """
         from . import icons
 
         dpr = icons.device_pixel_ratio(self)
         document = browser.document()
-        for kind in ("grip", "close"):
+        for kind in _GLYPHS:
             document.addResource(
                 QTextDocument.ResourceType.ImageResource,
                 QUrl(f"{_GLYPH_SCHEME}:{kind}"),
                 icons.pixmap(kind, FG, dpr),
             )
 
+    # -- lifecycle ---------------------------------------------------------------
+
     def done(self, result: int) -> None:  # noqa: N802 (Qt override)
-        """Persist the auto-show preference on any close (OK / Close / Esc)."""
+        """Persist the auto-show preference on any close (Close / Esc / ✕)."""
         QSettings().setValue(_SETTINGS_KEY, self._dont_show.isChecked())
         super().done(result)
 

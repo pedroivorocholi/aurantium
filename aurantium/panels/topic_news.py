@@ -12,6 +12,7 @@ from typing import Any
 
 from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QPushButton
 
+from ..guide import PanelGuide
 from ..panel import register_panel
 from ._news_common import NewsPanelBase
 from ..components.responsive_row import ResponsiveRow
@@ -21,6 +22,16 @@ DEFAULT_QUERY = "markets"
 
 @register_panel(id="topic_news", title="Topic News", category="News")
 class TopicNewsPanel(NewsPanelBase):
+    GUIDE = PanelGuide(
+        purpose="Headlines for a free-text query — a theme, a country, a sector — independent of any symbol.",
+        links="Doesn't follow the link group: it watches its own query, saved with the layout.",
+        interactions=(
+            "Type a query and press **Set** or Enter.",
+            "Single-click a headline for a preview; double-click to open it in your browser.",
+            "The filter box narrows the headlines as you type.",
+        ),
+    )
+
     def build(self) -> None:
         self._query = DEFAULT_QUERY
 

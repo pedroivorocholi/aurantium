@@ -18,6 +18,7 @@ from typing import Optional
 
 from PySide6.QtWidgets import QTabWidget
 
+from ..guide import PanelGuide
 from ..components.fit_width import fit_tabs
 from ..panel import UNLINKED, Panel, PanelRegistry, register_panel
 from .earnings import EarningsPanel
@@ -40,6 +41,19 @@ TAB_INSET = (8, 8, 8, 8)
 
 @register_panel(id="company", title="Company", category="Research")
 class CompanyPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="Single-name research in four tabs: Profile, Key Metrics, Financials and Earnings.",
+        links="Follows the link group's symbol, and fetches only the tab on screen. "
+        "Layouts that had separate Profile, Key Metrics, Financials or Earnings "
+        "panels open them as one Company panel.",
+        interactions=(
+            "Click a stat tile on **Profile** to jump to the tab that explains it.",
+            "The panel's **?** opens the guide for the tab you're on.",
+        ),
+    )
+
+    HOSTED_TABS = tuple(TABS)
+
     def build(self) -> None:
         self.content_layout.setContentsMargins(0, 0, 0, 0)
         self.tabs = QTabWidget(self)
@@ -92,6 +106,10 @@ class CompanyPanel(Panel):
             return
         self._status_lbl.setText(child._status_lbl.text())
         self._set_state(child._state_lbl.text(), child._state_lbl.property("severity") or "")
+
+    def guide_section(self) -> str:
+        """The ``?`` opens the page for the tab on screen."""
+        return f"{self.panel_id}:{self.current_key}"
 
     # -- symbol -------------------------------------------------------------
 

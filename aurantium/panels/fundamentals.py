@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Any, Optional
 
 import pandas as pd
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QAction, QColor
 from PySide6.QtWidgets import (
     QApplication,
@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from ..guide import GuideSection, PanelGuide
 from .. import glossary
 from ..components import MarketTable, make_filter_edit
 from ..components.action_bar import ActionBar
@@ -291,6 +292,29 @@ def debt_block(data: dict, period: str) -> dict:
 
 @register_panel(id="fundamentals", title="Financials", category="Research", listed=False)
 class FundamentalsPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="The company's income statement, balance sheet and cash flow, annual or quarterly, plus a derived debt view.",
+        links="Follows the Company panel's symbol.",
+        interactions=(
+            "**Income / Balance / Cash Flow / Debt** pick the statement; **Annual / "
+            "Quarterly** the period.",
+            "Hover any line for a plain-language explanation; **Find line item…** filters.",
+            "**Browser** opens the company's SEC filings or the statement on Yahoo "
+            "Finance; **Download** saves a styled Excel file; **Copy** puts the table "
+            "on the clipboard.",
+            "In a narrow panel the pickers fold into dropdowns, the buttons into one "
+            "⋯ menu, and the oldest periods drop first.",
+        ),
+        sections=(
+            GuideSection("Debt", "A credit view derived from the statements: total, "
+                "short- and long-term debt, leases, cash and net debt; interest expense "
+                "and cash interest paid; the implied cost of debt; interest coverage, "
+                "Debt/EBITDA, Net Debt/EBITDA, Debt/Equity and Debt/Capital; debt issued "
+                "and repaid. Quarterly figures are annualized ×4 for rates and multiples. "
+                "The implied rates are estimates; hover a line for its formula."),
+        ),
+    )
+
     def build(self) -> None:
         self._statement = "income"
         self._period = "annual"
@@ -339,6 +363,7 @@ class FundamentalsPanel(Panel):
         # -- table -----------------------------------------------------------
         self.table = MarketTable(0, 1, self)
         self.register_state_target(self.table)
+        self.table.viewport().installEventFilter(self)
         self.table.setHorizontalHeaderLabels(["Line Item"])
         self.table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
@@ -458,10 +483,17 @@ class FundamentalsPanel(Panel):
             item.setText(self._short_period(full) if compact else full)
             item.setToolTip(full)
 
-    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt override)
-        super().resizeEvent(event)
-        if hasattr(self, "table"):
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt override)
+        # the table viewport's own resize: in the panel's resizeEvent the
+        # viewport still had its old width, so the date/short-date choice
+        # could be made for the wrong size
+        if (
+            hasattr(self, "table")
+            and obj is self.table.viewport()
+            and event.type() == QEvent.Type.Resize
+        ):
             self._sync_header_labels()
+        return super().eventFilter(obj, event)
 
     # -- rendering -------------------------------------------------------------
 
@@ -486,6 +518,15 @@ class FundamentalsPanel(Panel):
         headers = ["Line Item"] + [str(c) for c in columns]
         self.table.setColumnCount(len(headers))
         self.table.setHorizontalHeaderLabels(headers)
+        # The line item takes the slack and the figures pack under their
+        # period headers; a narrow panel gives up the oldest periods first.
+        # Stretching every column split a wide panel into equal quarters, so
+        # "Net Income From Continuing Operation…" elided beside half-empty
+        # number columns.
+        if len(headers) > 1:
+            self.table.set_column_priority(
+                keep=[0, 1], droppable=list(range(len(headers) - 1, 1, -1))
+            )
         self._full_headers = headers
         self._compact_headers = None
         self._sync_header_labels()

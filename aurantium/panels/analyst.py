@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ..guide import PanelGuide
 from ..components.fmt import num as _fmt_price
 from ..components import MarketTable, make_filter_edit
 from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, Panel, register_panel
@@ -34,8 +35,42 @@ def _rec_color(key: str) -> str:
     return FG_DIM
 
 
+#: the feed's action codes, spelled out
+_ACTIONS = {
+    "main": "Maintain",
+    "reit": "Reiterate",
+    "up": "Upgrade",
+    "down": "Downgrade",
+    "init": "Initiate",
+}
+
+
+def _action_text(code) -> str:
+    """``"main"`` → ``"Maintain"``. Unknown codes pass through capitalized."""
+    if not code:
+        return NULL_GLYPH
+    key = str(code).strip().lower()
+    return _ACTIONS.get(key, str(code).strip().capitalize())
+
+
 @register_panel(id="analyst", title="Analyst Recs", category="Research")
 class AnalystPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="Wall Street's view of the linked stock: consensus rating, price targets and recent rating actions.",
+        links="Follows the link group's symbol.",
+        interactions=(
+            "The headline is the consensus rating, its average score (1 strong buy to "
+            "5 strong sell) and the number of analysts; below it the low, mean and "
+            "high price targets.",
+            "The table lists rating actions, newest first — maintains, reiterations, "
+            "upgrades and downgrades. Sort by any column or filter by firm or action.",
+        ),
+        fields=(
+            ("Action", "What the firm did: Maintain, Reiterate, Upgrade, Downgrade or Initiate"),
+            ("From / To", "The rating before and after"),
+        ),
+    )
+
     def build(self) -> None:
         # -- summary strip ------------------------------------------------
         summary = QVBoxLayout()
@@ -52,9 +87,9 @@ class AnalystPanel(Panel):
         summary.addLayout(rec_row)
 
         target_row = ResponsiveRow()
-        self.target_low_lbl = QLabel("Low: -", self)
-        self.target_mean_lbl = QLabel("Mean: -", self)
-        self.target_high_lbl = QLabel("High: -", self)
+        self.target_low_lbl = QLabel(f"Low: {NULL_GLYPH}", self)
+        self.target_mean_lbl = QLabel(f"Mean: {NULL_GLYPH}", self)
+        self.target_high_lbl = QLabel(f"High: {NULL_GLYPH}", self)
         for lbl in (self.target_low_lbl, self.target_mean_lbl, self.target_high_lbl):
             lbl.setObjectName("secondary")
         target_row.addWidget(self.target_low_lbl)
@@ -70,7 +105,8 @@ class AnalystPanel(Panel):
         self.register_state_target(self.table)
         self.table.setHorizontalHeaderLabels(UPGRADE_HEADERS)
         # Narrow panels give up columns instead of squeezing every one
-        self.table.set_column_priority(keep=[0, 2], droppable=[3, 4, 1])
+        # the firm name is the long text and takes the slack
+        self.table.set_column_priority(keep=[0, 2], droppable=[3, 4, 1], stretch=1)
         self.table.set_empty_text(
             EMPTY_NO_SYMBOL,
             EMPTY_NO_SYMBOL_HINT,
@@ -137,9 +173,11 @@ class AnalystPanel(Panel):
                 row = self.table.rowCount()
                 self.table.insertRow(row)
                 values = [
-                    entry.get("date") or NULL_GLYPH,
+                    # the day, not the feed's timestamp: "2026-10-12", like
+                    # every other dated table, rather than "...T18:47:46"
+                    str(entry.get("date") or "")[:10] or NULL_GLYPH,
                     entry.get("firm") or NULL_GLYPH,
-                    entry.get("action") or NULL_GLYPH,
+                    _action_text(entry.get("action")),
                     entry.get("from_grade") or NULL_GLYPH,
                     entry.get("to_grade") or NULL_GLYPH,
                 ]
@@ -149,7 +187,8 @@ class AnalystPanel(Panel):
                     self.table.setItem(row, col, item)
         self.table.apply_filter(self._filter.text())
 
-        self.set_status(f"{len(upgrades)} upgrades/downgrades")
+        # most rows are maintains and reiterations, not changes
+        self.set_status(f"{len(upgrades)} rating actions")
 
     # -- persistence ------------------------------------------------------------
 

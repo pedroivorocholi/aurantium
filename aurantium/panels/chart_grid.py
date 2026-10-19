@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 import pyqtgraph as pg
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QColor, QMouseEvent
 from PySide6.QtWidgets import (
     QGridLayout,
@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..guide import LIST_EDITOR, PanelGuide
 from ..components.fmt import num as _fmt_num
 from ..components import (
     FX_ENTRIES,
@@ -32,7 +33,9 @@ from ..components import (
 )
 from ..panel import NULL_GLYPH, Panel, register_panel
 from ..undo import UndoStack
-from ..theme import ACCENT, BG, BORDER_STRONG, DOWN, FG_DIM, UP
+from ..components.fmt import signed_pct
+from ..components.plot_utils import CompactAxis
+from ..theme import ACCENT, BG, BORDER_STRONG, DOWN, FG, FG_DIM, SPACE_MD, SPACE_XS, UP, LABEL
 from ..components.responsive_row import ResponsiveRow
 
 DEFAULT_SYMBOLS = [
@@ -79,14 +82,17 @@ class _ChartCell(QWidget):
         )
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(6, 5, 6, 6)
-        layout.setSpacing(3)
+        layout.setContentsMargins(SPACE_MD, SPACE_MD, SPACE_MD, SPACE_MD)
+        layout.setSpacing(SPACE_XS)
 
         self.title_lbl = QLabel(symbol, self)
         self.title_lbl.setObjectName("statValue")
+        self.title_lbl.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(self.title_lbl)
 
-        self.plot_widget = pg.PlotWidget(self)
+        # compact labels (30K, 7,200): full figures did not fit the 34px axis
+        # and pyqtgraph dropped them, so most cells had ticks with no values
+        self.plot_widget = pg.PlotWidget(self, axisItems={"left": CompactAxis(orientation="left")})
         self.plot_widget.setBackground(BG)
         self.plot_widget.setMinimumHeight(90)
         self.plot_widget.showGrid(x=False, y=False)
@@ -140,15 +146,31 @@ class _ChartCell(QWidget):
             chg_txt = NULL_GLYPH
             color = FG_DIM
         else:
-            sign = "+" if change_pct >= 0 else ""
-            chg_txt = f"{sign}{change_pct:.2f}%"
+            chg_txt = signed_pct(change_pct)
             color = UP if change_pct >= 0 else DOWN
-        self.title_lbl.setText(f"{self.symbol}  {last}  {chg_txt}")
-        self.title_lbl.setStyleSheet(f"font-weight: 700; color: {color};")
+        # The app's colour roles: the ticker amber, the price neutral, only the
+        # move in the up/down colour. Painting the whole line by the day's sign
+        # made a red ticker and a red price over a green (period-up) chart.
+        self.title_lbl.setText(
+            f"<span style='color:{LABEL}'>{self.symbol}</span>&nbsp;&nbsp;"
+            f"<span style='color:{FG}'>{last}</span>&nbsp;&nbsp;"
+            f"<span style='color:{color}'>{chg_txt}</span>"
+        )
 
 
 @register_panel(id="chart_grid", title="Chart Grid", category="Markets")
 class ChartGridPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="A grid of small line charts, one per symbol, to watch many markets at a glance.",
+        links="Click a cell to send its symbol to every panel in this link group.",
+        interactions=(
+            "Each title shows the symbol, last price and today's change. The line is "
+            "green or red by its move across the chart, with a muted moving average.",
+            "Right-click a cell to remove it, **Add chart…**, or **Edit panel…**.",
+        ),
+        sections=(LIST_EDITOR,),
+    )
+
     def build(self) -> None:
         self._symbols: list[str] = list(DEFAULT_SYMBOLS)
         self._cells: dict[str, _ChartCell] = {}
@@ -160,8 +182,9 @@ class ChartGridPanel(Panel):
         self._cols = COLUMNS
         self._grid_host = QWidget(self._scroll)
         self._grid = QGridLayout(self._grid_host)
-        self._grid.setSpacing(6)
+        self._grid.setSpacing(SPACE_MD)
         self._scroll.setWidget(self._grid_host)
+        self._scroll.viewport().installEventFilter(self)
         self.content_layout.addWidget(self._scroll, 1)
 
         config_row = ResponsiveRow()
@@ -176,10 +199,20 @@ class ChartGridPanel(Panel):
     #: narrowest a chart cell may get before the grid drops a column
     CELL_MIN = 170
 
-    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt override)
-        super().resizeEvent(event)
-        if not hasattr(self, "_scroll"):
-            return
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt override)
+        # Reflow on the scroll viewport's own resize. The panel's resizeEvent
+        # fires before its layouts have resized the viewport, so reading the
+        # width there saw the old size: a grid first shown at full width
+        # stayed one column wide (the Sector Heatmap had the same bug).
+        if (
+            hasattr(self, "_scroll")
+            and obj is self._scroll.viewport()
+            and event.type() == QEvent.Type.Resize
+        ):
+            self._reflow()
+        return super().eventFilter(obj, event)
+
+    def _reflow(self) -> None:
         width = self._scroll.viewport().width()
         cols = max(1, min(COLUMNS, width // self.CELL_MIN))
         if cols != self._cols:
@@ -280,6 +313,7 @@ class ChartGridPanel(Panel):
         remove_act = menu.addAction(f'Remove "{symbol}"')
         add_act = menu.addAction("Add chart…")
         edit_act = menu.addAction("Edit panel…")
+        self.add_guide_action(menu)
         chosen = menu.exec(global_pos)
         if chosen is remove_act:
             self._apply_edit([s for s in self._symbols if s != symbol])

@@ -15,13 +15,14 @@ from datetime import datetime
 from typing import Any, Optional
 
 import pyqtgraph as pg
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QRectF, Qt
 from PySide6.QtWidgets import QButtonGroup, QHBoxLayout, QLabel, QPushButton
 
+from ..guide import PanelGuide
 from ..commodities_meta import COMMODITIES, CommodityMeta, by_symbol
 from ..components import attach_hover, clamp_view
 from ..panel import Panel, register_panel
-from ..theme import ACCENT, BG, FG_DIM, tick_color
+from ..theme import ACCENT, BG, FG_DIM, FONT_SM, tick_color
 from .futures_curve import make_commodity_combo
 from ..components.responsive_row import ResponsiveRow
 
@@ -32,10 +33,44 @@ _RANGES = [("6M", 183), ("1Y", 365), ("All", None)]
 _COVERED = tuple(m for m in COMMODITIES if m.cftc_market)
 
 
+def _segments_cross(xs: list, ys: list, box) -> bool:
+    """Does the polyline through (xs, ys) enter ``box`` (a QRectF in data
+    coordinates)? Segment by segment, so a steep move between two readings
+    counts even when neither reading lies inside the box."""
+    lo_y, hi_y = sorted((box.top(), box.bottom()))
+    for x0, y0, x1, y1 in zip(xs, ys, xs[1:], ys[1:]):
+        a, b = max(min(x0, x1), box.left()), min(max(x0, x1), box.right())
+        if a > b:
+            continue  # this segment is entirely left or right of the box
+        if x1 == x0:
+            ya, yb = y0, y1
+        else:
+            slope = (y1 - y0) / (x1 - x0)
+            ya, yb = y0 + slope * (a - x0), y0 + slope * (b - x0)
+        if max(ya, yb) >= lo_y and min(ya, yb) <= hi_y:
+            return True
+    return False
+
+
 @register_panel(
     id="cot_history", title="Speculator Positioning (CFTC)", category="Analytics"
 )
 class CotHistoryPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="How large speculators are positioned in one futures market, week by week (CFTC Commitments of Traders).",
+        links="Pick a market in the dropdown and linked panels follow; click a "
+        "commodity elsewhere and the chart switches to it.",
+        interactions=(
+            "**6M**, **1Y** and **All** set the range; hover for any week's reading.",
+            "Above the dashed zero line speculators are net long — positioned for "
+            "higher prices; below it, net short. The line under the chart gives the "
+            "latest reading and its report date.",
+        ),
+        fields=(
+            ("Net contracts", "Long minus short contracts held by large speculators; the axis abbreviates (300K = 300,000)"),
+        ),
+    )
+
     def build(self) -> None:
         self._meta: CommodityMeta = _COVERED[0]
         self._syncing = False  # True while the combo is being set from code
@@ -57,7 +92,10 @@ class CotHistoryPanel(Panel):
             btn = QPushButton(label, self)
             btn.setCheckable(True)
             btn.setChecked(days is None)
-            btn.setFixedWidth(38)
+            # the app's one selector style (chart range, Day Brief window):
+            # an outline chip, never a filled block — and sized by its label,
+            # since a fixed width clipped "6M" to look like "3M"
+            btn.setObjectName("chartChip")
             btn.setToolTip(f"Show the last {label}" if days else "Show every report")
             self._range_group.addButton(btn, i)
             sel_row.addWidget(btn)
@@ -65,10 +103,18 @@ class CotHistoryPanel(Panel):
         self.content_layout.addLayout(sel_row)
 
         # -- history plot (real weekly date axis) ------------------------------
+        from ..components.plot_utils import CompactAxis
+
+        # 300K, not 300000: the axis matches the +201,579 readout's magnitude
+        # without printing six bare digits per tick
         self.plot_widget = pg.PlotWidget(
-            axisItems={"bottom": pg.DateAxisItem(orientation="bottom")}
+            axisItems={
+                "bottom": pg.DateAxisItem(orientation="bottom"),
+                "left": CompactAxis(orientation="left"),
+            }
         )
         self.plot_widget.setBackground(BG)
+        self.plot_widget.setMenuEnabled(False)  # app menu (with Quick guide), not pyqtgraph's own
         self.plot_widget.showGrid(x=True, y=True, alpha=0.15)
         self.plot_widget.setLabel("left", "Net contracts")
         self.plot_widget.getAxis("bottom").setTextPen(FG_DIM)
@@ -87,10 +133,13 @@ class CotHistoryPanel(Panel):
         self.latest_txt = pg.TextItem(color=ACCENT, anchor=(1, 1))
         self.plot_widget.addItem(self.latest_txt, ignoreBounds=True)
         attach_hover(self.plot_widget, self._hover_text)
+        self.plot_widget.getViewBox().sigRangeChanged.connect(self._place_tag)
+        self.plot_widget.getViewBox().sigResized.connect(self._place_tag)
         self.content_layout.addWidget(self.plot_widget, 1)
 
         # -- latest reading + plain-English caption ----------------------------
         self.latest_lbl = QLabel("", self)
+        self.latest_lbl.setWordWrap(True)  # wraps in a narrow dock, never clips
         self.content_layout.addWidget(self.latest_lbl)
 
         caption = QLabel(
@@ -135,7 +184,7 @@ class CotHistoryPanel(Panel):
         self.latest_txt.setText("")
         self._times, self._nets, self._dates = [], [], []
         self.latest_lbl.setText("")
-        self.plot_widget.setTitle(meta.label, color=FG_DIM, size="9pt")
+        self.plot_widget.setTitle(meta.label, color=FG_DIM, size=f"{FONT_SM}px")
         self.set_loading(True)
         self.subscribe(f"cftc:{meta.cftc_market}", self._on_cftc)
 
@@ -170,6 +219,7 @@ class CotHistoryPanel(Panel):
             self.latest_txt.setPos(times[-1], nets[-1])
         clamp_view(self.plot_widget, times, nets + [0.0])
         self._apply_range()
+        self._place_tag()
 
         net = data.get("noncommercial_net")
         if net is not None:
@@ -214,6 +264,46 @@ class CotHistoryPanel(Panel):
         return f"week of {self._dates[nearest]} · {self._nets[nearest]:+,.0f} contracts"
 
     # -- linked-symbol behavior -------------------------------------------------
+
+    #: where the end-value tag may sit, tried in order: below-left of the
+    #: last point, then above-left
+    _TAG_ANCHORS = ((1, -0.15), (1, 1.15))
+
+    def _place_tag(self, *_args) -> None:
+        """Put the end-value tag where the series doesn't run.
+
+        The tag sat up-left of the last point, which is exactly where the
+        line arrives from when it falls into that point, and in a small dock
+        any fixed side collided with the line. Each candidate box is tested
+        against the plotted points in screen space; when both sides collide
+        the tag is hidden, since the "Latest: …" line under the chart prints
+        the same figure. Re-run on every zoom and resize, because the box is
+        a fixed pixel size and the data under it changes with the scale.
+        """
+        txt = self.latest_txt
+        times, nets = getattr(self, "_times", []), getattr(self, "_nets", [])
+        if not times or not txt.toPlainText():
+            txt.setVisible(False)
+            return
+        # The tag's box in data units, from its pixel size and the view's
+        # scale. (Mapping the TextItem's own rect reads a transform pyqtgraph
+        # only updates at paint time, so it lagged a resize.)
+        px, py = self.plot_widget.getViewBox().viewPixelSize()
+        rect = txt.textItem.boundingRect()
+        w, h = rect.width() * px, rect.height() * py
+        x, y = times[-1], nets[-1]
+        for anchor in self._TAG_ANCHORS:
+            # anchor (1, a) puts the point a text-heights below the text's top
+            # edge, so in data units (y grows upward) the top edge is at
+            # y + a*h: a < 0 hangs the tag below the point, a > 1 lifts it above
+            top = y + anchor[1] * h
+            box = QRectF(x - w, top - h, w, h)
+            txt.setAnchor(anchor)
+            txt.setPos(x, y)
+            if not _segments_cross(times, nets, box):
+                txt.setVisible(True)
+                return
+        txt.setVisible(False)
 
     def on_symbol(self, symbol: str) -> None:
         # a linked symbol only switches the chart when it maps to a covered

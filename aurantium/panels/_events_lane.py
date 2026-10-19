@@ -25,7 +25,7 @@ import pyqtgraph as pg
 from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QFont, QPainterPath
 
-from ..theme import ACCENT, DOWN, FG_DIM, FG_MUTED, MONO_FONT, UP
+from ..theme import ACCENT, DOWN, FG_DIM, FG_MUTED, FONT_XS, MONO_FONT, UP
 
 #: z-score at which a daily return counts as worth flagging. Deliberately
 #: strict: a lane that marks every other day teaches the user to ignore it.
@@ -39,6 +39,35 @@ SIGMA_THRESHOLD = 2.5
 MARK_SIZE = 8
 HOVER_SIZE = 11
 LANE_HEIGHT = 20
+
+#: Closest two marks may sit, centre to centre, before they count as touching.
+MIN_GAP_PX = MARK_SIZE + 2
+#: A combined mark is a count. One step up from a single mark: glyphs are
+#: scaled to fill their box, so a digit at the same size already reads larger
+#: than an E or a dot, and +3 made the counts the loudest thing in the lane.
+GROUP_SIZE = MARK_SIZE + 1
+#: Lines a combined mark's tooltip lists before summarising the rest.
+GROUP_TIP_LINES = 8
+
+
+def cluster_marks(xs_px: list[float], min_gap: float = MIN_GAP_PX) -> list[list[int]]:
+    """Group marks that would touch at this zoom: lists of indices into
+    ``xs_px`` (which must be sorted), left to right.
+
+    Marks are drawn at their bar's x, so an earnings day that was also an
+    unusual move printed as one unreadable glyph, and a zoomed-out year of
+    events smeared into a solid bar. Stacking them into two rows only moved
+    the pile-up once three or more met; touching marks now merge into one
+    mark that says how many it holds. A cluster grows while each next mark is
+    within ``min_gap`` of the one before, so a dense run joins as one.
+    """
+    groups: list[list[int]] = []
+    for i, x in enumerate(xs_px):
+        if groups and x - xs_px[groups[-1][-1]] < min_gap:
+            groups[-1].append(i)
+        else:
+            groups.append([i])
+    return groups
 
 #: kind -> (glyph, colour). Shape carries the meaning and colour only
 #: reinforces it, per PRODUCT.md's colour-blindness rule.
@@ -175,6 +204,7 @@ def build_marks(
             continue
         marks[(iso, kind)] = {
             "t": times[idx],
+            "x": idx,
             "date": iso,
             "kind": kind,
             "label": _LABELS.get(kind, kind),
@@ -193,6 +223,7 @@ def build_marks(
             (iso, kind),
             {
                 "t": times[idx],
+                "x": idx,
                 "date": iso,
                 "kind": kind,
                 "label": _LABELS[kind],
@@ -201,6 +232,12 @@ def build_marks(
         )
 
     return sorted(marks.values(), key=lambda m: (m["t"], m["kind"]))
+
+
+def _mark_x(m: dict) -> float:
+    """Plot x of a mark: its bar's slot (the chart plots bars by index, so
+    closed hours take no room), or its time for a caller that plots by time."""
+    return m.get("x", m["t"])
 
 
 class EventsLane:
@@ -224,18 +261,23 @@ class EventsLane:
         pane.showGrid(x=False, y=False)
         pane.setMenuEnabled(False)
         pane.setMouseEnabled(x=False, y=False)
-        pane.hideAxis("left")
         pane.hideAxis("bottom")
+        # The left axis stays, as a gutter as wide as the price axis above
+        # (the chart sets the width), so the lane's dates line up with the
+        # candles; its one "tick" is the EVENTS caption, which therefore sits
+        # in the label column beside the strip instead of over its marks.
+        axis = pane.getAxis("left")
+        axis.setPen(pg.mkPen(None))
+        axis.setTickPen(pg.mkPen(0, 0, 0, 0))  # a zero-length tick still paints a dot; mkPen(None) is ignored here
+        axis.setTextPen(FG_MUTED)
+        axis.setTicks([[(0.0, "EVENTS")], []])
+        caption_font = QFont(MONO_FONT)
+        caption_font.setPixelSize(FONT_XS)
+        caption_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
+        axis.setStyle(tickFont=caption_font, tickLength=0)
         pane.setYRange(-1.0, 1.0, padding=0)
         pane.setToolTip("Days with something to explain — click a mark")
 
-        self._label = pg.TextItem(
-            html=f'<span style="font-family:{MONO_FONT};font-size:7pt;'
-            f'letter-spacing:1px;color:{FG_MUTED};">EVENTS</span>',
-            anchor=(0, 0.5),
-        )
-        self._label.setZValue(5)
-        pane.addItem(self._label, ignoreBounds=True)
 
         self._scatter = pg.ScatterPlotItem(
             pxMode=True,
@@ -254,24 +296,59 @@ class EventsLane:
 
     def set_marks(self, marks: list[dict]) -> None:
         self._marks = marks or []
+        self._groups: list[list[int]] = []
+        self._place()
+
+    def _place(self) -> None:
+        """(Re)draw the marks, merging any that would touch at this zoom."""
         if not self._marks:
+            self._groups = []
             self._scatter.clear()
             return
+        groups = self._groups_for_view()
+        pts = self._scatter.points()
+        if groups == getattr(self, "_groups", None) and pts is not None \
+                and len(pts) == len(groups):
+            return  # same arrangement as on screen: nothing to redraw
+        self._groups = groups
         spots = []
-        for m in self._marks:
-            glyph, color = MARK_STYLE.get(m["kind"], ("●", FG_DIM))
-            symbol = PG_SYMBOL.get(m["kind"]) or glyph_path(glyph)
-            spots.append(
-                {
-                    "pos": (m["t"], 0.0),
-                    "symbol": symbol,
-                    "brush": pg.mkBrush(color),
-                    "pen": None,
-                    "data": m,
-                }
-            )
+        for idxs in groups:
+            members = [self._marks[i] for i in idxs]
+            if len(members) == 1:
+                m = members[0]
+                glyph, color = MARK_STYLE.get(m["kind"], ("●", FG_DIM))
+                symbol = PG_SYMBOL.get(m["kind"]) or glyph_path(glyph)
+                spots.append({"pos": (_mark_x(m), 0.0), "symbol": symbol,
+                              "brush": pg.mkBrush(color), "pen": None, "data": m})
+                continue
+            xs = [_mark_x(m) for m in members]
+            kinds = {m["kind"] for m in members}
+            # one kind keeps its colour; a mix is neutral (the secondary-text
+            # grey, not full ink, so a count never outshouts the marks)
+            color = MARK_STYLE.get(next(iter(kinds)), ("", FG_DIM))[1] if len(kinds) == 1 else FG_DIM
+            count = str(len(members)) if len(members) < 10 else "9+"
+            spots.append({
+                "pos": ((min(xs) + max(xs)) / 2.0, 0.0),
+                "symbol": glyph_path(count),
+                "size": GROUP_SIZE,
+                "brush": pg.mkBrush(color),
+                "pen": None,
+                "data": {"group": members, "x0": min(xs), "x1": max(xs)},
+            })
         self._scatter.setData(spots)
-        self._reposition_label()
+
+    def _groups_for_view(self) -> list[list[int]]:
+        singles = [[i] for i in range(len(self._marks))]
+        try:
+            vb = self.pane.getViewBox()
+            (x0, x1), _ = vb.viewRange()
+            width = vb.width()
+        except Exception:
+            return singles
+        if x1 <= x0 or width <= 0:
+            return singles
+        scale = width / (x1 - x0)
+        return cluster_marks([(_mark_x(m) - x0) * scale for m in self._marks])
 
     def clear(self) -> None:
         self.set_marks([])
@@ -286,21 +363,52 @@ class EventsLane:
             return ""
         from datetime import date as _date
 
+        def pretty(iso: str, fmt: str) -> str:
+            try:
+                return _date.fromisoformat(iso).strftime(fmt)
+            except ValueError:
+                return iso
+
+        group = data.get("group")
+        if group:
+            lines = [
+                f"{pretty(m.get('date', ''), '%d %b %Y')} · {m.get('label', '')}"
+                + (f" ({m['detail']})" if m.get("detail") else "")
+                for m in group[:GROUP_TIP_LINES]
+            ]
+            if len(group) > GROUP_TIP_LINES:
+                lines.append(f"… and {len(group) - GROUP_TIP_LINES} more")
+            dates = {m.get("date") for m in group}
+            hint = "click for the Day Brief" if len(dates) == 1 else "click to zoom in"
+            return f"{len(group)} events · {hint}\n" + "\n".join(lines)
         iso = data.get("date", "")
-        try:
-            pretty = _date.fromisoformat(iso).strftime("%a %d %b %Y")
-        except ValueError:
-            pretty = iso
         detail = data.get("detail") or ""
-        line = f"{pretty} · {data.get('label', '')}"
+        line = f"{pretty(iso, '%a %d %b %Y')} · {data.get('label', '')}"
         return f"{line}\n{detail}" if detail else line
 
     def _clicked(self, _item, points, _ev=None) -> None:
         if not len(points):
             return
         data = points[0].data()
-        if isinstance(data, dict) and data.get("date"):
+        if not isinstance(data, dict):
+            return
+        group = data.get("group")
+        if group:
+            dates = {m.get("date") for m in group}
+            if len(dates) == 1:
+                self._on_pick(str(next(iter(dates))))
+            else:
+                self.zoom_to(data["x0"], data["x1"])
+            return
+        if data.get("date"):
             self._on_pick(str(data["date"]))
+
+    def zoom_to(self, x0: float, x1: float) -> None:
+        """Open a combined mark: zoom until its events stand apart. The lane is
+        x-linked to the price plot, so the whole chart follows."""
+        span = max(x1 - x0, 1.0)
+        pad = max(span * 0.6, 3.0)
+        self.pane.getViewBox().setXRange(x0 - pad, x1 + pad, padding=0)
 
     def _hovered(self, _item, points, _ev=None) -> None:
         shape = (
@@ -311,13 +419,10 @@ class EventsLane:
         self.pane.setCursor(shape)
 
     def _reposition_label(self, *_args) -> None:
-        """Pin the EVENTS caption to the left edge of the visible range, so it
-        names the strip without scrolling away with the data."""
-        try:
-            (x0, _x1), _ = self.pane.getViewBox().viewRange()
-        except Exception:
-            return
-        self._label.setPos(x0, 0.62)
+        """A zoom changes how far apart the marks sit on screen: re-group.
+        (The EVENTS caption lives in the axis gutter now and never moves.)"""
+        if getattr(self, "_marks", None):
+            self._place()
 
     def set_background(self, color: str) -> None:
         self.pane.setBackground(color)

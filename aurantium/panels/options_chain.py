@@ -22,14 +22,18 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
+from ..guide import PanelGuide
 from ..components.fmt import integer as _fmt_int
 from ..components.fmt import num as _fmt_num
 from ..components import MarketTable
-from ..panel import Panel, register_panel
+from ..components.market_table import STRETCH_ALL
+from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, Panel, register_panel
 from ..color import delta_e, mix_oklab
-from ..theme import BG, BG_HEADER, DOWN, UP
+from ..theme import BG, BG_HEADER, DOWN, SPACE_XS, UP
 from ..components.responsive_row import ResponsiveRow
 
 # calls: Vol | OI | IV% | Δ | Γ | Θ | Vega | Bid | Ask | Last | Strike
@@ -199,6 +203,25 @@ def _make_item(text: str) -> QTableWidgetItem:
 
 @register_panel(id="options", title="Options Chain", category="Research")
 class OptionsChainPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="The options chain of the linked stock: calls and puts around the current price for one expiry.",
+        links="Follows the link group's symbol.",
+        interactions=(
+            "Pick an **Expiry**. The strike nearest the spot (at the money) is "
+            "highlighted and in-the-money rows are tinted.",
+            "Greek columns are hidden by default: right-click a header ▸ **Columns** "
+            "to show Δ, Γ, Θ and Vega. The choice is saved with the layout.",
+            "Hover a column header for what it means.",
+        ),
+        fields=(
+            ("Bid / Ask / Last", "Current quotes and the last trade for the contract"),
+            ("IV%", "Implied volatility: the yearly move the option price assumes"),
+            ("OI", "Open interest: contracts outstanding"),
+            ("Vol", "Contracts traded today"),
+            ("Δ Γ Θ Vega", "Greeks from Black–Scholes; Θ per day, Vega per 1% of volatility"),
+        ),
+    )
+
     def build(self) -> None:
         self._expiries: list[str] = []
         self._current_expiry: str = ""
@@ -209,10 +232,15 @@ class OptionsChainPanel(Panel):
         header_row = ResponsiveRow()
         header_row.addWidget(QLabel("Expiry:", self))
         self.expiry_combo = QComboBox(self)
+        # sized to its dates whenever they change: built empty, it measured
+        # nothing and clipped every expiry to "2026-1("
+        self.expiry_combo.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToContents
+        )
         self.expiry_combo.currentTextChanged.connect(self._on_expiry_changed)
         header_row.addWidget(self.expiry_combo)
         header_row.addStretch(1)
-        self.spot_lbl = QLabel("Spot: -", self)
+        self.spot_lbl = QLabel(f"Spot: {NULL_GLYPH}", self)
         self.spot_lbl.setStyleSheet("font-weight: 700;")
         header_row.addWidget(self.spot_lbl)
         self.content_layout.addLayout(header_row)
@@ -224,13 +252,13 @@ class OptionsChainPanel(Panel):
         self.register_state_target(self.calls_table)
         self.calls_table.setHorizontalHeaderLabels(CALL_HEADERS)
         self._configure_table(self.calls_table)
-        tables_row.addWidget(self.calls_table, 1)
+        tables_row.addWidget(self._titled("CALLS", self.calls_table), 1)
 
         self.puts_table = MarketTable(0, len(PUT_HEADERS), self)
         self.register_state_target(self.puts_table)
         self.puts_table.setHorizontalHeaderLabels(PUT_HEADERS)
         self._configure_table(self.puts_table)
-        tables_row.addWidget(self.puts_table, 1)
+        tables_row.addWidget(self._titled("PUTS", self.puts_table), 1)
 
         _apply_header_tips(self.calls_table)
         _apply_header_tips(self.puts_table)
@@ -238,8 +266,37 @@ class OptionsChainPanel(Panel):
         self.content_layout.addLayout(tables_row, 1)
 
         # Greeks off by default — right-click a header ▸ Columns to reveal them.
+        # Narrow panels give up the outer columns first, keeping strike and
+        # last; at width every column shares the space, so neither side opens
+        # a gap. Greeks stay out of the list: hidden until the user shows them.
+        self.calls_table.set_column_priority(
+            keep=[CALL_HEADERS.index("Strike"), CALL_HEADERS.index("Last")],
+            droppable=[CALL_HEADERS.index(h) for h in ("Vol", "OI", "IV%", "Bid", "Ask")],
+            stretch=STRETCH_ALL,
+        )
+        self.puts_table.set_column_priority(
+            keep=[PUT_HEADERS.index("Strike"), PUT_HEADERS.index("Last")],
+            droppable=[PUT_HEADERS.index(h) for h in ("Vol", "OI", "IV%", "Bid", "Ask")],
+            stretch=STRETCH_ALL,
+        )
+        for table in (self.calls_table, self.puts_table):
+            table.set_empty_text(EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT)
         self.calls_table.set_hidden_columns(CALL_GREEK_COLS)
         self.puts_table.set_hidden_columns(PUT_GREEK_COLS)
+
+    def _titled(self, title: str, table: MarketTable) -> QWidget:
+        """A table under its eyebrow. The two sides of the chain were
+        unlabelled, so which one held the calls had to be inferred from the
+        mirrored column order."""
+        box = QWidget(self)
+        lay = QVBoxLayout(box)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(SPACE_XS)
+        eyebrow = QLabel(title, box)
+        eyebrow.setObjectName("panelEyebrow")
+        lay.addWidget(eyebrow)
+        lay.addWidget(table, 1)
+        return box
 
     @staticmethod
     def _configure_table(table: MarketTable) -> None:
@@ -259,7 +316,9 @@ class OptionsChainPanel(Panel):
         self.expiry_combo.blockSignals(False)
         self.calls_table.setRowCount(0)
         self.puts_table.setRowCount(0)
-        self.spot_lbl.setText("Spot: -")
+        for table in (self.calls_table, self.puts_table):
+            table.set_empty_text(f"No options listed for {symbol}", "")
+        self.spot_lbl.setText(f"Spot: {NULL_GLYPH}")
         self.unsubscribe_all()
         self.subscribe(f"options:{symbol}", self._on_options)
 
@@ -288,7 +347,7 @@ class OptionsChainPanel(Panel):
 
         spot = data.get("spot")
         self._spot = spot
-        self.spot_lbl.setText(f"Spot: {_fmt_num(spot)}" if spot is not None else "Spot: -")
+        self.spot_lbl.setText(f"Spot: {_fmt_num(spot)}" if spot is not None else f"Spot: {NULL_GLYPH}")
 
         expiry = data.get("expiry")
         expiries = data.get("expiries")

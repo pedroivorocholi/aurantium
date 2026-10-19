@@ -219,13 +219,14 @@ def test_a_new_day_brief_opens_floating(win):
     assert _is_floating(_day_briefs(win)[0])
 
 
-def test_the_day_brief_is_the_only_floatable_panel(win):
-    """The never-float rule still holds for everything else."""
+def test_other_panels_dock_but_can_still_become_windows(win):
+    """Programmatic panels dock in place; every panel can still be dragged
+    out into a window of its own (multi-monitor)."""
     import PySide6QtAds as QtAds
 
     for pid in ("chart", "news", "watchlist", "analyst"):
         dock = win.add_panel(pid)
-        assert not dock.features() & QtAds.CDockWidget.DockWidgetFloatable, pid
+        assert dock.features() & QtAds.CDockWidget.DockWidgetFloatable, pid
         assert not _is_floating(dock), pid
 
 
@@ -273,3 +274,62 @@ def test_a_floatable_panel_can_still_be_docked_by_the_user(win):
     dock = _day_briefs(win)[0]
     assert dock.features() & QtAds.CDockWidget.DockWidgetMovable
     assert dock.features() & QtAds.CDockWidget.DockWidgetFloatable
+
+
+# -- crowded marks combine -------------------------------------------------------
+
+
+def test_touching_marks_cluster_and_distant_ones_do_not():
+    from aurantium.panels._events_lane import MIN_GAP_PX, cluster_marks
+
+    xs = [0, 3, 6, 100, 104, 300]
+    assert cluster_marks(xs, MIN_GAP_PX) == [[0, 1, 2], [3, 4], [5]]
+    assert cluster_marks([], MIN_GAP_PX) == []
+
+
+def _crowded_lane(chart, qapp):
+    """Seven events on consecutive days, viewed so they cannot stand apart."""
+    from aurantium.panels._events_lane import EventsLane
+
+    lane = chart._lane
+    lane.pane.resize(400, 20)
+    marks = [{"t": 0, "x": float(i), "date": f"2026-03-0{i + 1}", "kind": "earnings",
+              "label": "Earnings", "detail": ""} for i in range(7)]
+    lane.pane.getViewBox().setXRange(0, 2000, padding=0)
+    lane.set_marks(marks)
+    qapp.processEvents()
+    return lane
+
+
+def test_crowded_marks_draw_as_one_count(chart, qapp):
+    lane = _crowded_lane(chart, qapp)
+    points = lane._scatter.points()
+    assert len(points) == 1
+    data = points[0].data()
+    assert len(data["group"]) == 7
+    tip = lane._tip(0, 0, data)
+    assert tip.startswith("7 events")
+    assert "zoom" in tip
+
+
+def test_clicking_a_combined_mark_zooms_until_they_separate(chart, qapp):
+    lane = _crowded_lane(chart, qapp)
+    point = lane._scatter.points()[0]
+    lane._clicked(lane._scatter, [point])
+    qapp.processEvents()
+    (x0, x1), _ = lane.pane.getViewBox().viewRange()
+    assert x0 <= 0 and x1 >= 6 and x1 - x0 < 30
+
+
+def test_a_combined_mark_on_one_day_opens_the_brief(chart, qapp):
+    picked = []
+    chart._lane._on_pick = picked.append
+    lane = chart._lane
+    lane.pane.resize(400, 20)
+    same_day = [{"t": 0, "x": 3.0, "date": "2026-03-04", "kind": k, "label": k,
+                 "detail": ""} for k in ("earnings", "move_down")]
+    lane.set_marks(same_day)
+    qapp.processEvents()
+    (point,) = lane._scatter.points()
+    lane._clicked(lane._scatter, [point])
+    assert picked == ["2026-03-04"]

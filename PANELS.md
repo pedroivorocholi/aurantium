@@ -107,11 +107,18 @@ name without the leading underscore, then change its `id=`, `title=`, and
 for tutorial files and never appears in the menu.
 
 ```python
+from aurantium.guide import PanelGuide
 from aurantium.panel import Panel, register_panel
 from PySide6.QtWidgets import QLabel
 
 @register_panel(id="spread", title="10Y Spread", category="Custom")
 class SpreadPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="Last price of the linked symbol, in one line.",
+        links="Follows the link group's symbol.",
+        interactions=("Click a ticker in any linked panel to change it.",),
+    )
+
     def build(self):
         self.lbl = QLabel("waiting for symbol…")
         self.content_layout.addWidget(self.lbl)
@@ -126,6 +133,9 @@ class SpreadPanel(Panel):
 
 The whole API surface:
 
+- `GUIDE = PanelGuide(...)` — **required.** The panel's quick guide, declared
+  next to its code (see *Quick guides* below). The F1 window generates the
+  panel's page from it, and the `?` in the panel header opens that page.
 - `build(self)` — create widgets into `self.content_layout`. Called once.
 - `on_symbol(self, symbol)` — the active symbol of this panel's link group
   changed. Re-subscribe to the topics you care about.
@@ -139,6 +149,32 @@ The whole API surface:
 - `self.set_status("…")` — small status text in the panel header. Provider
   errors show up there automatically.
 - `settings() -> dict` / `restore(dict)` — persist panel state into layouts.
+
+### Quick guides
+
+Every panel declares a `GUIDE` — a `PanelGuide` from `aurantium.guide`. It is a
+quick guide, not a manual: a few lines a user reads before trusting a panel.
+
+| Field | What goes in it |
+|---|---|
+| `purpose` | One line: what the panel is for. Required. |
+| `links` | What drives it (the link group? its own query?) and what clicking in it drives. |
+| `interactions` | The gestures that matter, one per entry: clicks, right-click entries, buttons. |
+| `fields` | `(column or field, plain-language meaning)` pairs for anything not obvious. |
+| `shortcuts` | `(keys, what they do)` for keys only this panel handles. Global keys belong on the F1 Shortcuts page. |
+| `sections` | `GuideSection(title, text)` for tabs and sub-views; shown collapsed. |
+
+Text is plain; `**bold**` names a control. A host whose tabs are themselves
+panels sets `HOSTED_TABS = ((key, label, PanelClass), ...)` and each tab's
+own `GUIDE` becomes a page nested under the host's.
+
+The single source of truth is the declaration: the F1 window, the header's
+`?` button and the panel's right-click **Quick guide** entry all read it, and
+nothing else holds a copy. `tests/test_panel_guides.py` fails for any
+registered panel whose guide is missing or empty, for any F1 page that names a
+panel that no longer exists, and for any shortcut that is bound but not listed
+(or listed but not bound). Your own panels in `user_panels/` follow the same
+rule; `_example_macro.py` shows a complete one.
 
 Rules of thumb: never do network I/O in a panel (add a provider instead);
 guard every payload field (`q.get(...)` — values can be `None`); callbacks

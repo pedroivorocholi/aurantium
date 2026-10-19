@@ -141,3 +141,47 @@ def test_a_panel_setting_stretch_afterwards_does_not_defeat_the_priorities(table
 
     content = table.sizeHintForColumn(1)
     assert table.columnWidth(1) <= content * 2 + 40
+
+
+# -- what a layout saves ----------------------------------------------------
+#
+# A column dropped for width is the layout's decision, not the user's. Saving
+# it as "hidden" made it permanent: a panel that happened to be narrow when the
+# layout was saved (or when a preset was generated) came back with columns that
+# never reappeared however wide it was made.
+
+def test_a_column_dropped_for_width_is_not_saved_as_hidden(table):
+    table.set_column_priority(keep=[0, 1], droppable=[4, 2, 3])
+    table.resize(150, 200)
+    assert table.isColumnHidden(4)  # dropped to fit
+    assert table.hidden_columns() == []
+
+
+def test_a_user_hidden_column_is_saved(table):
+    table.set_column_priority(keep=[0, 1], droppable=[4, 2, 3])
+    table.resize(1000, 200)
+    table._toggle_column(2, False)
+    table.resize(150, 200)
+    assert table.hidden_columns() == [2]
+
+
+def test_restoring_hidden_columns_keeps_them_hidden_when_wide(table):
+    table.set_column_priority(keep=[0, 1], droppable=[4, 2, 3])
+    table.set_hidden_columns([3])
+    table.resize(1000, 200)
+    assert _visible(table) == [0, 1, 2, 4]
+    assert table.hidden_columns() == [3]
+
+
+def test_restoring_does_not_pin_a_width_drop(table):
+    """A layout saved by older code may list a width drop as hidden; that is
+    indistinguishable from a user choice, so it is honoured, and showing it
+    again from the Columns menu clears it for good."""
+    table.set_column_priority(keep=[0, 1], droppable=[4, 2, 3])
+    table.set_hidden_columns([4])
+    table.resize(1000, 200)
+    assert table.isColumnHidden(4)
+    table._toggle_column(4, True)
+    table.resize(150, 200)
+    table.resize(1000, 200)
+    assert not table.isColumnHidden(4)

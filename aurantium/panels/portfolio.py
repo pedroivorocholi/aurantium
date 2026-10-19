@@ -19,27 +19,27 @@ import pyqtgraph as pg
 from PySide6.QtCore import QDate, QSize, Qt
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import (
-    QAbstractItemView,
     QDateEdit,
     QDoubleSpinBox,
     QGridLayout,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
     QLineEdit,
     QPushButton,
-    QTableWidget,
     QTableWidgetItem,
     QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
-from ..components import attach_suggestions
-from ..components.fit_width import fit_columns, fit_tabs
+from ..guide import GuideSection, PanelGuide
+from ..components import MarketTable, attach_suggestions
+from ..components import fmt
+from ..components.fit_width import fit_tabs
 from ..panel import NULL_GLYPH, Panel, register_panel
 from ..theme import (
     ACCENT,
+    LABEL,
     ACCENT_DEEP,
     FONT_TITLE,
     BG_HEADER,
@@ -308,6 +308,32 @@ class _AllocationBars(QWidget):
 
 @register_panel(id="portfolio", title="Portfolio", category="Analytics")
 class PortfolioPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="Your positions marked to live prices, with allocation, performance and risk.",
+        links="Click a position to send its symbol to every panel in this link group.",
+        interactions=(
+            "Add a holding: symbol, **Qty**, **Price** and **Buy date**. Leave Price "
+            "on *market* to use the current quote as the cost.",
+            "Select a row and **Mark sold** to close it at today's price, or "
+            "**Remove** to delete it; Ctrl+Z undoes.",
+            "A sold position keeps its row with buy → sell dates; **TOTAL** sums "
+            "value and P&L.",
+        ),
+        fields=(
+            ("Qty / Cost", "Units held and the price paid for each"),
+            ("Mkt Value", "Qty × the latest price (or the sell price)"),
+            ("P&L / P&L%", "Gain or loss against cost"),
+        ),
+        sections=(
+            GuideSection("Allocation", "Sector weights of the open positions, as bars."),
+            GuideSection("Performance", "Portfolio value from your earliest buy date — "
+                "each position counted only while held — rebased to 100 against SPY."),
+            GuideSection("Risk", "Weighted beta, the largest position as a share of "
+                "the book, and the maximum drawdown over a year. The analytics tabs "
+                "start fetching only when first opened."),
+        ),
+    )
+
     def build(self) -> None:
         self._positions: list[dict] = []  # [{"symbol", "qty", "cost"}, ...]
         self._last_price: dict[str, Optional[float]] = {}
@@ -338,19 +364,16 @@ class PortfolioPanel(Panel):
         lay = QVBoxLayout(w)
         lay.setContentsMargins(0, 0, 0, 0)
 
-        self.table = QTableWidget(0, len(HEADERS), w)
-        fit_columns(self.table)
+        # A MarketTable like every other table panel: in a narrow dock it
+        # gives up whole columns (dates, cost, quantity first) rather than
+        # eliding all eight into "Sym ty ost …".
+        self.table = MarketTable(0, len(HEADERS), w)
         self.table.setHorizontalHeaderLabels(HEADERS)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.table.setAlternatingRowColors(True)
-        header = self.table.horizontalHeader()
-        header.setSectionResizeMode(COL_SYMBOL, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(COL_DATE, QHeaderView.ResizeMode.ResizeToContents)
-        for col in (COL_QTY, COL_COST, COL_LAST, COL_MKTVAL, COL_PNL, COL_PNLPCT):
-            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
+        self.table.set_column_priority(
+            keep=[COL_SYMBOL, COL_MKTVAL, COL_PNLPCT],
+            droppable=[COL_DATE, COL_COST, COL_QTY, COL_LAST, COL_PNL],
+            stretch=COL_DATE,
+        )
         self.table.itemSelectionChanged.connect(self._on_row_selected)
         lay.addWidget(self.table, 1)
 
@@ -418,6 +441,7 @@ class PortfolioPanel(Panel):
             axisItems={"bottom": pg.DateAxisItem(orientation="bottom")}
         )
         self._perf_plot.showGrid(x=True, y=True, alpha=0.15)
+        self._perf_plot.setMenuEnabled(False)  # app menu (with Quick guide), not pyqtgraph's own
         self._perf_plot.addLegend()
         self._perf_port = self._perf_plot.plot(
             [], [], pen=pg.mkPen(ACCENT, width=1.8), name="Portfolio"
@@ -519,11 +543,12 @@ class PortfolioPanel(Panel):
         sold = pos.get("sell_date") is not None
         sym_item = QTableWidgetItem(pos["symbol"])
         sym_item.setFlags(sym_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        sym_item.setForeground(QColor(LABEL))  # tickers wear LABEL app-wide
         self.table.setItem(row, COL_SYMBOL, sym_item)
 
-        qty_item = QTableWidgetItem(_fmt(pos["qty"], 4))
+        qty_item = QTableWidgetItem(fmt.quantity(pos["qty"]))
         cost = pos.get("cost")
-        cost_item = QTableWidgetItem(_fmt(cost, 4) if cost is not None else "mkt")
+        cost_item = QTableWidgetItem(fmt.price(cost) if cost is not None else "mkt")
         for item in (qty_item, cost_item):
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -553,11 +578,13 @@ class PortfolioPanel(Panel):
         font = label_item.font()
         font.setBold(True)
         label_item.setFont(font)
-        label_item.setForeground(QColor(ACCENT))
+        label_item.setForeground(QColor(LABEL))
         label_item.setBackground(QColor(BG_HEADER))
         self.table.setItem(row, COL_SYMBOL, label_item)
-        for col in (COL_QTY, COL_COST, COL_LAST, COL_MKTVAL, COL_PNL, COL_PNLPCT):
-            item = QTableWidgetItem(NULL_GLYPH)
+        # every cell of the band, Date included: leaving it out punched a
+        # black hole in the middle of the totals row
+        for col in (COL_QTY, COL_COST, COL_DATE, COL_LAST, COL_MKTVAL, COL_PNL, COL_PNLPCT):
+            item = QTableWidgetItem("" if col == COL_DATE else NULL_GLYPH)
             item.setFlags(Qt.ItemFlag.ItemIsEnabled)
             item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             bold_font = item.font()
@@ -626,17 +653,17 @@ class PortfolioPanel(Panel):
 
         cost_item = self.table.item(row, COL_COST)
         if cost_item is not None:
-            cost_item.setText(_fmt(cost, 4) if cost is not None else "mkt")
+            cost_item.setText(fmt.price(cost) if cost is not None else "mkt")
         last_item = self.table.item(row, COL_LAST)
         mktval_item = self.table.item(row, COL_MKTVAL)
         pnl_item = self.table.item(row, COL_PNL)
         pnlpct_item = self.table.item(row, COL_PNLPCT)
         if not (last_item and mktval_item and pnl_item and pnlpct_item):
             return
-        last_item.setText(_fmt(last))
+        last_item.setText(fmt.price(last))
         mktval_item.setText(_fmt(mkt_val))
-        pnl_item.setText(_fmt(pnl))
-        pnlpct_item.setText(f"{_fmt(pnl_pct)}%" if pnl_pct is not None else NULL_GLYPH)
+        pnl_item.setText(fmt.signed(pnl))
+        pnlpct_item.setText(fmt.signed_pct(pnl_pct))
         if pnl is not None:
             apply_tick(pnl_item, pnl, glyph=False)
             apply_tick(pnlpct_item, pnl)
@@ -670,9 +697,9 @@ class PortfolioPanel(Panel):
             pnlpct_item.setText(NULL_GLYPH)
             return
         mktval_item.setText(_fmt(total_mkt))
-        pnl_item.setText(_fmt(total_pnl))
+        pnl_item.setText(fmt.signed(total_pnl))
         pnl_pct = (total_pnl / total_cost * 100.0) if total_cost else None
-        pnlpct_item.setText(f"{_fmt(pnl_pct)}%" if pnl_pct is not None else NULL_GLYPH)
+        pnlpct_item.setText(fmt.signed_pct(pnl_pct))
         apply_tick(pnl_item, total_pnl, glyph=False)
         apply_tick(pnlpct_item, total_pnl)
 

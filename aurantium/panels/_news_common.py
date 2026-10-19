@@ -30,7 +30,7 @@ from ..components.fit_width import fit_columns
 from ..languages import main_language
 from ..panel import EMPTY_NO_SYMBOL, Panel
 from ..symbol_context import GROUPS, SymbolContext
-from ..theme import ACCENT, FG_DIM
+from ..theme import FG_DIM, LABEL
 
 
 def parse_published(value: Any) -> Optional[datetime]:
@@ -149,7 +149,9 @@ def populate_news_table(table: QTableWidget, data: Any) -> int:
     pairs = _ranked_with_dates(data) if isinstance(data, list) else []
     count = 0
     for entry, published_dt in pairs:
-        title = entry.get("title") or "(untitled)"
+        # feeds hand over HTML-escaped titles ("Marsh &amp; McLennan") and
+        # stray double spaces; show the text a reader would see on the page
+        title = " ".join(_html.unescape(entry.get("title") or "").split()) or "(untitled)"
         publisher = entry.get("publisher") or ""
         when = format_when(published_dt)  # reuse the datetime parsed for ranking
 
@@ -157,7 +159,7 @@ def populate_news_table(table: QTableWidget, data: Any) -> int:
         table.insertRow(row)
 
         time_item = QTableWidgetItem(when)
-        time_item.setForeground(QColor(ACCENT))
+        time_item.setForeground(QColor(LABEL))
         time_item.setFlags(time_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
         head_item = QTableWidgetItem(title)
@@ -277,6 +279,9 @@ class NewsPanelBase(Panel):
         self.news_empty = EmptyState.attach(
             self.table, self._news_empty_title, self._news_empty_hint
         )
+        # set_loading() reaches the overlay, so a fetch reads "Loading…"
+        # rather than "No recent headlines" while it is still in flight
+        self.register_state_target(self.news_empty)
 
         self.preview_lbl = QLabel("", self)
         self.preview_lbl.setWordWrap(True)

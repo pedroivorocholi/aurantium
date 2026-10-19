@@ -11,11 +11,12 @@ from __future__ import annotations
 from typing import Any, Optional
 
 import pyqtgraph as pg
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton
 
+from ..guide import PanelGuide
 from ..components import attach_suggestions
-from ..panel import NULL_GLYPH, Panel, register_panel
+from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, Panel, register_panel
 from ..theme import ACCENT, BG, FG, FG_DIM, series_color
 from ..components.responsive_row import ResponsiveRow
 
@@ -76,6 +77,16 @@ def _dedupe(symbols: list[str]) -> list[str]:
 
 @register_panel(id="performance", title="Performance", category="Analytics")
 class PerformancePanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="The linked symbol's return against a comparison set, from the start of the window.",
+        links="Follows the link group's symbol, which is always the first line.",
+        interactions=(
+            "**1mo / 6mo / 1y / 5y** set the window; every line starts at 0%.",
+            "Type symbols in **Compare**, separated by commas, and press **Apply** or Enter.",
+            "The legend above the chart prints each line's total return.",
+        ),
+    )
+
     def build(self) -> None:
         self._period = "6mo"
         self._compare: list[str] = list(DEFAULT_COMPARE)
@@ -91,7 +102,10 @@ class PerformancePanel(Panel):
         for label, _period, _interval in PERIODS:
             btn = QPushButton(label, self)
             btn.setCheckable(True)
-            btn.setFixedWidth(48)
+            # the app's one selector style (chart range, Day Brief window):
+            # an outline chip, never a filled block — and sized by its label,
+            # since a fixed width clipped "6M" to look like "3M"
+            btn.setObjectName("chartChip")
             btn.clicked.connect(lambda _=False, p=label: self._set_period(p))
             period_row.addWidget(btn)
             self._period_buttons[label] = btn
@@ -120,13 +134,45 @@ class PerformancePanel(Panel):
         self.plot_widget = pg.PlotWidget(
             axisItems={"bottom": pg.DateAxisItem(orientation="bottom")}
         )
+        self.plot_widget.setMenuEnabled(False)  # app menu (with Quick guide), not pyqtgraph's own
         self.plot_widget.setBackground(BG)
         self.plot_widget.showGrid(x=True, y=True, alpha=0.15)
         self.plot_widget.getAxis("left").setTextPen(FG_DIM)
+        # the figures are % returns; say so, as Macro's curve says "Yield (%)"
+        self.plot_widget.setLabel("left", "Return (%)")
         self.plot_widget.getAxis("bottom").setTextPen(FG_DIM)
         zero_pen = pg.mkPen(FG_DIM, width=1, style=Qt.PenStyle.DashLine)
-        self.plot_widget.addItem(pg.InfiniteLine(pos=0, angle=0, pen=zero_pen))
+        self._zero_line = pg.InfiniteLine(pos=0, angle=0, pen=zero_pen)
+        self.plot_widget.addItem(self._zero_line)
         self.content_layout.addWidget(self.plot_widget, 1)
+
+        # Until a symbol arrives the plot had nothing to say but showed it
+        # anyway: bare axes from -400 to 400. Say what is missing instead,
+        # with the same overlay the Chart uses.
+        from ..components.empty_state import EmptyState
+
+        self._empty = EmptyState(
+            self.plot_widget.viewport(), EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT
+        )
+        self.plot_widget.viewport().installEventFilter(self)
+        self._set_plot_empty(True)
+
+    def _set_plot_empty(self, empty: bool) -> None:
+        """With nothing to plot, hide the axes and the zero line too, as the
+        Chart does: otherwise they measure nothing (-400..400) and the zero
+        line strikes through the message."""
+        item = self.plot_widget.getPlotItem()
+        for side in ("left", "bottom"):
+            item.showAxis(side, not empty)
+        self._zero_line.setVisible(not empty)
+        self._empty.setVisible(empty)
+        if empty:
+            self._empty.raise_()
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt override)
+        if obj is self.plot_widget.viewport() and event.type() == QEvent.Type.Resize:
+            self._empty.setGeometry(obj.rect())
+        return super().eventFilter(obj, event)
 
     # -- period selector -----------------------------------------------------
 
@@ -154,6 +200,7 @@ class PerformancePanel(Panel):
     # -- linked-symbol lifecycle ------------------------------------------------
 
     def on_symbol(self, symbol: str) -> None:
+        self._set_plot_empty(False)
         self._rebuild_series()
 
     # -- series (re)construction ------------------------------------------------

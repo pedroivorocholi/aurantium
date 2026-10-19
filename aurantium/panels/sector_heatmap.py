@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPen
 from PySide6.QtWidgets import (
     QFrame,
@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..guide import LIST_EDITOR, PanelGuide
 from ..components import (
     SECTOR_ETF_ENTRIES,
     EditorColumn,
@@ -28,7 +29,22 @@ from ..components import (
 )
 from ..color import mix_oklab, readable_on
 from ..panel import NULL_GLYPH, Panel, register_panel
-from ..theme import BG, BG_ALT, BORDER_STRONG, DOWN, FG_DIM, FG_MUTED, UP
+from ..theme import (
+    BG,
+    BG_ALT,
+    BORDER_STRONG,
+    DOWN,
+    FG_DIM,
+    FG_MUTED,
+    FONT_DISPLAY,
+    FONT_MD,
+    FONT_SM,
+    RADIUS_XS,
+    SPACE_LG,
+    SPACE_MD,
+    UP,
+    WEIGHT_BOLD,
+)
 from ..undo import UndoStack
 from ..components.responsive_row import ResponsiveRow
 
@@ -129,9 +145,8 @@ class _Tile(QFrame):
     clicked = Signal(str)
     menu_requested = Signal(str, object)  # symbol, global pos
 
-    #: Corner radius, matching the theme's existing 3px rather than the 4px this
-    #: tile used to invent.
-    RADIUS = 3
+    #: Corner radius: the theme's small-surface step, not a local number.
+    RADIUS = RADIUS_XS
 
     def __init__(self, label: str, symbol: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -139,11 +154,16 @@ class _Tile(QFrame):
         self._fill = QColor(BG)
         self._has_data = False
         self.setFrameShape(QFrame.Shape.NoFrame)
-        self.setMinimumSize(70, 44)
+        # Width floor only. The height floor comes from the layout: a fixed
+        # 44px minimum here was shorter than the three labels need, so a
+        # one-column stack squeezed every tile until name, ticker and figure
+        # printed on top of each other.
+        self.setMinimumWidth(70)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setContentsMargins(SPACE_LG, SPACE_MD, SPACE_LG, SPACE_MD)
+        layout.setSpacing(0)
 
         # Backgrounds must be explicitly transparent: theme.py's blanket
         # ``QWidget`` rule would otherwise paint each label with a flat BG
@@ -170,13 +190,15 @@ class _Tile(QFrame):
             return
         self._ink = ink
         self.name_lbl.setStyleSheet(
-            f"background: transparent; color: {ink}; font-weight: 700; font-size: 11px;"
+            f"background: transparent; color: {ink};"
+            f" font-weight: {WEIGHT_BOLD}; font-size: {FONT_MD}px;"
         )
         self.symbol_lbl.setStyleSheet(
-            f"background: transparent; color: {ink}; font-size: 10px;"
+            f"background: transparent; color: {ink}; font-size: {FONT_SM}px;"
         )
         self.pct_lbl.setStyleSheet(
-            f"background: transparent; color: {ink}; font-weight: 700; font-size: 20px;"
+            f"background: transparent; color: {ink};"
+            f" font-weight: {WEIGHT_BOLD}; font-size: {FONT_DISPLAY}px;"
         )
 
     def set_change_pct(self, change_pct: Any) -> None:
@@ -229,13 +251,32 @@ class _Tile(QFrame):
 
 @register_panel(id="sectors", title="Sector Heatmap", category="Markets")
 class SectorHeatmapPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="The S&P 500 sectors as a heatmap: one tile per sector ETF, colored by today's move.",
+        links="Click a tile to send its ETF to every panel in this link group.",
+        interactions=(
+            "Color runs from red (−2% or worse) through neutral to green (+2% or "
+            "better). A dashed tile has no reading yet.",
+            "Right-click a tile to remove it, **Add tile…** or **Edit panel…**; any "
+            "Yahoo Finance symbol can be a tile.",
+            "Tiles reflow into up to three columns as the panel widens.",
+        ),
+        sections=(LIST_EDITOR,),
+    )
+
     def build(self) -> None:
         self._tiles_cfg: list = [list(row) for row in DEFAULT_TILES]
         self._tile_of_symbol: dict[str, _Tile] = {}
 
         self.grid_container = QWidget(self)
         self.grid = QGridLayout(self.grid_container)
-        self.grid.setSpacing(6)
+        self.grid.setSpacing(SPACE_MD)
+        self.grid.setContentsMargins(0, 0, 0, 0)
+        # Reflow on the container's own resize. The panel's resizeEvent fires
+        # before its layouts have resized the container, so reading the width
+        # there saw the previous size — a panel built narrow and then widened
+        # stayed one tile wide for good.
+        self.grid_container.installEventFilter(self)
         self.content_layout.addWidget(self.grid_container, 1)
 
         edit_row = ResponsiveRow()
@@ -279,14 +320,20 @@ class SectorHeatmapPanel(Panel):
             return GRID_COLS
         return max(1, min(GRID_COLS, (width + 4) // 84))
 
-    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt override)
-        super().resizeEvent(event)
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt override)
+        if obj is getattr(self, "grid_container", None) and event.type() == QEvent.Type.Resize:
+            self._reflow()
+        return super().eventFilter(obj, event)
+
+    def _reflow(self) -> None:
         if not hasattr(self, "_tile_of_symbol"):
             return
         cols = self._grid_cols()
         tiles = list(self._tile_of_symbol.values())
+        if not tiles:
+            return
         placed = {self.grid.getItemPosition(self.grid.indexOf(t))[1] for t in tiles}
-        if tiles and max(placed) + 1 == min(cols, len(tiles)):
+        if max(placed) + 1 == min(cols, len(tiles)):
             return  # already laid out for this width
         for t in tiles:
             self.grid.removeWidget(t)
@@ -349,6 +396,7 @@ class SectorHeatmapPanel(Panel):
         remove_act = menu.addAction(f'Remove "{label}"')
         add_act = menu.addAction("Add tile…")
         edit_act = menu.addAction("Edit panel…")
+        self.add_guide_action(menu)
         chosen = menu.exec(global_pos)
         if chosen is remove_act:
             self._apply_edit([list(r) for r in self._tiles_cfg if r[1] != symbol])

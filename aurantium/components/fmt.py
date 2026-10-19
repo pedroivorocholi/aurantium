@@ -32,6 +32,9 @@ __all__ = [
     "integer",
     "compact",
     "price",
+    "signed",
+    "quantity",
+    "date",
 ]
 
 
@@ -74,6 +77,49 @@ def signed_pct(value: Any, decimals: int = 2) -> str:
     if v is None:
         return NULL_GLYPH
     return f"{v:+.{decimals}f}%"
+
+
+def signed(value: Any, decimals: int = 2) -> str:
+    """A change that always carries its sign: ``+1.67`` / ``-7.92``.
+
+    The number twin of :func:`signed_pct`. Change columns printed positives
+    bare in some panels and signed in others, so the same +0.43 move read
+    ``0.43`` in the Watchlist and ``+0.43`` on the chart beside it.
+    """
+    v = _f(value)
+    return NULL_GLYPH if v is None else f"{v:+,.{decimals}f}"
+
+
+def quantity(value: Any, max_decimals: int = 4) -> str:
+    """A holding size: whole numbers bare, fractions to at most
+    ``max_decimals`` with trailing zeros dropped — ``50``, ``0.5``, ``12.25``.
+    A position of fifty shares printed as ``50.0000`` beside a two-decimal
+    price looked like a price."""
+    v = _f(value)
+    if v is None:
+        return NULL_GLYPH
+    if v == int(v):
+        return f"{int(v):,}"
+    return f"{v:,.{max_decimals}f}".rstrip("0").rstrip(".")
+
+
+def date(value: Any) -> str:
+    """A calendar date as ``YYYY-MM-DD``.
+
+    Feeds hand dates over as full ISO timestamps (``2026-11-02T15:00:00-05:00``)
+    or datetimes, and three panels printed them verbatim — a 25-character
+    timestamp where the reader needed the day. The day is read from the
+    string as given (no timezone conversion), so it is the day the source
+    meant.
+    """
+    if value is None:
+        return NULL_GLYPH
+    iso = getattr(value, "isoformat", None)
+    text = iso() if callable(iso) else str(value)
+    text = text.strip()
+    if len(text) >= 10 and text[4] == "-" and text[7] == "-":
+        return text[:10]
+    return text or NULL_GLYPH
 
 
 def integer(value: Any) -> str:

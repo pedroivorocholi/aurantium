@@ -14,7 +14,13 @@ is one Python file in ``user_panels/`` (this directory) with exactly one
 restart aurantium, and it shows up in the Panels ▸ Add Panel menu — nothing
 else to register.
 
-The three things every panel needs:
+The four things every panel needs:
+  0. ``GUIDE``         — the panel's quick guide (``PanelGuide``): one line on
+                          what it's for, what it links to, its key gestures,
+                          what its columns mean. The F1 window builds the
+                          panel's page from it and the header's ``?`` opens
+                          that page. Required: a panel without one fails
+                          ``tests/test_panel_guides.py``. See PANELS.md.
   1. ``build()``       — construct widgets, add them to ``self.content_layout``.
   2. ``on_symbol(sym)`` — react when the linked symbol changes (optional —
                           skip it entirely if your panel isn't symbol-driven).
@@ -50,7 +56,8 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
-from aurantium.panel import Panel, register_panel
+from aurantium.guide import PanelGuide
+from aurantium.panel import NULL_GLYPH, Panel, register_panel
 from aurantium.theme import ACCENT, DOWN, FG_DIM, UP
 
 # Commodities shown in the mini-table below (World Bank Commodities topics).
@@ -60,15 +67,29 @@ COMMODITY_CODES = ["GOLD", "WTI", "COPPER"]
 def _fmt(value: Any, decimals: int = 2) -> str:
     """Small defensive formatter — every field from a topic can be None."""
     if value is None:
-        return "-"
+        return NULL_GLYPH  # the app's one "no value" mark: an em dash, never "-"
     try:
         return f"{float(value):,.{decimals}f}"
     except (TypeError, ValueError):
-        return "-"
+        return NULL_GLYPH
 
 
 @register_panel(id="example_macro", title="Example: Macro Snapshot", category="Examples")
 class ExampleMacroPanel(Panel):
+    # The quick guide, declared next to the code it describes. Keep it short:
+    # it is a quick guide, not a manual. Plain text; **bold** names a control.
+    GUIDE = PanelGuide(
+        purpose="A worked example: CFTC positioning and a commodities mini-table.",
+        links="Doesn't follow the link group — it watches fixed topics.",
+        interactions=(
+            "Copy this file to a name without the underscore to make your own panel.",
+        ),
+        fields=(
+            ("Bias", "bullish when speculators are net long, bearish when net short"),
+            ("Chg%", "Change since the previous reading"),
+        ),
+    )
+
     def build(self) -> None:
         # --- 1) CFTC positioning: two independent, non-symbol topics ------
         # These aren't tied to the linked symbol at all — we just subscribe

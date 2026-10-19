@@ -1,6 +1,8 @@
 """Panels opened from the menu arrive as their own window, so opening one
-never reshuffles a tuned layout. Dragged into the layout, a panel snaps in and
-is docked for good: docked panels move and snap but never tear off again.
+never reshuffles a tuned layout. Dragged into the layout, a panel snaps in.
+Dragged out past every aurantium window, it becomes a window of its own (a
+second monitor's docking area); a drag released inside a window but off any
+drop target goes back where it came from.
 """
 
 import pytest
@@ -54,23 +56,100 @@ def test_slash_add_opens_floating(win):
     assert _floating(win._docks[new_id])
 
 
-def test_docking_it_ends_floating_for_good(win, qapp):
+def test_a_docked_panel_can_still_become_a_window(win, qapp):
+    """Multi-screen: a docked panel can be dragged out onto another monitor."""
     import PySide6QtAds as QtAds
 
     dock = win.add_panel("company", floating=True)
-    assert _floatable(dock)
-    # what a drop onto the layout does: move it into a dock area
     win.dock_manager.addDockWidget(QtAds.DockWidgetArea.RightDockWidgetArea, dock)
     qapp.processEvents()
     assert not _floating(dock)
-    assert not _floatable(dock)
+    assert _floatable(dock)
 
 
 def test_programmatic_panels_still_dock(win):
     """Layouts and presets place panels exactly — no surprise windows."""
     dock = win.add_panel("chart")
     assert not _floating(dock)
-    assert not _floatable(dock)
+
+
+class _Cursor:
+    def __init__(self, point):
+        self._p = point
+
+    def pos(self):
+        return self._p
+
+
+def _tear_off(win, qapp, monkeypatch, dock, point):
+    """What a drag released at ``point`` does: QtAds floats the dock, then the
+    window decides whether that was a new window or a missed drop."""
+    import aurantium.app as app_mod
+
+    monkeypatch.setattr(app_mod, "QCursor", _Cursor(point))
+    win.dock_manager.addDockWidgetFloating(dock)
+    for _ in range(5):
+        qapp.processEvents()
+
+
+def test_a_drag_out_of_every_window_makes_a_new_window(win, qapp, monkeypatch):
+    from PySide6.QtCore import QPoint
+
+    win.show()
+    win.add_panel("chart")
+    dock = win.add_panel("company")
+    qapp.processEvents()
+    far = win.frameGeometry().bottomRight() + QPoint(4000, 4000)
+    _tear_off(win, qapp, monkeypatch, dock, far)
+    assert _floating(dock)
+
+
+def test_a_drag_released_inside_the_window_goes_back_home(win, qapp, monkeypatch):
+    win.show()
+    chart = win.add_panel("chart")
+    dock = win.add_panel("company")
+    qapp.processEvents()
+    home = dock.dockAreaWidget()
+    _tear_off(win, qapp, monkeypatch, dock, win.frameGeometry().center())
+    assert not _floating(dock), "a missed drop must not leave a stray window"
+    assert dock.dockAreaWidget() is home or dock.dockAreaWidget() is chart.dockAreaWidget()
+
+
+def test_panel_windows_get_the_app_shortcuts(win):
+    dock = win.add_panel("company", floating=True)
+    container = dock.dockContainer().floatingWidget()
+    keys = {a.shortcut().toString() for a in container.actions()}
+    assert "F5" in keys and "F11" in keys
+
+
+def test_maximize_stays_inside_its_own_window(win, qapp):
+    main = win.add_panel("chart")
+    win.add_panel("watchlist")
+    other = win.add_panel("company", floating=True)
+    qapp.processEvents()
+    win._set_maximized(main.objectName(), True)
+    assert not other.isClosed(), "a panel on another monitor stays put"
+    win._exit_maximize()
+
+
+def test_an_off_screen_window_is_pulled_back(win, qapp):
+    from PySide6.QtWidgets import QApplication
+
+    dock = win.add_panel("company", floating=True)
+    container = dock.dockContainer().floatingWidget()
+    container.move(-60000, -60000)
+    win._keep_on_screen(container)
+    assert QApplication.screenAt(container.frameGeometry().center()) is not None
+
+
+def test_link_groups_reach_panels_in_other_windows(win, qapp):
+    from aurantium.symbol_context import DEFAULT_GROUP, SymbolContext
+
+    dock = win.add_panel("company", floating=True)
+    panel = dock.widget()
+    SymbolContext.instance().set_symbol(panel.link_group or DEFAULT_GROUP, "MSFT")
+    qapp.processEvents()
+    assert panel.current_symbol == "MSFT"
 
 
 def test_a_floating_panel_survives_save_and_restore(win):

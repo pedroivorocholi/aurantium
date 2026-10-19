@@ -29,11 +29,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..guide import PanelGuide
 from ..components.fmt import integer as _fmt_int
 from ..components.fmt import num as _fmt_num
 from ..panel import NULL_GLYPH, Panel, register_panel
 from ..press import PRESS_RADIUS_PROPERTY
-from ..theme import ACCENT, BORDER_STRONG, FG_DIM, MONO_FONT, RADIUS_SM, tick_color
+from ..theme import ACCENT, BORDER_STRONG, FG_DIM, MONO_FONT, RADIUS_SM, tick_color, LABEL
 from ..components.responsive_row import ResponsiveRow
 
 
@@ -205,6 +206,17 @@ class RangeBar(QWidget):
 
 @register_panel(id="profile", title="Company Profile", category="Research", listed=False)
 class ProfilePanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="Who the company is: live price, key statistics, the 52-week range, its business and its officers.",
+        links="Follows the Company panel's symbol.",
+        interactions=(
+            "**Click a stat tile** — P/E, market cap, beta, EPS, dividend yield — to "
+            "jump to the tab that explains it.",
+            "The 52-week bar marks where today's price sits between the year's low and high.",
+            "**Show more** expands the description; the website link opens in your browser.",
+        ),
+    )
+
     def build(self) -> None:
         self._info: dict = {}
         self._price: Optional[float] = None
@@ -384,7 +396,7 @@ class ProfilePanel(Panel):
         overflow = full > clamp + 2
         self.more_btn.setVisible(overflow)
         label = "Show less" if self._desc_open else "Show more"
-        self.more_btn.setText(f'<a href="#" style="color:{ACCENT}; text-decoration:none;">{label}</a>')
+        self.more_btn.setText(f'<a href="#" style="color:{LABEL}; text-decoration:none;">{label}</a>')
         self.desc_lbl.setMaximumHeight(16777215 if (self._desc_open or not overflow) else clamp)
 
     def resizeEvent(self, event) -> None:  # noqa: N802 (Qt override)
@@ -468,7 +480,7 @@ class ProfilePanel(Panel):
             shown = site.split("//", 1)[1].rstrip("/")
             shown = shown[4:] if shown.startswith("www.") else shown
             self.web_lbl.setText(
-                f'<a href="{escape(site)}" style="color:{ACCENT}; text-decoration:none;">{escape(shown)} ↗</a>'
+                f'<a href="{escape(site)}" style="color:{LABEL}; text-decoration:none;">{escape(shown)} ↗</a>'
             )
         else:
             self.web_lbl.setText("")
@@ -491,10 +503,11 @@ class ProfilePanel(Panel):
             none.setObjectName("secondary")
             self.officers_grid.addWidget(none, 0, 0)
         for r, o in enumerate(officers):
-            name = QLabel(o.get("name") or NULL_GLYPH, self)
+            # the feed pads some names ("Kevan  Parekh"): print them as written
+            name = QLabel(" ".join(str(o.get("name") or "").split()) or NULL_GLYPH, self)
             name.setWordWrap(True)
             name.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-            title = QLabel(o.get("title") or "", self)
+            title = QLabel(" ".join(str(o.get("title") or "").split()), self)
             title.setObjectName("secondary")
             title.setWordWrap(True)
             # title under the name, not beside it: two columns of names and

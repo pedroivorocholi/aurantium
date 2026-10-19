@@ -14,6 +14,7 @@ use on top of an ``ACCENT`` fill (black on amber in dark, white on amber in
 light), so accent chips/selections stay readable in both themes.
 """
 
+import os
 import sys
 
 from PySide6.QtCore import QSettings
@@ -143,36 +144,59 @@ _DARK = {
     # land on. It does NOT work on an amber fill (1.62:1) — checked controls
     # take ON_ACCENT for their ring instead.
     "FOCUS": "#e8eef4",
+    "SPLITTER": "#141820",     # the gutter between panels (BORDER: dark needs no more)
+    "LABEL": "#ffab2e",        # data text: tickers, times, headline figures (amber, as ACCENT)
 }
 
 _LIGHT = {
-    "ACCENT": "#b45309",       # burnt amber — readable as text on white and as a fill
-    "ACCENT_DEEP": "#92400e",  # deeper amber
-    "ON_ACCENT": "#ffffff",    # text on an amber fill — white on the light theme
-    "BG": "#ffffff",           # white — all data surfaces
-    "BG_ALT": "#f4f5f7",       # light zebra stripe
-    "BG_ELEV": "#eceef1",      # raised controls (buttons)
-    "CHROME": "#e8eaed",       # light chrome — title bars / top / bottom
-    "CHROME_HOVER": "#dcdfe3", # hover / active tab
-    "BG_HEADER": "#dbe1ea",    # section rows inside panels
-    "CHROME_BORDER": "#c9ced4",# outline between chrome and surface
-    "CHROME_LOW": "#eef0f3",   # the panel header plane: chrome, one step down
-    "CHROME_EDGE": "#ffffff",  # the lit top edge of a raised chrome surface
-    "CHROME_TEXT": "#1b2028",  # dark text on light chrome
-    "CHROME_TEXT_DIM": "#4c545e",  # darker so small chrome text stays readable
-    "HEADER_BLUE": "#d4dde9",  # table column-header band (light) — a clear blue-gray band
-    "SELECT_BLUE": "#cfe0f5",  # selected row (light blue)
-    "BORDER": "#dfe3e8",       # hairline dividers
-    "BORDER_STRONG": "#c3c9d0",
-    "FG": "#1a1f26",           # primary text (near-black)
-    "FG_DIM": "#5b636d",       # secondary text, axis labels
-    "FG_MUTED": "#8a929b",     # eyebrows, disabled
-    "UP": "#0a8f3c",           # gains — green (darker for a white bg)
-    "DOWN": "#d32f2f",         # losses — red
-    "FOCUS": "#1a1f26",        # keyboard-focus ring — 12:1 or better on every surface
+    # Designed as a light UI, not derived from the dark one. Two earlier
+    # versions mirrored dark, and on screen that read as the OS "invert
+    # colours" switch: the dark theme's steel-blue chrome turned into a
+    # blue-grey wash over everything, and title bars sat *darker* than the
+    # content, a frame that only makes sense on black.
+    #
+    # So: neutral greys with no blue cast; chrome that is near-white, a step
+    # off the white content rather than a band around it; content separated
+    # by a grey gutter (SPLITTER) the way cards sit on a page; near-black
+    # text, because dark-on-light thin monospace needs more contrast than
+    # light-on-dark to look as solid; and colour kept for what it encodes —
+    # amber for the active control, blue for tickers (links: a click
+    # re-centres every linked panel), green/red for direction.
+    "ACCENT": "#b55400",       # amber — active tab, checked chip, the price line (4.6:1)
+    "ACCENT_DEEP": "#8f4200",  # pressed / checked amber
+    "ON_ACCENT": "#ffffff",    # text on an amber fill
+    "BG": "#ffffff",           # content
+    "BG_ALT": "#f7f7f8",       # zebra stripe, neutral
+    "BG_ELEV": "#ffffff",      # buttons: white, edged by BORDER_STRONG
+    "CHROME": "#f1f2f4",       # menu bar, tab strips — a step off white
+    "CHROME_HOVER": "#e4e6e9", # hover / pressed chrome
+    "BG_HEADER": "#f1f2f4",    # section and total rows inside a panel
+    "CHROME_BORDER": "#d3d6da",# the line under chrome
+    "CHROME_LOW": "#f8f9fa",   # the panel header plane
+    "CHROME_EDGE": "#fcfcfd",  # the lit top edge of chrome (never BG: data stays flat)
+    "CHROME_TEXT": "#15171a",  # text on chrome
+    "CHROME_TEXT_DIM": "#555a61",
+    "HEADER_BLUE": "#f1f2f4",  # table column-header band — neutral, not blue
+    "SELECT_BLUE": "#dce8fc",  # selected row
+    "BORDER": "#e7e8ea",       # hairlines inside a surface
+    "BORDER_STRONG": "#c8cbd0",# control edges
+    "FG": "#15171a",           # primary text, near-black (17:1)
+    "FG_DIM": "#555a61",       # secondary text, axis labels (7:1)
+    "FG_MUTED": "#767b82",     # eyebrows, disabled (4.5:1)
+    "UP": "#087f36",           # gains (5.1:1 under white heatmap figures)
+    "DOWN": "#d12f2f",         # losses
+    "FOCUS": "#15171a",        # keyboard-focus ring
+    "SPLITTER": "#d3d6da",     # the gutter between panels
+    "LABEL": "#0b57d0",        # tickers, times, headline figures, links
 }
 
+
 _PALETTES = {"dark": _DARK, "light": _LIGHT}
+
+#: Gutter between docked panels, in px. Dark separates panels by the chrome
+#: around each one, so a hairline is enough; on white the gutter *is* the
+#: separation, and 2px of grey between two white panels read as one sheet.
+_SPLITTER_PX = {"dark": 2, "light": 4}
 
 # -- press scrim strength ---------------------------------------------------
 #
@@ -225,7 +249,13 @@ def _settings() -> QSettings:
 
 def _read_theme_name() -> str:
     """The saved theme name, defaulting to dark. Safe to call before a
-    QApplication exists — the scope is named, so it does not depend on one."""
+    QApplication exists — the scope is named, so it does not depend on one.
+
+    ``AURANTIUM_THEME`` in the environment wins, so the screenshot harness
+    and tests can render either theme without touching the user's choice."""
+    forced = os.environ.get("AURANTIUM_THEME", "")
+    if forced in _PALETTES:
+        return forced
     try:
         name = _settings().value(THEME_SETTINGS_KEY, DEFAULT_THEME, type=str)
     except Exception:
@@ -426,10 +456,22 @@ QToolTip {{
    couldn't tint. */
 QWidget#panelHeader > QLabel {{ background: transparent; }}
 QLabel#panelSymbol {{
-    background: transparent; color: {p['ACCENT']};
+    background: transparent; color: {p['LABEL']};
     font-family: "{MONO_FONT}"; font-size: {FONT_MD}px; font-weight: {WEIGHT_BOLD};
     letter-spacing: 0.5px;
 }}
+/* The panel's "?" — opens its quick guide. Quiet until the pointer finds it:
+   it sits beside the link badge on every panel, and a second outlined chip
+   there would double the header's chrome for a control used once in a while. */
+QToolButton#guideButton {{
+    background: transparent; color: {p['FG_MUTED']};
+    font-family: "{MONO_FONT}"; font-size: {FONT_SM}px; font-weight: {WEIGHT_BOLD};
+    border: 1px solid transparent; border-radius: {RADIUS_SM}px; padding: 0px 5px;
+}}
+QToolButton#guideButton:hover, QToolButton#guideButton:pressed {{
+    color: {p['CHROME_TEXT']}; border-color: {p['BORDER_STRONG']};
+}}
+QToolButton#guideButton[kbFocus="true"] {{ border-color: {p['FOCUS']}; }}
 /* -- semantic label roles -------------------------------------------------
    Two idioms were hand-written at ~30 call sites: ``color: FG_DIM`` for a
    secondary label, and ``color: ACCENT; font-weight: bold`` for a stat value.
@@ -441,11 +483,29 @@ QLabel#panelSymbol {{
    than restating a colour. */
 QLabel#secondary {{ background: transparent; color: {p['FG_DIM']}; }}
 QLabel#statValue {{
-    background: transparent; color: {p['ACCENT']};
+    background: transparent; color: {p['LABEL']};
     font-weight: {WEIGHT_BOLD};
 }}
+/* A figure in running layout (not a table cell): tabular monospaced digits.
+   A role, because ``setFont(QFont(MONO_FONT))`` on a label does nothing here —
+   the blanket QWidget rule above sets font-family and outranks setFont, so
+   such figures quietly rendered in the proportional UI face. */
+QLabel#figure {{ background: transparent; font-family: "{MONO_FONT}"; }}
+/* The chart's headline: ticker, last price and change, one step above body. */
+QLabel#chartTicker {{
+    background: transparent; color: {p['LABEL']};
+    font-size: {FONT_LG}px; font-weight: {WEIGHT_BOLD};
+}}
+QLabel#chartPrice {{
+    background: transparent; color: {p['FG']};
+    font-family: "{MONO_FONT}"; font-size: {FONT_LG}px;
+}}
+QLabel#chartChange {{
+    background: transparent;
+    font-family: "{MONO_FONT}"; font-size: {FONT_LG}px; font-weight: {WEIGHT_BOLD};
+}}
 QLabel#statValueLarge {{
-    background: transparent; color: {p['ACCENT']};
+    background: transparent; color: {p['LABEL']};
     font-size: {FONT_TITLE}px; font-weight: {WEIGHT_BOLD};
 }}
 
@@ -467,7 +527,7 @@ QLabel#tileLabel {{
 QLabel#tileValue {{
     color: {p['FG']}; font-family: "{MONO_FONT}"; font-size: {FONT_LG}px; font-weight: {WEIGHT_BOLD};
 }}
-QFrame#statTile[clickable="true"] QLabel#tileValue {{ color: {p['ACCENT']}; }}
+QFrame#statTile[clickable="true"] QLabel#tileValue {{ color: {p['LABEL']}; }}
 /* The "⋯" overflow menu on a panel's control line: a chip-height square,
    no menu arrow — the glyph already says "more". */
 QToolButton#moreButton {{
@@ -516,7 +576,7 @@ QMenuBar::item:disabled {{ color: {p['FG_MUTED']}; }}
 /* The blanket QWidget rule above paints every plain widget BG (true black),
    which is visibly darker than CHROME — override it so the logo's transparent
    PNG shows the same chrome grey as the rest of the row, not a black box. */
-QLabel#menuBarLogo {{ background: transparent; padding: 0px 0px 0px 14px; }}
+QLabel#menuBarLogo {{ background: transparent; padding: {SPACE_SM}px 0px 0px {SPACE_LG}px; }}
 
 /* -- depth: chrome above, data below --------------------------------------
    The app was flat. The menu row, the command bar, every panel header strip
@@ -547,8 +607,11 @@ QLabel#commandLabel {{
 }}
 QLineEdit#commandInput {{
     background: {p['BG']}; border: 1px solid {p['BORDER_STRONG']}; border-radius: {RADIUS_SM}px;
-    padding: 4px 10px; color: {p['ACCENT']}; font-family: "{MONO_FONT}"; font-size: {FONT_LG}px;
+    padding: 4px 10px; color: {p['LABEL']}; font-family: "{MONO_FONT}"; font-size: {FONT_LG}px;
     selection-background-color: {p['ACCENT']}; selection-color: {p['ON_ACCENT']};
+    /* without this Qt fades the placeholder from `color` — LABEL at half
+       alpha, a pale wash that on white is the "inverted colours" look */
+    placeholder-text-color: {p['FG_MUTED']};
 }}
 QLineEdit#commandInput:focus {{ border-color: {p['ACCENT']}; }}
 
@@ -595,11 +658,51 @@ QTableView::item:selected:!active, QListWidget::item:selected:!active {{
     background: {p['SELECT_BLUE']}; color: {p['CHROME_TEXT']};
 }}
 QListWidget::item {{ padding: 2px 4px; }}
+/* A list of choices (names, not figures) reads in the UI face. */
+QListWidget#choiceList {{ font-family: "{UI_FONT}"; font-size: {FONT_MD}px; }}
+QListWidget#choiceList::item {{ padding: {SPACE_SM}px {SPACE_LG}px; }}
 QListWidget::item:hover {{ background: {p['CHROME_LOW']}; }}
 QListWidget::item:selected {{ background: {p['SELECT_BLUE']}; color: {p['CHROME_TEXT']}; }}
 
+/* -- F1 guide: section list beside the page -------------------------------
+   Chrome-toned rail so the list reads as navigation, not as a data table; the
+   current page takes the accent edge the dock tabs use for "this one". */
+QTreeWidget#guideNav {{
+    background: {p['CHROME_LOW']}; border: 1px solid transparent;
+    border-right-color: {p['BORDER_STRONG']}; padding: {SPACE_SM}px 0;
+    font-size: {FONT_MD}px;
+}}
+QTreeWidget#guideNav[kbFocus="true"] {{ border-color: {p['FOCUS']}; }}
+QTreeWidget#guideNav::item {{
+    padding: 3px {SPACE_LG}px; color: {p['CHROME_TEXT_DIM']};
+    border: 0; border-left: 2px solid transparent;
+}}
+QTreeWidget#guideNav::item:hover {{ background: {p['CHROME_HOVER']}; color: {p['CHROME_TEXT']}; }}
+QTreeWidget#guideNav::item:selected, QTreeWidget#guideNav::item:selected:!active {{
+    background: {p['CHROME_HOVER']}; color: {p['CHROME_TEXT']};
+    border-left: 2px solid {p['ACCENT']};
+}}
+QTreeWidget#guideNav::item:disabled {{ color: {p['FG_MUTED']}; padding-top: {SPACE_LG}px; }}
+QTreeWidget#guideNav::branch {{ background: transparent; image: none; }}
+/* Tree-item check boxes (Key Metrics ▸ Custom picker). Unstyled, the native
+   indicator drew dark-on-black and the picker's "tick the metrics" had
+   nothing visible to tick. Same box as QCheckBox::indicator. */
+QTreeView::indicator {{
+    width: 12px; height: 12px; background: {p['BG_ELEV']};
+    border: 1px solid {p['BORDER_STRONG']}; border-radius: {RADIUS_XS}px;
+}}
+QTreeView::indicator:hover {{ border-color: {p['ACCENT']}; }}
+QTreeView::indicator:checked {{ background: {p['ACCENT']}; border-color: {p['ACCENT']}; }}
+QTreeView::indicator:indeterminate {{ background: {p['ACCENT_DEEP']}; border-color: {p['ACCENT_DEEP']}; }}
+QTextBrowser#guidePage {{ padding: {SPACE_SM}px {SPACE_XL}px; }}
+
 /* -- inner tab widgets (e.g. Portfolio) — amber underline like the docks -- */
 QTabWidget::pane {{ border: 0; border-top: 1px solid {p['BORDER']}; }}
+/* The weight goes on the bar as well as on ::tab. QTabBar measures each tab
+   with the *bar's* font and paints it with the sub-control's, so a semibold
+   label measured at regular weight came out a few pixels too wide for its own
+   tab and elided ("Positio…", "Allocati…") in a panel with room to spare. */
+QTabBar {{ font-weight: {WEIGHT_MEDIUM}; }}
 QTabBar::tab {{
     background: transparent; color: {p['CHROME_TEXT_DIM']};
     padding: 5px 12px; border: 0; border-bottom: 2px solid transparent;
@@ -617,16 +720,20 @@ QTabBar::tab:disabled {{ color: {p['FG_MUTED']}; }}
 QTabBar::tab[kbFocus="true"] {{ color: {p['FOCUS']}; border-bottom-color: {p['FOCUS']}; }}
 
 /* -- inputs -------------------------------------------------------------- */
-QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {{
+/* QDateEdit is listed with the rest: it was the one input left out, so the
+   Day Brief's date box and Portfolio's buy date rendered borderless on the
+   surface, a different control from the fields beside them. */
+QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QDateEdit {{
     background: {p['BG']}; border: 1px solid {p['BORDER_STRONG']}; border-radius: {RADIUS_SM}px;
     padding: 4px 8px; color: {p['FG']};
     selection-background-color: {p['ACCENT']}; selection-color: {p['ON_ACCENT']};
 }}
-QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {{
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QDateEdit:focus {{
     border-color: {p['ACCENT']};
 }}
-QLineEdit:hover, QComboBox:hover {{ border-color: {p['CHROME_HOVER']}; }}
-QLineEdit:disabled, QComboBox:disabled {{ color: {p['FG_MUTED']}; }}
+QLineEdit:hover, QComboBox:hover, QDateEdit:hover {{ border-color: {p['CHROME_HOVER']}; }}
+QLineEdit:disabled, QComboBox:disabled, QDateEdit:disabled {{ color: {p['FG_MUTED']}; }}
+QDateEdit::drop-down {{ border: 0; width: 18px; }}
 QComboBox:pressed {{ border-color: {p['ACCENT']}; background: {p['CHROME_LOW']}; }}
 QComboBox::drop-down {{ border: 0; width: 18px; }}
 /* Plain list popup. The default menu-style popup paints its own square
@@ -712,6 +819,20 @@ QPushButton#chartChip:checked:hover, QPushButton#chartChip:checked:pressed {{
     background: {p['CHROME_HOVER']}; color: {p['ACCENT']}; border-color: {p['ACCENT']};
 }}
 QPushButton#chartChip[kbFocus="true"] {{ border-color: {p['FOCUS']}; }}
+/* Indicator chips: the chart chips' exact metrics and a neutral edge, so the
+   three control rows read as one family. The series colour is carried by the
+   line swatch painted as the chip's icon (chart._chip_swatch), like a legend
+   entry, not by a coloured frame. Off = muted label and swatch. */
+QPushButton#indicatorChip {{
+    padding: 1px 7px 1px 6px; font-size: {FONT_SM}px; font-weight: {WEIGHT_MEDIUM};
+    min-height: 18px; max-height: 18px; border-radius: {RADIUS_SM}px;
+    background: {p['BG_ELEV']}; color: {p['FG_MUTED']}; border: 1px solid {p['BORDER_STRONG']};
+}}
+QPushButton#indicatorChip:checked {{ color: {p['CHROME_TEXT']}; }}
+QPushButton#indicatorChip:hover, QPushButton#indicatorChip:pressed {{
+    background: {p['CHROME_HOVER']}; color: {p['CHROME_TEXT']}; border-color: {p['BORDER_STRONG']};
+}}
+QPushButton#indicatorChip[kbFocus="true"] {{ border-color: {p['FOCUS']}; }}
 
 QToolButton {{
     background: transparent; border: 1px solid transparent; border-radius: {RADIUS_SM}px;
@@ -856,7 +977,7 @@ QStatusBar::item {{ border: 0; }}
 
 def _build_ads_stylesheet(p: dict) -> str:
     return f"""
-ads--CDockContainerWidget {{ background: {p['BORDER']}; }}
+ads--CDockContainerWidget {{ background: {p['SPLITTER']}; }}
 ads--CDockAreaWidget {{ background: {p['BG']}; border: 0; }}
 /* Raised, the same way the command bar is: lit top edge, dark bottom edge.
    A dock title bar sits directly on the data surface of the panel below it, so
@@ -926,9 +1047,9 @@ ads--CDockAreaTitleBar[focused="true"] {{
 ads--CDockWidgetTab[focused="true"] QLabel {{ color: {p['CHROME_TEXT']}; }}
 
 /* splitters: thin hairline dividers, subtle until hovered (then amber) */
-ads--CDockSplitter::handle {{ background: {p['BORDER']}; }}
-ads--CDockSplitter::handle:horizontal {{ width: 2px; }}
-ads--CDockSplitter::handle:vertical {{ height: 2px; }}
+ads--CDockSplitter::handle {{ background: {p['SPLITTER']}; }}
+ads--CDockSplitter::handle:horizontal {{ width: {_SPLITTER_PX[_active_name]}px; }}
+ads--CDockSplitter::handle:vertical {{ height: {_SPLITTER_PX[_active_name]}px; }}
 ads--CDockSplitter::handle:hover {{ background: {p['ACCENT']}; }}
 /* Held, not pushed — a splitter is dragged, like a scrollbar handle. */
 ads--CDockSplitter::handle:pressed {{ background: {p['ACCENT_DEEP']}; }}
@@ -940,6 +1061,77 @@ STYLESHEET = _build_stylesheet(_ACTIVE)
 # app-global sheet; the docking chrome is applied to the dock manager directly
 # (see app.py) via this dedicated sheet.
 ADS_STYLESHEET = _build_ads_stylesheet(_ACTIVE)
+
+
+# -- arrow images ------------------------------------------------------------
+#
+# The sheet restyles QComboBox::drop-down and the spin-box steppers, and a
+# restyled sub-control loses its native arrow. Every combo in the app rendered
+# as a plain text box with nothing to say it opens, and every spin box showed a
+# blank grey block where its stepper arrows belonged. QSS cannot draw a glyph
+# (no ``content:``, and border-triangles render as boxes in Qt), so the arrows
+# are painted here — palette colours, 1x/2x/3x for scaled displays — written to
+# a per-palette folder, and the sheet points the arrow sub-controls at them.
+
+#: (name, logical width, logical height, points as fractions of the box)
+_ARROWS = (
+    ("chevron-down", 10, 6, ((0.1, 0.2), (0.5, 0.8), (0.9, 0.2))),
+    ("chevron-up", 8, 5, ((0.1, 0.8), (0.5, 0.2), (0.9, 0.8))),
+    ("chevron-down-small", 8, 5, ((0.1, 0.2), (0.5, 0.8), (0.9, 0.2))),
+)
+
+
+def _arrow_sheet(p: dict) -> str:
+    """Paint the arrow images for palette ``p`` and return the QSS that uses
+    them. Best-effort: on any failure the arrows are simply absent, as before."""
+    import hashlib
+    import tempfile
+    from pathlib import Path
+
+    from PySide6.QtCore import QPointF, Qt
+    from PySide6.QtGui import QImage, QPainter, QPen
+
+    tones = {"": p["CHROME_TEXT_DIM"], "-off": p["FG_MUTED"]}
+    key = hashlib.sha1(repr(sorted(tones.items())).encode()).hexdigest()[:10]
+    folder = Path(tempfile.gettempdir()) / "aurantium-theme" / key
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        for name, w, h, pts in _ARROWS:
+            for suffix, color in tones.items():
+                for scale in (1, 2, 3):
+                    path = folder / (f"{name}{suffix}" + (f"@{scale}x" if scale > 1 else "") + ".png")
+                    if path.is_file():
+                        continue
+                    img = QImage(w * scale, h * scale, QImage.Format.Format_ARGB32_Premultiplied)
+                    img.fill(Qt.GlobalColor.transparent)
+                    painter = QPainter(img)
+                    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+                    pen = QPen(QColor(color), 1.6 * scale)
+                    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+                    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+                    painter.setPen(pen)
+                    painter.drawPolyline([QPointF(x * w * scale, y * h * scale) for x, y in pts])
+                    painter.end()
+                    img.save(str(path))
+    except Exception:
+        return ""
+    url = folder.as_posix()
+    return f"""
+QComboBox::down-arrow {{ image: url({url}/chevron-down.png); width: 10px; height: 6px; }}
+QComboBox::down-arrow:disabled {{ image: url({url}/chevron-down-off.png); }}
+QDateEdit::down-arrow {{ image: url({url}/chevron-down.png); width: 10px; height: 6px; }}
+QDateEdit::down-arrow:disabled {{ image: url({url}/chevron-down-off.png); }}
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
+    image: url({url}/chevron-up.png); width: 8px; height: 5px;
+}}
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
+    image: url({url}/chevron-down-small.png); width: 8px; height: 5px;
+}}
+QSpinBox::up-arrow:disabled, QDoubleSpinBox::up-arrow:disabled {{ image: url({url}/chevron-up-off.png); }}
+QSpinBox::down-arrow:disabled, QDoubleSpinBox::down-arrow:disabled {{
+    image: url({url}/chevron-down-small-off.png);
+}}
+"""
 
 
 def apply_theme(app: QApplication) -> None:
@@ -965,9 +1157,9 @@ def apply_theme(app: QApplication) -> None:
     pal.setColor(QPalette.ColorRole.Highlight, QColor(p["SELECT_BLUE"]))
     pal.setColor(QPalette.ColorRole.HighlightedText, QColor(p["CHROME_TEXT"]))
     pal.setColor(QPalette.ColorRole.PlaceholderText, QColor(p["FG_MUTED"]))
-    pal.setColor(QPalette.ColorRole.Link, QColor(p["ACCENT"]))
+    pal.setColor(QPalette.ColorRole.Link, QColor(p["LABEL"]))
     app.setPalette(pal)
-    app.setStyleSheet(STYLESHEET)
+    app.setStyleSheet(STYLESHEET + _arrow_sheet(p))
 
 
 # -- up/down tick helpers ---------------------------------------------------

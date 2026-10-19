@@ -17,7 +17,9 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from ..guide import LIST_EDITOR, PanelGuide
 from ..components.fmt import num as _fmt_num
+from ..components.fmt import signed, signed_pct
 from ..components import (
     INDEX_ENTRIES,
     EditorColumn,
@@ -29,7 +31,7 @@ from ..components import (
 )
 from ..panel import NULL_GLYPH, Panel, register_panel
 from ..undo import UndoStack
-from ..theme import ACCENT, BG_HEADER, FG_DIM, apply_tick
+from ..theme import BG_HEADER, FG_DIM, apply_tick, LABEL
 from ..components.responsive_row import ResponsiveRow
 
 DEFAULT_AMERICAS = [
@@ -63,6 +65,20 @@ ROW_KIND_DATA = "data"
 
 @register_panel(id="world_indices", title="World Indices", category="Markets")
 class WorldIndicesPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="The world's major equity indices, grouped by region.",
+        links="Click an index to send it to every panel in this link group.",
+        interactions=(
+            "The filter box narrows the rows by name.",
+            "Right-click a row to remove it, add an index to a region, or **Edit panel…**.",
+        ),
+        fields=(
+            ("Last", "Latest index level"),
+            ("Chg / Chg%", "Change since the previous close"),
+        ),
+        sections=(LIST_EDITOR,),
+    )
+
     def build(self) -> None:
         self._americas: list = [list(row) for row in DEFAULT_AMERICAS]
         self._europe: list = [list(row) for row in DEFAULT_EUROPE]
@@ -138,7 +154,7 @@ class WorldIndicesPanel(Panel):
         self.table.insertRow(row)
         item = QTableWidgetItem(text)
         item.setFlags(Qt.ItemFlag.ItemIsEnabled)  # not selectable
-        item.setForeground(QColor(ACCENT))
+        item.setForeground(QColor(LABEL))
         font = item.font()
         font.setBold(True)
         item.setFont(font)
@@ -178,8 +194,8 @@ class WorldIndicesPanel(Panel):
             return
 
         last_item.setText(_fmt_num(price))
-        chg_item.setText(_fmt_num(change))
-        pct_item.setText(f"{_fmt_num(change_pct)}%" if change_pct is not None else NULL_GLYPH)
+        chg_item.setText(signed(change))
+        pct_item.setText(signed_pct(change_pct))
 
         if change is not None:
             apply_tick(chg_item, change, glyph=False)

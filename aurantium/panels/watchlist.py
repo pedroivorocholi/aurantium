@@ -21,7 +21,9 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from ..guide import PanelGuide
 from ..components.fmt import num as _fmt_num
+from ..components.fmt import signed, signed_pct
 from ..components import (
     MarketTable,
     NumericTableWidgetItem,
@@ -30,7 +32,7 @@ from ..components import (
 )
 from ..panel import NULL_GLYPH, Panel, register_panel
 from ..undo import UndoStack
-from ..theme import ACCENT, apply_tick
+from ..theme import apply_tick, LABEL
 from ..components.responsive_row import ResponsiveRow
 
 DEFAULT_SYMBOLS = [
@@ -57,6 +59,27 @@ def _fmt_volume(value: Any) -> str:
 
 @register_panel(id="watchlist", title="Watchlist", category="Markets")
 class WatchlistPanel(Panel):
+    GUIDE = PanelGuide(
+        purpose="Live quotes for your own list of symbols — the panel that drives the rest.",
+        links="Click a row to send its symbol to every panel in this link group. "
+        "The Watchlist leads rather than follows: it highlights the row that "
+        "matches the group's symbol but never changes its list.",
+        interactions=(
+            "Type a ticker or a name in **Add symbol or name…** and press Enter or **Add**.",
+            "Select a row and press **Remove**, Delete or Backspace to drop it; Ctrl+Z puts it back.",
+            "Click a column header to sort; the filter box narrows the list as you type.",
+            "A price that changes flashes green or red for a moment.",
+            "Right-click for **Export Table to CSV…** and the **Columns** menu.",
+        ),
+        fields=(
+            ("Last", "Latest price"),
+            ("Chg", "Change since the previous close"),
+            ("Chg%", "The same change in percent"),
+            ("Volume", "Shares or contracts traded today (K thousand, M million, B billion)"),
+        ),
+        shortcuts=(("Delete / Backspace", "Remove the selected symbol"),),
+    )
+
     def build(self) -> None:
         self._symbols: list[str] = list(DEFAULT_SYMBOLS)
         # symbol -> its column-0 item (find current row via table.row(item)) and
@@ -139,7 +162,7 @@ class WatchlistPanel(Panel):
         self.table.insertRow(row)
         sym_item = QTableWidgetItem(symbol)
         sym_item.setFlags(sym_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-        sym_item.setForeground(QColor(ACCENT))
+        sym_item.setForeground(QColor(LABEL))
         self.table.setItem(row, COL_SYMBOL, sym_item)
         cells: dict = {}
         for key, col in (
@@ -180,8 +203,8 @@ class WatchlistPanel(Panel):
         # bulk_update coalesces the four edits into a single re-sort per tick.
         with self.table.bulk_update():
             cells["last"].setText(_fmt_num(price))
-            cells["chg"].setText(_fmt_num(change))
-            cells["pct"].setText(f"{_fmt_num(change_pct)}%" if change_pct is not None else NULL_GLYPH)
+            cells["chg"].setText(signed(change))
+            cells["pct"].setText(signed_pct(change_pct))
             cells["vol"].setText(_fmt_volume(volume))
             if change is not None:
                 apply_tick(cells["chg"], change, glyph=False)

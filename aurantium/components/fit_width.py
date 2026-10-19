@@ -108,6 +108,52 @@ class ColumnFitter(QObject):
     def _natural(self, header: QHeaderView, col: int) -> int:
         return max(self._view.sizeHintForColumn(col), header.sectionSizeHint(col), 1)
 
+    #: rows inspected per column to learn its data alignment
+    _ALIGN_SCAN_ROWS = 12
+
+    def align_headers(self) -> None:
+        """Align each column's header label the way its cells are aligned.
+
+        Qt centres header labels whatever the data does, so a right-aligned
+        number sat under a centred "Chg%" and a left-aligned name column on a
+        wide panel had its "Symbol" floating hundreds of pixels from the first
+        letter of any symbol. Reading the alignment off the column's own cells
+        keeps every table right without each panel declaring it twice.
+        Group-header rows (spans) are skipped.
+        """
+        view = self._view
+        item_at = getattr(view, "item", None)
+        header_item = getattr(view, "horizontalHeaderItem", None)
+        if item_at is None or header_item is None:
+            return
+        left = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        right = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        centre = Qt.AlignmentFlag.AlignCenter
+        rows = min(view.rowCount(), self._ALIGN_SCAN_ROWS)
+        for c in range(view.columnCount()):
+            hdr = header_item(c)
+            if hdr is None:
+                continue
+            want = None
+            for r in range(rows):
+                if view.columnSpan(r, 0) > 1:
+                    continue
+                cell = item_at(r, c)
+                if cell is None or not cell.text():
+                    continue
+                align = Qt.AlignmentFlag(int(cell.textAlignment()))
+                if align & Qt.AlignmentFlag.AlignRight:
+                    want = right
+                elif align & Qt.AlignmentFlag.AlignHCenter:
+                    want = centre
+                else:
+                    want = left
+                break
+            if want is None:
+                continue  # no data yet: leave the label where it is
+            if Qt.AlignmentFlag(int(hdr.textAlignment())) != want:
+                hdr.setTextAlignment(want)
+
     def fit(self) -> None:
         if self._busy or not self._alive():
             return
@@ -116,6 +162,7 @@ class ColumnFitter(QObject):
             return
         self._busy = True
         try:
+            self.align_headers()
             cols = [c for c in range(header.count()) if not header.isSectionHidden(c)]
             avail = self._view.viewport().width()
             if not cols or avail <= 0:

@@ -190,15 +190,22 @@ def rendered(qapp):
     host.render(pix)
     img = pix.toImage()
 
+    from PySide6.QtGui import QColor
+
+    bg = QColor(theme.BG)
+    bg_lum = bg.red() * 0.2126 + bg.green() * 0.7152 + bg.blue() * 0.0722
+
     def ink(name):
+        """The pixel furthest in luminance from the surface: the brightest on
+        the dark theme, the darkest on the light one."""
         g = labels[name].geometry()
-        best, best_lum = None, -1.0
+        best, best_gap = None, -1.0
         for y in range(g.top(), g.bottom() + 1):
             for x in range(g.left(), g.right() + 1):
                 c = img.pixelColor(x, y)
                 lum = c.red() * 0.2126 + c.green() * 0.7152 + c.blue() * 0.0722
-                if lum > best_lum:
-                    best_lum, best = lum, c.name()
+                if abs(lum - bg_lum) > best_gap:
+                    best_gap, best = abs(lum - bg_lum), c.name()
         return best
 
     yield ink, labels
@@ -216,16 +223,17 @@ def test_secondary_resolves_to_the_dim_foreground(rendered):
     assert ink("secondary") == theme.FG_DIM.lower()
 
 
-def test_stat_value_resolves_to_the_accent(rendered):
-    """~9 call sites wrote ``color: ACCENT; font-weight: bold``."""
+def test_stat_value_resolves_to_the_label_ink(rendered):
+    """~9 call sites wrote ``color: ACCENT; font-weight: bold``. A stat value is
+    data text, so it wears LABEL: the amber itself on dark, link ink on light."""
     ink, labels = rendered
-    assert ink("statValue") == theme.ACCENT.lower()
+    assert ink("statValue") == theme.LABEL.lower()
     assert labels["statValue"].font().weight() == theme.WEIGHT_BOLD
 
 
 def test_the_large_stat_value_takes_the_title_step(rendered):
     ink, labels = rendered
-    assert ink("statValueLarge") == theme.ACCENT.lower()
+    assert ink("statValueLarge") == theme.LABEL.lower()
     assert labels["statValueLarge"].font().pixelSize() == theme.FONT_TITLE
 
 
