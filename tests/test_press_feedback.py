@@ -558,6 +558,7 @@ def test_a_cell_selecting_table_sinks_the_cell(qapp, filt):
     _press_at(qapp, vp, _row_centre(table, 1, 1))
     scrim = _settled_region(qapp, vp)
     assert scrim.geometry() == table.visualRect(table.model().index(1, 1))
+    _press_at(qapp, vp, _row_centre(table, 1, 1), QEvent.Type.MouseButtonRelease)
 
 
 def test_a_read_only_view_does_not_pretend_to_be_a_button(qapp, filt):

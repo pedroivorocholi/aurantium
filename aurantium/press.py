@@ -461,6 +461,12 @@ def press_level(widget) -> float:
             if scrim is None:
                 continue
             try:
+                # only a scrim that is still this host's child: when a widget
+                # is freed and a new one lands at its address, shiboken can
+                # hand back the old Python wrapper, attributes and all, and a
+                # dead scrim's stored level would read as a live press
+                if scrim.parentWidget() is not host:
+                    continue
                 level = max(level, scrim.get_press())
             except RuntimeError:
                 pass
