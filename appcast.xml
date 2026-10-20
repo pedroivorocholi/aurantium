@@ -20,6 +20,77 @@
     <language>en</language>
 
     <item>
+      <title>Aurantium 1.12.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.12.0</h3>
+        <ul>
+          <li>New title bar in the app&#x27;s own style, with Windows Snap Layouts</li>
+          <li>Fresh icon set across the whole app</li>
+          <li>Every button, tab and chip now answers a click with a quick press response</li>
+          <li>Tab indicators slide between tabs, range chips crossfade, menus fade in</li>
+          <li>Export a chart as a sharp 2x image (Save as PNG or Copy) with symbol, range and legend</li>
+          <li>Chart ranges: 5y shown at regular width, plus a custom &quot;last N minutes/hours/days&quot;</li>
+          <li>Link-group button shows a chain icon and fills smoothly on hover</li>
+          <li>Fixed log-scale charts drawing in the wrong place</li>
+          <li>Fixed charts with bars before 1970 crashing the readout on Windows</li>
+          <li>Fixed inactive dock tabs sitting on a white/black band</li>
+          <li>Removed the stray arrow under &quot;List all tabs&quot;</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 20 Oct 2026 15:40:40 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.12.0/aurantium-setup.exe"
+        sparkle:version="1.12.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75444818"
+        sparkle:edSignature="gtCTdalZ+KecoREEJ8FRB9C5b6PvnyRomPP+EG4wMxZ7HMuYuBRrtf+/lo2GrJoku9J0zXRe94RNLXF1mclVCg=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.12.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.12.0</h3>
+        <ul>
+          <li>New title bar in the app&#x27;s own style, with Windows Snap Layouts</li>
+          <li>Fresh icon set across the whole app</li>
+          <li>Every button, tab and chip now answers a click with a quick press response</li>
+          <li>Tab indicators slide between tabs, range chips crossfade, menus fade in</li>
+          <li>Export a chart as a sharp 2x image (Save as PNG or Copy) with symbol, range and legend</li>
+          <li>Chart ranges: 5y shown at regular width, plus a custom &quot;last N minutes/hours/days&quot;</li>
+          <li>Link-group button shows a chain icon and fills smoothly on hover</li>
+          <li>Fixed log-scale charts drawing in the wrong place</li>
+          <li>Fixed charts with bars before 1970 crashing the readout on Windows</li>
+          <li>Fixed inactive dock tabs sitting on a white/black band</li>
+          <li>Removed the stray arrow under &quot;List all tabs&quot;</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 20 Oct 2026 15:40:40 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.12.0/aurantium-mac.zip"
+        sparkle:version="1.12.0"
+        sparkle:os="macos"
+        length="292293073"
+        sparkle:edSignature="8k9RIRFehT/yCuiieX6MV2bHFaEnZJVNtO2JPleufMjCyS/WnKledrGJAYFvUduX2TrIIeylGD74f/j3JrDeCQ=="
+        type="application/zip" />
+    </item>
+    <item>
       <title>Aurantium 1.11.0</title>
       <description><![CDATA[
         <style>
