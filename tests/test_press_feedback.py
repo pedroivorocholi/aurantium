@@ -561,9 +561,13 @@ def test_a_cell_selecting_table_sinks_the_cell(qapp, filt):
     _press_at(qapp, vp, _row_centre(table, 1, 1), QEvent.Type.MouseButtonRelease)
 
 
-def test_a_read_only_view_does_not_pretend_to_be_a_button(qapp, filt):
+def test_a_read_only_view_does_not_pretend_to_be_a_button(qapp, filt, monkeypatch):
     from PySide6.QtWidgets import QAbstractItemView, QTableWidget, QTableWidgetItem
 
+    # reduced motion lands a press at full depth at once, so a wrongly sunk
+    # row cannot hide behind an animation that has barely started (it did:
+    # this passed on a desktop and failed on CI, where animations are off)
+    monkeypatch.setattr(motion, "animations_enabled", lambda: False)
     table = QTableWidget(2, 2)
     table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
     table.setItem(0, 0, QTableWidgetItem("x"))
@@ -572,6 +576,22 @@ def test_a_read_only_view_does_not_pretend_to_be_a_button(qapp, filt):
     qapp.processEvents()
     _press_at(qapp, table.viewport(), _row_centre(table, 0))
     assert press.press_level(table) == 0.0
+
+
+def test_a_check_box_row_sinks_even_without_selection(qapp, filt, monkeypatch):
+    from PySide6.QtWidgets import QAbstractItemView, QTableWidget, QTableWidgetItem
+
+    monkeypatch.setattr(motion, "animations_enabled", lambda: False)
+    table = QTableWidget(2, 2)
+    table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+    item = QTableWidgetItem("alert")
+    item.setCheckState(Qt.CheckState.Checked)  # a box the click toggles
+    table.setItem(0, 0, item)
+    table.resize(300, 200)
+    table.show()
+    qapp.processEvents()
+    _press_at(qapp, table.viewport(), _row_centre(table, 0))
+    assert press.press_level(table) == 1.0
 
 
 def test_a_sortable_header_section_sinks(qapp, filt):
