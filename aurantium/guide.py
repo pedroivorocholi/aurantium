@@ -105,11 +105,11 @@ class Shortcut:
 
 SHORTCUT_GROUPS: tuple[tuple[str, tuple[Shortcut, ...]], ...] = (
     ("Global", (
-        Shortcut("Ctrl+F", "Jump to the SYMBOL box with its text selected"),
+        Shortcut("Ctrl+F", "Jump to the search box with its text selected"),
         Shortcut("F5 / Ctrl+R", "Refresh every live feed"),
         Shortcut("Ctrl+Z", "Undo the last edit (drawing, list or position change)"),
         Shortcut("Ctrl+S", "Save the current layout under a name"),
-        Shortcut("Shift+F11 / Ctrl+Shift+F", "Toggle borderless full screen for the window you are in"),
+        Shortcut("Alt+P / Alt+S", "Open the Panels / Settings menu from the title bar"),
         Shortcut("F1 / Ctrl+Shift+H / Help", "Open this guide (Help is the key some keyboards carry)"),
         Shortcut("Shift+F1 / Ctrl+Shift+G", "Open the guide on the focused panel's page"),
         Shortcut("Ctrl+Q", "Quit aurantium"),
@@ -122,7 +122,7 @@ SHORTCUT_GROUPS: tuple[tuple[str, tuple[Shortcut, ...]], ...] = (
         Shortcut("Ctrl+1 / Ctrl+2 / Ctrl+3 / Ctrl+4", "Put the focused panel in link group A, B, C or D"),
         Shortcut("Middle-click a tab", "Close that panel", bound=False),
     )),
-    ("SYMBOL box", (
+    ("search box", (
         Shortcut("Enter", "Send the ticker, or run a /command", bound=False),
         Shortcut("Up / Down", "Recall earlier entries (kept across sessions)", bound=False),
         Shortcut("Tab / Shift+Tab", "Cycle through the suggestions", bound=False),
@@ -197,15 +197,16 @@ GETTING_STARTED = Page(
     group="",
     lead=(
         _p("aurantium is a terminal of <b>linked panels</b>. Type a ticker or a "
-           "name (<i>AAPL</i>, <i>nvidia</i>, <i>gold</i>) in the <b>SYMBOL</b> box "
+           "name (<i>AAPL</i>, <i>nvidia</i>, <i>gold</i>) in the <b>search</b> box in the title bar "
            "and press Enter: every panel in the same link group re-centers on it. "
            "Clicking a symbol in any panel does the same.")
-        + _p("Add panels from the <b>Panels</b> menu. A new panel opens as its own "
+        + _p("Add panels from the <b>Panels</b> menu (the layout icon at the left "
+             "of the title bar). A new panel opens as its own "
              "window; drag its tab into the workspace and it snaps into place. "
              "Drag a panel off the window, onto a second monitor say, and it "
              "becomes a window of its own.")
         + _p("<b>F11</b> maximizes the focused panel and <b>Esc</b> brings the rest "
-             "back. The SYMBOL box is also a command line: <code>/add</code>, "
+             "back. The search box is also a command line: <code>/add</code>, "
              "<code>/layout</code>, <code>/save</code>, <code>/refresh</code>, "
              "<code>/day</code>.")
         + _p("Every panel has a <b>?</b> in its header that opens its own page here. "
@@ -240,10 +241,9 @@ LINKING = Page(
             "window of its own that you can move to another monitor. Drop more "
             "panels into it and they dock and snap just as in the main window. "
             "A drag released inside a window but not on a drop target goes back "
-            "where it came from. Panels in every window share the link groups, "
-            "<b>Shift+F11</b> puts the window you are in into full screen, and "
+            "where it came from. Panels in every window share the link groups, and "
             "<b>F11</b> maximizes a panel within its own window. Each window's "
-            "position, monitor and full-screen state are saved with the layout; "
+            "position, monitor and maximized state are saved with the layout; "
             "a window whose monitor is gone reopens on this one.")),
         Detail("Panel sizes", _p(
             "Panels reorganize for the size you give them. Squeeze one narrow and "
@@ -272,7 +272,7 @@ LINKING = Page(
             "<code>AAPL 2026-03-14</code> — a symbol and a date in one entry",
         ])),
         Detail("Symbol search", _p(
-            "As you type, the SYMBOL box suggests instruments by <b>name</b> as "
+            "As you type, the search box suggests instruments by <b>name</b> as "
             "well as ticker — “10 year treasury”, “cattle” and “euro” all work — "
             "from a curated catalog plus a live lookup. The same suggestions "
             "appear in the symbol boxes of the Watchlist, Price Alerts, Portfolio "
@@ -284,7 +284,8 @@ SETTINGS = Page(
     id="settings",
     title="Settings",
     group="",
-    lead=_p("Everything except <b>Panels</b> lives under the <b>Settings</b> menu."),
+    lead=_p("Everything except <b>Panels</b> lives under the <b>Settings</b> menu, "
+            "the gear icon on the title bar."),
     details=[
         Detail("Theme", _p(
             "Dark (default) or light. aurantium restarts to apply it and restores "
@@ -297,10 +298,6 @@ SETTINGS = Page(
             "When on, the window's ✕ hides aurantium to the system tray instead of "
             "quitting, so price alerts keep firing. The tray icon's menu has "
             "Show, Hide, the same toggle, and Quit.")),
-        Detail("Full Screen", _p(
-            "Borderless full screen that covers the taskbar (<b>Shift+F11</b> / "
-            "<b>Ctrl+Shift+F</b>). aurantium opens this way; turning it off "
-            "leaves a maximized window.")),
         Detail("Workspaces and Layout", _p(
             "Starter desks, and your own saved arrangements — see "
             "<a href=\"guide:linking\">Linking &amp; Workspaces</a>.")),

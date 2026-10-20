@@ -172,12 +172,12 @@ def build_marks(
     day quietly attaches to the nearest bar rather than floating in a gap."""
     if not times or not closes:
         return []
-    from datetime import datetime
+    from ..date_context import bar_datetime
 
     by_date: dict[str, int] = {}
     for i, t in enumerate(times):
         try:
-            by_date.setdefault(datetime.fromtimestamp(t).date().isoformat(), i)
+            by_date.setdefault(bar_datetime(t).date().isoformat(), i)
         except (ValueError, OSError, OverflowError):
             continue
 
@@ -215,7 +215,7 @@ def build_marks(
         if idx >= len(times):
             continue
         try:
-            iso = datetime.fromtimestamp(times[idx]).date().isoformat()
+            iso = bar_datetime(times[idx]).date().isoformat()
         except (ValueError, OSError, OverflowError):
             continue
         kind = "move_up" if ret >= 0 else "move_down"
@@ -288,6 +288,8 @@ class EventsLane:
         )
         self._scatter.setZValue(10)
         self._scatter.sigClicked.connect(self._clicked)
+        # press feedback (press.py) sinks just the mark under the pointer
+        pane.__dict__["press_region"] = self._press_region
         self._scatter.sigHovered.connect(self._hovered)
         pane.addItem(self._scatter)
         pane.getViewBox().sigXRangeChanged.connect(self._reposition_label)
@@ -402,6 +404,19 @@ class EventsLane:
             return
         if data.get("date"):
             self._on_pick(str(data["date"]))
+
+    def _press_region(self, pos):
+        """The pressed mark's square in pane coordinates, for press.py."""
+        from PySide6.QtCore import QPoint, QRect
+
+        scene_pos = self.pane.mapToScene(pos)
+        pts = self._scatter.pointsAt(self._scatter.mapFromScene(scene_pos))
+        if pts is None or not len(pts):
+            return None
+        centre = self.pane.mapFromScene(self._scatter.mapToScene(pts[0].pos()))
+        half = HOVER_SIZE // 2 + 2
+        rect = QRect(centre - QPoint(half, half), centre + QPoint(half, half))
+        return rect, half
 
     def zoom_to(self, x0: float, x1: float) -> None:
         """Open a combined mark: zoom until its events stand apart. The lane is

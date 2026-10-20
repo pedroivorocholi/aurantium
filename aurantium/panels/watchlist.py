@@ -94,7 +94,7 @@ class WatchlistPanel(Panel):
         self.table.setHorizontalHeaderLabels(HEADERS)
         self.table.set_empty_text(
             "Watchlist is empty",
-            "Add a symbol below, or type one in the SYMBOL bar",
+            "Add a symbol below, or type one in the search box",
         )
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(COL_SYMBOL, QHeaderView.ResizeMode.ResizeToContents)

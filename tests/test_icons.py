@@ -75,10 +75,21 @@ def test_the_two_tone_icon_carries_a_hover_colour(qapp):
     assert normal != active
 
 
-def test_a_dot_carries_more_diameter_than_a_line_carries_thickness():
-    """Matching the two numbers would make the grip read as a sixth of the
-    family's weight — which is how the first attempt looked."""
-    assert icons.DOT > icons.STROKE
+def test_every_kind_is_vendored_from_reicon():
+    """The family is generated (tools/vendor_reicon.py); a kind without SVG
+    markup would paint nothing."""
+    from aurantium import reicon_icons
+
+    for kind in icons.KINDS:
+        assert reicon_icons.SVG[kind].lstrip().startswith("<"), kind
+
+
+def test_the_vendored_set_carries_its_licence():
+    """Reicon is MIT: the notice has to travel with the copies."""
+    from aurantium import reicon_icons
+
+    assert "MIT License" in reicon_icons.__doc__
+    assert "Copyright (c) 2025 REICON" in reicon_icons.__doc__
 
 
 # -- the family is closed ---------------------------------------------------
@@ -132,7 +143,8 @@ def test_the_colour_blind_direction_marks_are_left_alone():
 
 
 def test_the_panel_chrome_kinds_all_survived():
-    """The six glyphs that shipped on MainWindow before the family moved out."""
+    """The six glyphs that shipped on MainWindow before the family moved out
+    are still kinds (now drawn from Reicon)."""
     for kind in ("close", "expand", "maximize", "restore", "menu", "pin"):
         assert kind in icons.KINDS
 

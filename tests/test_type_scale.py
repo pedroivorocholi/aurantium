@@ -69,6 +69,7 @@ def test_the_stylesheet_only_uses_scale_sizes():
 
 def test_the_stylesheet_only_uses_scale_radii():
     allowed = {
+        theme.RADIUS_NONE,
         theme.RADIUS_XS,
         theme.RADIUS_SM,
         theme.RADIUS_MD,

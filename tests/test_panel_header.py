@@ -100,20 +100,94 @@ def test_the_flash_uses_the_link_groups_own_color(panel):
 def test_the_badge_is_outlined_not_filled(panel):
     """The link badge is the least important thing on screen; a solid amber
     chip made it the loudest, competing with the data for the accent color."""
-    sheet = panel._badge.styleSheet()
-    assert "background: transparent" in sheet
-    assert GROUP_COLORS[DEFAULT_GROUP] in sheet
+    from PySide6.QtGui import QColor
+
+    c = panel._badge.colors()
+    assert c["fill"].alpha() == 0
+    assert c["border"] == QColor(GROUP_COLORS[DEFAULT_GROUP])
+    assert c["content"] == QColor(GROUP_COLORS[DEFAULT_GROUP])
 
 
 def test_the_badge_has_no_hardcoded_colors_when_unlinked(panel):
     """The unlinked state used to hardcode dark-theme greys, which were wrong
     on the light theme."""
+    from PySide6.QtGui import QColor
+
     from aurantium.theme import BORDER_STRONG, FG_MUTED
 
     panel.set_link_group(UNLINKED)
-    sheet = panel._badge.styleSheet()
-    assert FG_MUTED in sheet
-    assert BORDER_STRONG in sheet
+    c = panel._badge.colors()
+    assert c["content"] == QColor(FG_MUTED)
+    assert c["border"] == QColor(BORDER_STRONG)
+
+
+def test_the_unlinked_badge_is_a_link_glyph_not_a_dash(panel):
+    panel.set_link_group(UNLINKED)
+    assert panel._badge.text() == ""
+    assert panel._badge._group == UNLINKED
+    linked_w = None
+    panel.set_link_group("B")
+    linked_w = panel._badge.sizeHint().width()
+    panel.set_link_group(UNLINKED)
+    assert panel._badge.sizeHint().width() < linked_w  # glyph only, no letter
+
+
+def test_hovered_the_glyph_turns_with_the_letter(panel):
+    """Hovered, the badge fills with the group colour; the glyph used to keep
+    that same colour and vanish into the fill while the letter turned dark."""
+    from PySide6.QtGui import QColor
+
+    from aurantium.theme import BG
+
+    panel.set_link_group("B")
+    panel._badge.set_hover(1.0)
+    c = panel._badge.colors()
+    assert c["fill"] == QColor(GROUP_COLORS["B"])
+    assert c["content"] == QColor(BG)  # glyph and letter are both painted in it
+
+
+def test_the_glyph_is_painted_in_the_content_colour(panel, qapp):
+    from PySide6.QtGui import QColor
+
+    from aurantium.theme import BG
+
+    panel.set_link_group("B")
+    badge = panel._badge
+    badge.resize(badge.sizeHint())
+    badge.set_hover(1.0)
+    img = badge.grab().toImage()
+    fill, bg = QColor(GROUP_COLORS["B"]), QColor(BG)
+    # inside the glyph's box there are pixels near BG, not only the fill
+    box = [img.pixelColor(x, y) for x in range(4, 4 + badge.ICON) for y in range(2, img.height() - 2)]
+    dist = lambda a, b: abs(a.red() - b.red()) + abs(a.green() - b.green()) + abs(a.blue() - b.blue())
+    assert any(dist(px, bg) < dist(px, fill) for px in box)
+
+
+def test_the_hover_fill_eases_in_and_out(panel, motion_on):
+    from PySide6.QtCore import QEvent, QPointF
+    from PySide6.QtGui import QEnterEvent
+
+    badge = panel._badge
+    badge.enterEvent(QEnterEvent(QPointF(2, 2), QPointF(2, 2), QPointF(2, 2)))
+    assert badge._anim.state() == badge._anim.State.Running
+    assert badge._anim.endValue() == 1.0 and badge.hover < 1.0
+    badge._anim.setCurrentTime(badge._anim.duration() // 2)
+    mid = badge.hover
+    assert 0.0 < mid < 1.0
+    badge.leaveEvent(QEvent(QEvent.Type.Leave))
+    # leaving mid-fill retargets from where it is, never snapping to full first
+    assert badge._anim.startValue() == mid and badge._anim.endValue() == 0.0
+
+
+def test_reduced_motion_fills_at_once(panel, monkeypatch):
+    from PySide6.QtCore import QPointF
+    from PySide6.QtGui import QEnterEvent
+
+    from aurantium import motion
+
+    monkeypatch.setattr(motion, "animations_enabled", lambda: False)
+    panel._badge.enterEvent(QEnterEvent(QPointF(2, 2), QPointF(2, 2), QPointF(2, 2)))
+    assert panel._badge.hover == 1.0
 
 
 def test_a_second_flash_survives_the_first_animation_being_collected(panel, motion_on):

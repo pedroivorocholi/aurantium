@@ -274,7 +274,7 @@ class NewsPanelBase(Panel):
         # symbol yet was an unexplained blank rectangle.
         self._news_empty_title = EMPTY_NO_SYMBOL
         self._news_empty_hint = (
-            "Click a ticker in any linked panel, or type one in the SYMBOL bar"
+            "Click a ticker in any linked panel, or type one in the search box"
         )
         self.news_empty = EmptyState.attach(
             self.table, self._news_empty_title, self._news_empty_hint

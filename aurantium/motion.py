@@ -91,6 +91,21 @@ PRESS_OUT_MS = 160
 
 #: Overlay crossfades — an empty state arriving, a loading veil retiring.
 OVERLAY_MS = 160
+
+#: A selection indicator travelling to its new tab (transitions.py): long
+#: enough for the eye to follow it from the old tab, short enough that the
+#: tab's content is never waiting on it.
+INDICATOR_MS = 180
+#: A chip's checked fill crossfading in as its neighbour's fades out.
+CROSSFADE_MS = 140
+#: A menu or dropdown arriving. Native Windows menus fade in about this fast.
+POPUP_IN_MS = 110
+#: Where a popup's fade starts — visible at once, so it reads as arriving
+#: rather than as late.
+POPUP_IN_FROM = 0.35
+#: Where a tab's incoming page starts. Mostly there already: the page is the
+#: thing being read, and the indicator is what carries the motion.
+PAGE_IN_FROM = 0.6
 #: A panel's first appearance. Once per panel, so it can afford a beat more.
 PANEL_IN_MS = 180
 

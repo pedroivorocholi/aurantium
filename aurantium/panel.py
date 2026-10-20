@@ -28,9 +28,11 @@ from typing import Any, Callable, Optional, Type
 from PySide6.QtCore import (
     Property,
     QPropertyAnimation,
+    QRectF,
+    QSize,
     Qt,
 )
-from PySide6.QtGui import QAction, QColor, QPainter
+from PySide6.QtGui import QAction, QColor, QFont, QFontMetrics, QPainter, QPen
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -54,7 +56,6 @@ from .theme import (
     FOCUS,
     FONT_XS,
     RADIUS_SM,
-    WEIGHT_BOLD,
 )
 from .symbol_context import (
     DEFAULT_GROUP,
@@ -422,6 +423,149 @@ class _HeaderStrip(QWidget):
         p.end()
 
 
+class _LinkBadge(QToolButton):
+    """The link-group badge: a chain glyph, plus the group letter when linked.
+
+    Painted rather than styled, for two reasons. A stylesheet ``:hover`` swaps
+    colours in one frame, and the badge should fill under the pointer the way
+    the rest of the chrome answers it. And Qt only uses a tool button's
+    hover-mode icon when the button is auto-raise, so the glyph stayed in the
+    group colour on top of a fill of that same colour and vanished. One
+    ``hover`` value (0 = resting, 1 = under the pointer) now drives the fill,
+    the glyph and the letter together, so they cannot disagree.
+
+    Resting, it is the group's colour as an outline and label on the panel
+    surface: the least important thing on screen should not be the loudest.
+    Hovered, it fills with that colour and the content turns to ``BG``. It
+    stays filled while its menu is open, which is what the pointer went there
+    for.
+    """
+
+    ICON = 11
+    GAP = 3
+
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent)
+        self.setObjectName("groupBadge")
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self._group = DEFAULT_GROUP
+        self._hover = 0.0
+        self._glyphs: dict[str, Any] = {}
+        # one animation for the badge's life, retargeted from the value on
+        # screen, so a pointer flicking across it never snaps
+        self._anim = QPropertyAnimation(self, b"hover", self)
+        self._anim.setEasingCurve(motion.EASE_OUT)
+
+    def get_hover(self) -> float:
+        return self._hover
+
+    def set_hover(self, value: float) -> None:
+        self._hover = float(value)
+        self.update()
+
+    hover = Property(float, get_hover, set_hover)
+
+    def set_group(self, group: str) -> None:
+        self._group = group
+        self.updateGeometry()
+        self.update()
+
+    def _ease_to(self, target: float) -> None:
+        if self._anim.state() == QPropertyAnimation.State.Running and self._anim.endValue() == target:
+            return
+        self._anim.stop()
+        # in at the press speed, out a beat slower: the same asymmetry as press
+        # feedback — the arrival is watched, the departure is not
+        ms = motion.duration(motion.PRESS_IN_MS * 4 // 3 if target > self._hover else motion.PRESS_OUT_MS)
+        if ms == 0 or self._hover == target:
+            self.set_hover(target)
+            return
+        self._anim.setDuration(ms)
+        self._anim.setStartValue(self._hover)
+        self._anim.setEndValue(target)
+        self._anim.start()
+
+    def menu_closed(self) -> None:
+        if not self.underMouse():
+            self._ease_to(0.0)
+
+    def enterEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        super().enterEvent(event)
+        if self.isEnabled():
+            self._ease_to(1.0)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        super().leaveEvent(event)
+        menu = self.menu()
+        if menu is None or not menu.isVisible():
+            self._ease_to(0.0)
+
+    def colors(self) -> dict:
+        """(fill, border, content) for the current state; the fill may be
+        transparent."""
+        from .color import mix_oklab
+
+        t = self._hover if self.isEnabled() else 0.0
+        if self._group != UNLINKED:
+            tone = GROUP_COLORS.get(self._group, FG_MUTED)
+            fill = QColor(tone)
+            fill.setAlphaF(t)
+            border, content = QColor(tone), QColor(mix_oklab(tone, BG, t))
+        else:
+            fill = QColor(0, 0, 0, 0)
+            border = QColor(mix_oklab(BORDER_STRONG, CHROME_TEXT_DIM, t))
+            content = QColor(mix_oklab(FG_MUTED, CHROME_TEXT_DIM, t))
+        if not self.isEnabled():
+            border, content = QColor(BORDER), QColor(FG_MUTED)
+        if self.property("kbFocus"):
+            border = QColor(FOCUS)
+        return {"fill": fill, "border": border, "content": content}
+
+    def _font(self):
+        f = QFont(self.font())
+        f.setPixelSize(FONT_XS)
+        f.setWeight(QFont.Weight.Bold)
+        return f
+
+    def sizeHint(self) -> QSize:  # noqa: N802 (Qt override)
+        fm = QFontMetrics(self._font())
+        w = 4 + self.ICON + 4
+        if self._group != UNLINKED:
+            w += self.GAP + fm.horizontalAdvance(self._group) + 1
+        return QSize(w, max(self.ICON, fm.height()) + 4)
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802 (Qt override)
+        return self.sizeHint()
+
+    def _glyph(self, color: QColor):
+        from . import icons
+
+        key = color.name()
+        pm = self._glyphs.get(key)
+        if pm is None:
+            if len(self._glyphs) > 48:  # one per animation frame colour
+                self._glyphs.clear()
+            pm = icons.pixmap("link", key, icons.device_pixel_ratio(self), self.ICON)
+            self._glyphs[key] = pm
+        return pm
+
+    def paintEvent(self, _event) -> None:  # noqa: N802 (Qt override)
+        c = self.colors()
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        p.setPen(QPen(c["border"], 1))
+        p.setBrush(c["fill"] if c["fill"].alpha() else Qt.BrushStyle.NoBrush)
+        p.drawRoundedRect(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5), RADIUS_SM, RADIUS_SM)
+        x = 4
+        p.drawPixmap(x, (self.height() - self.ICON) // 2, self._glyph(c["content"]))
+        if self._group != UNLINKED:
+            p.setFont(self._font())
+            p.setPen(c["content"])
+            text = QRectF(x + self.ICON + self.GAP, 0, self.width(), self.height())
+            p.drawText(text, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, self._group)
+        p.end()
+
+
 class _PanelLayout(QVBoxLayout):
     """The panel's outermost layout: fills whatever height the dock gives.
 
@@ -540,8 +684,7 @@ class Panel(QWidget):
         # (an explicit minimum keeps the natural width whenever there's room)
         for lbl in (self._status_lbl, self._state_lbl):
             lbl.setMinimumWidth(1)
-        self._badge = QToolButton(header)
-        self._badge.setObjectName("groupBadge")
+        self._badge = _LinkBadge(header)
         self._badge.setToolTip(
             "Link group — panels in the same group follow the same symbol"
         )
@@ -552,11 +695,16 @@ class Panel(QWidget):
             act.triggered.connect(lambda _=False, g=g: self.set_link_group(g))
             menu.addAction(act)
         self._badge.setMenu(menu)
+        menu.aboutToHide.connect(self._badge.menu_closed)
         # The panel's own quick guide, one click from the panel itself. Beside
         # the badge because both are about the panel rather than its data.
         self._guide_btn = QToolButton(header)
         self._guide_btn.setObjectName("guideButton")
-        self._guide_btn.setText("?")
+        from . import icons
+        from .theme import CHROME_TEXT, FG_MUTED
+
+        icons.set_icon(self._guide_btn, "help", FG_MUTED, hover_color=CHROME_TEXT, size=14)
+        self._guide_btn.setAccessibleName("Quick guide")
         self._guide_btn.setToolTip("Quick guide to this panel (Shift+F1)")
         self._guide_btn.clicked.connect(self.open_guide)
         hl.addWidget(self._symbol_lbl)
@@ -863,57 +1011,14 @@ class Panel(QWidget):
         self.set_error(error)
 
     def _update_badge(self) -> None:
-        """Paint the link-group badge.
-
-        It used to be a solid amber chip — which made the least important
-        element on screen the loudest, and spent the accent color that
-        elsewhere means "this is data". It is now the group's color as an
-        outline and label on the panel surface: still unmistakable, no longer
-        competing with the numbers. Hovering fills it, so it still reads as
-        something you can click.
-
-        Both states derive from the palette (the unlinked colors used to be
-        hardcoded dark-theme greys, which were wrong on the light theme).
-
-        A per-widget stylesheet outranks the app sheet on every property it
-        names, and ``QToolButton#groupBadge`` is an id selector, so the global
-        ``QToolButton[kbFocus="true"]`` focus rule lost to it and the badge was
-        the one control in the app that could be tabbed to and show nothing.
-        The full state set is therefore spelled out here: hover fills, pressed
-        holds that fill while ``press.py`` eases the shadow over it, and
-        keyboard focus takes the neutral ring — ON_ACCENT on the filled hover
-        state, where the neutral ring would not be readable.
-
-        Sizes and radii come from the scale in ``theme.py``; they used to be
-        three inline literals that drifted out of step with it.
-        """
-        linked = self._link_group != UNLINKED
-        color = QColor(GROUP_COLORS.get(self._link_group, FG_MUTED)).name()
-        self._badge.setText(self._link_group if linked else "—")
-        base = (
-            f" font-size: {FONT_XS}px; font-weight: {WEIGHT_BOLD};"
-            f" border-radius: {RADIUS_SM}px; padding: 1px 6px;"
-        )
-        if linked:
-            self._badge.setStyleSheet(
-                f"QToolButton#groupBadge {{ background: transparent; color: {color};"
-                f"{base} border: 1px solid {color}; }}"
-                f"QToolButton#groupBadge:hover, QToolButton#groupBadge:pressed"
-                f" {{ background: {color}; color: {BG}; }}"
-                f'QToolButton#groupBadge[kbFocus="true"]'
-                f" {{ border-color: {FOCUS}; }}"
-                f"QToolButton#groupBadge:disabled"
-                f" {{ color: {FG_MUTED}; border-color: {BORDER}; }}"
+        """Point the link-group badge at the current group. ``_LinkBadge``
+        paints every state itself (see its docstring): the outline, the
+        animated hover fill, keyboard focus and disabled all derive from the
+        palette and the group's colour."""
+        self._badge.set_group(self._link_group)
+        if self._link_group != UNLINKED:
+            self._badge.setToolTip(
+                f"Link group {self._link_group} — panels in the same group follow the same symbol"
             )
         else:
-            self._badge.setStyleSheet(
-                "QToolButton#groupBadge { background: transparent;"
-                f" color: {FG_MUTED};{base}"
-                f" border: 1px solid {BORDER_STRONG}; }}"
-                f"QToolButton#groupBadge:hover, QToolButton#groupBadge:pressed"
-                f" {{ color: {CHROME_TEXT_DIM}; border-color: {CHROME_TEXT_DIM}; }}"
-                f'QToolButton#groupBadge[kbFocus="true"]'
-                f" {{ border-color: {FOCUS}; }}"
-                f"QToolButton#groupBadge:disabled"
-                f" {{ color: {FG_MUTED}; border-color: {BORDER}; }}"
-            )
+            self._badge.setToolTip("Not linked — choose a link group to follow a symbol")

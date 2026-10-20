@@ -55,6 +55,7 @@ hiddenimports += [
     "aurantium.panels",
     "aurantium.panels._news_common",
     "aurantium.panels._events_lane",
+    "aurantium.panels._chart_export",
 ]
 hiddenimports += [f"aurantium.panels.{m}" for m in _PANELS]
 hiddenimports += [
@@ -109,6 +110,9 @@ hiddenimports += [
     "aurantium.date_context",
     "aurantium.sector_meta",
     "aurantium.command_bar",
+    "aurantium.title_bar",
+    "aurantium.transitions",
+    "aurantium.reicon_icons",
     "aurantium.undo",
 ]
 

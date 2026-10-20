@@ -73,6 +73,30 @@ button sets ``:pressed`` with no ``MouseButtonPress``, so no scrim fires and
 the stylesheet's hover-tone rule is the whole feedback. That is intended:
 ``motion.py``'s budget says keyboard-triggered actions do not animate.
 
+Rows, tabs, sections and marks
+------------------------------
+
+Most of what a user clicks in a terminal is not a button: it is a watchlist
+row, a news headline, a sortable column header, a tab, a heatmap tile, a mark
+on the events lane. Those had no press response at all, so the same sink now
+covers them — the *same* scrim, curve, durations and alpha — but over only the
+part that was pressed: the row, the cell, the section, the tab, the mark.
+
+One scrim per host (an item view's viewport, a tab bar, a custom widget),
+retargeted to the pressed region on each press. Never one per row: a 500-row
+table costs one extra widget, not 500, and nothing at all while idle. Where
+the region comes from:
+
+* item views — the pressed row (the cell, for a table that selects cells);
+  only when the view does something with a click (it selects, or the item is
+  checkable), so a read-only table does not pretend to be a button;
+* header sections — when the header is clickable (sortable);
+* tab bars — the pressed tab;
+* anything else — a ``press_region(pos)`` method on the widget (or on the
+  plot widget whose viewport was pressed), returning ``(QRect, radius)`` in
+  the pressed widget's coordinates, or None. The events lane uses it to sink
+  just the mark under the pointer.
+
 Reduced motion
 --------------
 
@@ -90,17 +114,29 @@ from PySide6.QtCore import (
     QEvent,
     QObject,
     QPropertyAnimation,
+    QRect,
     QRectF,
     Qt,
 )
 from PySide6.QtGui import QColor, QPainter, QPainterPath
-from PySide6.QtWidgets import QPushButton, QToolButton, QWidget
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QComboBox,
+    QHeaderView,
+    QPushButton,
+    QTabBar,
+    QTableView,
+    QToolButton,
+    QWidget,
+)
 
 from . import motion
 from .theme import PRESS_ALPHA, RADIUS_SM
 
 #: Attribute holding a widget's scrim, so it is created at most once.
 _ATTR = "_aurantium_press_scrim"
+#: Attribute holding a host's *region* scrim (rows, tabs, sections, marks).
+_REGION_ATTR = "_aurantium_press_region_scrim"
 
 #: Class-name fragment for the QtAds dock tab. Matched by name rather than by
 #: ``isinstance``: PySide6-QtAds is an optional import in several entry points
@@ -116,10 +152,13 @@ class _PressScrim(QWidget):
     keeps receiving every event exactly as before this widget existed.
     """
 
-    def __init__(self, target: QWidget, radius: int) -> None:
+    def __init__(self, target: QWidget, radius: int, region: bool = False) -> None:
         super().__init__(target)
         self._press = 0.0
         self._radius = radius
+        #: A region scrim covers one row/tab/section/mark of its host, set per
+        #: press by ``press_region_in``; a plain scrim covers the whole host.
+        self._region: QRect | None = QRect() if region else None
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
         # NOT WA_OpaquePaintEvent: the point is to composite over whatever the
@@ -148,7 +187,11 @@ class _PressScrim(QWidget):
         and stops, so there are no more frames to re-measure in, and a control
         that resizes after that would otherwise stay wrong until release.
         """
-        if event.type() == QEvent.Type.Resize and obj is self.parentWidget():
+        if (
+            event.type() == QEvent.Type.Resize
+            and obj is self.parentWidget()
+            and self._region is None
+        ):
             self.setGeometry(obj.rect())
         return False  # never consume: this observes, it does not intercept
 
@@ -189,7 +232,8 @@ class _PressScrim(QWidget):
 
     def _run(self, to: float, ms: int) -> None:
         self._anim.stop()
-        self.setGeometry(self.parentWidget().rect())
+        if self._region is None:
+            self.setGeometry(self.parentWidget().rect())
         self._anim.setDuration(motion.duration(ms))
         self._anim.setStartValue(self._press)
         self._anim.setEndValue(to)
@@ -209,6 +253,17 @@ class _PressScrim(QWidget):
 
     def press_in(self) -> None:
         self._run(1.0, motion.PRESS_IN_MS)
+
+    def press_region_in(self, rect: QRect, radius: int) -> None:
+        """Sink just ``rect`` of the host. A new region starts from rest: the
+        shadow moving from the last row to this one would read as a slide."""
+        if self._region != rect:
+            self._anim.stop()
+            self.set_press(0.0)
+        self._region = QRect(rect)
+        self._radius = radius
+        self.setGeometry(rect)
+        self.press_in()
 
     def press_out(self) -> None:
         self._run(0.0, motion.PRESS_OUT_MS)
@@ -256,6 +311,10 @@ def corner_radius(widget) -> int | None:
     """
     if isinstance(widget, (QPushButton, QToolButton)):
         return RADIUS_SM
+    # A non-editable combo is a button that opens a list. An editable one is a
+    # text field first, and is excluded with the other text inputs.
+    if isinstance(widget, QComboBox) and not widget.isEditable():
+        return RADIUS_SM
     # Opt-in for clickable surfaces that aren't buttons (the Profile's stat
     # tiles): a widget sets the ``pressRadius`` property while it is
     # clickable and gets the same sink every button does.
@@ -297,6 +356,92 @@ def attach(widget, radius: int | None = None) -> _PressScrim | None:
     return scrim
 
 
+def _row_region(view: QAbstractItemView, viewport: QWidget, pos) -> QRect | None:
+    index = view.indexAt(pos)
+    if not index.isValid():
+        return None
+    flags = index.flags()
+    if not flags & Qt.ItemFlag.ItemIsEnabled:
+        return None
+    selects = view.selectionMode() != QAbstractItemView.SelectionMode.NoSelection
+    if not (selects or flags & Qt.ItemFlag.ItemIsUserCheckable):
+        return None  # a read-only view: a click does nothing, so nothing sinks
+    rect = view.visualRect(index)
+    if isinstance(view, QTableView) and (
+        view.selectionBehavior() == QAbstractItemView.SelectionBehavior.SelectItems
+    ):
+        return rect  # the cell: that is what this table acts on
+    return QRect(0, rect.top(), viewport.width(), rect.height())
+
+
+def _section_region(header: QHeaderView, pos) -> QRect | None:
+    if not header.sectionsClickable():
+        return None
+    horizontal = header.orientation() == Qt.Orientation.Horizontal
+    logical = header.logicalIndexAt(pos)
+    if logical < 0:
+        return None
+    start = header.sectionViewportPosition(logical)
+    size = header.sectionSize(logical)
+    vp = header.viewport()
+    if horizontal:
+        return QRect(start, 0, size, vp.height())
+    return QRect(0, start, vp.width(), size)
+
+
+def press_region(widget, pos) -> tuple[QWidget, QRect, int] | None:
+    """Where a press at ``pos`` (in ``widget``'s coordinates) should sink, for
+    surfaces whose clickable part is smaller than the widget: ``(host, rect,
+    radius)`` with ``rect`` in ``host``'s coordinates, or None."""
+    parent = widget.parentWidget()
+    if isinstance(parent, QHeaderView) and parent.viewport() is widget:
+        rect = _section_region(parent, pos)
+        return (widget, rect, 0) if rect is not None else None
+    if isinstance(widget, QHeaderView):
+        return None  # presses arrive on its viewport, handled above
+    if isinstance(parent, QAbstractItemView) and parent.viewport() is widget:
+        rect = _row_region(parent, widget, pos)
+        return (widget, rect, 0) if rect is not None else None
+    if isinstance(widget, QTabBar):
+        i = widget.tabAt(pos)
+        if i < 0 or not widget.isTabEnabled(i):
+            return None
+        return widget, widget.tabRect(i), 0
+    for owner in (widget, parent):
+        try:
+            # not getattr's default: pyqtgraph's PlotWidget forwards unknown
+            # attributes to its PlotItem and raises NameError, not
+            # AttributeError, for one neither has
+            hook = owner.__dict__.get("press_region") if owner is not None else None
+        except (AttributeError, RuntimeError):
+            hook = None
+        if callable(hook):
+            local = pos if owner is widget else widget.mapTo(owner, pos)
+            found = hook(local)
+            if found is None:
+                return None
+            rect, radius = found
+            if owner is not widget:
+                rect = QRect(owner.mapTo(widget, rect.topLeft()), rect.size())
+            return widget, rect, radius
+    return None
+
+
+def region_scrim(host: QWidget) -> _PressScrim:
+    """``host``'s region scrim, created on first use — one per host, however
+    many rows it holds."""
+    existing = getattr(host, _REGION_ATTR, None)
+    if existing is not None:
+        try:
+            existing.objectName()
+            return existing
+        except RuntimeError:
+            pass
+    scrim = _PressScrim(host, 0, region=True)
+    setattr(host, _REGION_ATTR, scrim)
+    return scrim
+
+
 def scrim_of(widget) -> _PressScrim | None:
     """``widget``'s scrim if one has ever been created, else None."""
     return getattr(widget, _ATTR, None)
@@ -304,14 +449,22 @@ def scrim_of(widget) -> _PressScrim | None:
 
 def press_level(widget) -> float:
     """How far ``widget`` is currently sunk, 0.0–1.0. 0.0 when it has never
-    been pressed. For tests and for the state-gallery harness."""
-    scrim = scrim_of(widget)
-    if scrim is None:
-        return 0.0
-    try:
-        return scrim.get_press()
-    except RuntimeError:
-        return 0.0
+    been pressed. For an item view this is its pressed row (the scrim lives
+    on the viewport). For tests and for the state-gallery harness."""
+    hosts = [widget]
+    viewport = getattr(widget, "viewport", None)
+    if callable(viewport):
+        hosts.append(viewport())
+    level = 0.0
+    for host in hosts:
+        for scrim in (scrim_of(host), getattr(host, _REGION_ATTR, None)):
+            if scrim is None:
+                continue
+            try:
+                level = max(level, scrim.get_press())
+            except RuntimeError:
+                pass
+    return level
 
 
 # --------------------------------------------------------------------------
@@ -360,6 +513,15 @@ class PressFeedbackFilter(QObject):
             if event.button() != Qt.MouseButton.LeftButton:
                 return
             if not isinstance(obj, QWidget) or not obj.isEnabled():
+                return
+            region = press_region(obj, event.position().toPoint())
+            if region is not None:
+                host, rect, radius = region
+                self._end()  # a press that never got its release
+                scrim = region_scrim(host)
+                scrim.press_region_in(rect, radius)
+                self._active = scrim
+                self._target = obj
                 return
             scrim = attach(obj)
             if scrim is None:

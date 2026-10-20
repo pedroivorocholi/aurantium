@@ -579,7 +579,7 @@ class FundamentalsPanel(Panel):
         """Why the table is empty, in words — never a silent blank panel."""
         sym = self.current_symbol
         if not sym:
-            return "No symbol linked", "Type a company ticker (e.g. MSFT) in the SYMBOL box."
+            return "No symbol linked", "Type a company ticker (e.g. MSFT) in the search box."
         if not self._data:
             return f"Loading {sym}…", ""
         qtype = str(self._data.get("quote_type") or "").upper()

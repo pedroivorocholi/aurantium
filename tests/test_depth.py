@@ -81,14 +81,19 @@ def test_the_command_bar_is_raised_on_both_edges():
     assert f"border-bottom: 1px solid {theme.CHROME_BORDER}" in rule
 
 
-def test_the_command_label_clears_its_background():
-    """The blanket ``QWidget`` rule paints every plain widget BG, which on a
-    chrome bar is a black box around the label — the trap ``menuBarLogo``
-    already documents."""
+def test_inside_the_title_bar_the_bar_is_the_raised_surface():
+    """The command bar moved into the title bar: the bar's own bottom edge
+    separates chrome from data, and the command bar drops its edges rather
+    than drawing a box inside the bar."""
     sheet = theme.STYLESHEET
-    start = sheet.index("QLabel#commandLabel {")
+    start = sheet.index("QWidget#menuBarRow {")
     rule = sheet[start : sheet.index("}", start)]
-    assert "background: transparent" in rule
+    assert f"border-bottom: 1px solid {theme.CHROME_BORDER}" in rule
+    start = sheet.index("QWidget#menuBarRow QWidget#commandBar {")
+    rule = sheet[start : sheet.index("}", start)]
+    assert "border: none" in rule
+
+
 
 
 def test_the_dock_title_bar_is_raised_on_both_edges():
@@ -145,3 +150,51 @@ def test_the_data_surface_itself_stays_flat():
     rule = sheet[start : sheet.index("}", start)]
     assert theme.CHROME_EDGE not in rule
     assert f"background: {theme.BG}" in rule
+
+
+def test_inactive_dock_tabs_sit_on_the_title_bar_not_the_page(qapp):
+    """QtAds holds its tabs in a plain QWidget (``tabsContainerWidget``) inside
+    a scroll area. The blanket ``QWidget { background: BG }`` rule painted
+    both, so inactive tabs showed the page colour — a white band in the light
+    theme, a black one in the dark — inside the CHROME title bar."""
+    import PySide6QtAds as QtAds
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QLabel, QMainWindow
+
+    old = qapp.styleSheet()
+    qapp.setStyleSheet(theme.STYLESHEET)
+    try:
+        win = QMainWindow()
+        mgr = QtAds.CDockManager(win)
+        mgr.setStyleSheet(theme.ADS_STYLESHEET)
+        area = None
+        docks = []
+        for title in ("News", "Market Movers"):
+            d = QtAds.CDockWidget(mgr, title)
+            d.setWidget(QLabel(title))
+            area = mgr.addDockWidget(QtAds.LeftDockWidgetArea, d) if area is None else area
+            if d.dockAreaWidget() is None:
+                mgr.addDockWidgetTabToArea(d, area)
+            docks.append(d)
+        win.resize(600, 300)
+        win.show()
+        QTest.qWait(100)
+        bar = area.titleBar().tabBar()
+        docks[0].setAsCurrentTab()  # the inactive one away from the (0,0) cursor
+        QTest.qWait(50)
+        inactive = docks[1].tabWidget()
+        assert not inactive.isActiveTab()
+        image = area.titleBar().grab().toImage()
+        spot = inactive.mapTo(area.titleBar(), inactive.rect().topLeft())
+        assert image.pixelColor(spot.x() + 3, spot.y() + 3) == QColor(theme.CHROME)
+        win.close()
+    finally:
+        qapp.setStyleSheet(old)
+
+
+def test_dock_area_buttons_draw_no_menu_arrow():
+    # Qt pins a small arrow to the corner of a tool button with a menu; on the
+    # 12px "List all tabs" button it was clutter beside the glyph
+    from aurantium import theme
+
+    assert "ads--CTitleBarButton::menu-indicator { image: none; width: 0px; }" in theme.ADS_STYLESHEET

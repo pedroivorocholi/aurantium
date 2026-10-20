@@ -47,6 +47,7 @@ from ..theme import (
 )
 from ..undo import UndoStack
 from ..components.responsive_row import ResponsiveRow
+from ..press import PRESS_RADIUS_PROPERTY
 
 DEFAULT_TILES = [
     ["Technology", "XLK"],
@@ -160,6 +161,8 @@ class _Tile(QFrame):
         # printed on top of each other.
         self.setMinimumWidth(70)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        # a tile is pressed like a button: the same sink, on its own corners
+        self.setProperty(PRESS_RADIUS_PROPERTY, self.RADIUS)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(SPACE_LG, SPACE_MD, SPACE_LG, SPACE_MD)

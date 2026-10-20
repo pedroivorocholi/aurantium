@@ -390,6 +390,14 @@ def main() -> int:
 
     app._aurantium_press_filter = press.install(app)
 
+    # Selections travel instead of cutting: tab underlines and the dock tabs'
+    # active box slide, chips crossfade, menus fade in. Installed after the
+    # press filter so it runs first on a press and snapshots a chip before the
+    # press response starts on it.
+    from . import transitions
+
+    app._aurantium_transition_filter = transitions.install(app)
+
     # Providers first (so panels' initial subscriptions resolve), then panels.
     _splash_message(splash, "LOADING · PROVIDERS")
     from .providers import register_all_providers
@@ -421,10 +429,10 @@ def main() -> int:
             lambda: _surface_on_second_instance(ipc_server, win)
         )
         _surface_on_second_instance(ipc_server, win)
-    # launch in borderless full screen (covers the taskbar); toggle off with
-    # Settings ▸ Full Screen / Shift+F11, which drops back to a maximized window.
+    # launch maximized on the monitor the window last closed on (there is no
+    # full-screen mode any more; the taskbar stays visible).
     # The 1500x900 set in MainWindow stays as the restore size.
-    win.enter_fullscreen()
+    win.enter_maximized()
 
     _splash_message(splash, "LOADING · LAYOUT")
     startup_err = ""

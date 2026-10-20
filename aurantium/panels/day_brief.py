@@ -146,7 +146,7 @@ class DayBriefPanel(Panel):
         purpose="Why did it move? One session of the linked stock, set against the market, with the events and news around it.",
         links="Follows the link group's symbol and date. A click on the chart's "
         "EVENTS lane, **D** over a bar, the chart's right-click menu or /day in the "
-        "SYMBOL box opens it — as its own window; drag it into the layout to dock it.",
+        "search box opens it — as its own window; drag it into the layout to dock it.",
         interactions=(
             "◀ ▶ step a session at a time; the date box picks any day. A date that "
             "wasn't a trading day snaps to the session before it, and the panel says so.",
@@ -204,14 +204,19 @@ class DayBriefPanel(Panel):
         hl.setContentsMargins(0, 0, 0, 0)
         hl.setSpacing(4)
 
-        self.prev_btn = QPushButton("◀", row)
-        self.next_btn = QPushButton("▶", row)
-        for btn, tip in (
-            (self.prev_btn, "Previous session"),
-            (self.next_btn, "Next session"),
+        self.prev_btn = QPushButton(row)
+        self.next_btn = QPushButton(row)
+        from .. import icons
+        from ..theme import CHROME_TEXT_DIM, FG_MUTED
+
+        for btn, kind, tip in (
+            (self.prev_btn, "chevron-left", "Previous session"),
+            (self.next_btn, "chevron-right", "Next session"),
         ):
             btn.setObjectName("chartChip")
+            icons.set_icon(btn, kind, CHROME_TEXT_DIM, disabled_color=FG_MUTED, size=14)
             btn.setToolTip(tip)
+            btn.setAccessibleName(tip)
             btn.setFixedWidth(22)
         self.prev_btn.clicked.connect(lambda: self._step(-1))
         self.next_btn.clicked.connect(lambda: self._step(1))

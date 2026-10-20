@@ -450,3 +450,193 @@ def test_clickable_profile_tiles_sink_like_buttons(qapp, filt):
     assert press.press_level(tile) == pytest.approx(0.0)
     tile.set_clickable(False)
     assert press.corner_radius(tile) is None
+
+
+# -- rows, sections, tabs, tiles, marks ---------------------------------------
+#
+# Item views, header sections, tab bars and custom-painted surfaces sink only
+# the pressed region, with the same scrim, curve, durations and alpha as a
+# button.
+
+
+def _press_at(qapp, widget, pos, kind=QEvent.Type.MouseButtonPress):
+    event = QMouseEvent(
+        kind,
+        QPointF(pos),
+        QPointF(widget.mapToGlobal(pos)),
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton if kind == QEvent.Type.MouseButtonPress else Qt.MouseButton.NoButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    qapp.sendEvent(widget, event)
+
+
+def _row_centre(view, row, col=0):
+    return view.visualRect(view.model().index(row, col)).center()
+
+
+def _settled_region(qapp, host):
+    scrim = getattr(host, press._REGION_ATTR)
+    _settle(qapp, scrim._anim)
+    return scrim
+
+
+def test_pressing_a_watchlist_row_sinks_that_row(qapp, filt):
+    from aurantium.panels.watchlist import WatchlistPanel
+
+    panel = WatchlistPanel()
+    panel.build()
+    panel.resize(600, 400)
+    panel.show()
+    qapp.processEvents()
+    table = panel.table
+    assert table.rowCount() >= 2
+    vp = table.viewport()
+
+    _press_at(qapp, vp, _row_centre(table, 1))
+    scrim = _settled_region(qapp, vp)
+    assert press.press_level(table) > 0.0
+    row_rect = table.visualRect(table.model().index(1, 0))
+    assert scrim.geometry().top() == row_rect.top()
+    assert scrim.geometry().height() == row_rect.height()
+    assert scrim.geometry().width() == vp.width()  # the row, not the cell
+
+    _press_at(qapp, vp, _row_centre(table, 1), QEvent.Type.MouseButtonRelease)
+    _settle(qapp, scrim._anim)
+    assert press.press_level(table) == pytest.approx(0.0)
+
+
+def test_pressing_a_news_item_sinks_it(qapp, filt):
+    from aurantium.panels.news import NewsPanel
+    from aurantium.panels._news_common import populate_news_table
+
+    panel = NewsPanel()
+    panel.build()
+    panel.resize(600, 400)
+    panel.show()
+    populate_news_table(panel.table, [
+        {"title": "Fed holds rates", "publisher": "Wire", "url": "https://example.com/a"},
+        {"title": "Oil climbs", "publisher": "Wire", "url": "https://example.com/b"},
+    ])
+    qapp.processEvents()
+    vp = panel.table.viewport()
+    _press_at(qapp, vp, _row_centre(panel.table, 0, 1))
+    _settled_region(qapp, vp)
+    assert press.press_level(panel.table) > 0.0
+
+
+def test_one_scrim_serves_every_row(qapp, filt):
+    """No per-row widget or effect: a big table must cost one scrim."""
+    from PySide6.QtWidgets import QTableWidget, QTableWidgetItem
+
+    table = QTableWidget(200, 3)
+    for r in range(200):
+        table.setItem(r, 0, QTableWidgetItem(str(r)))
+    table.resize(400, 300)
+    table.show()
+    qapp.processEvents()
+    vp = table.viewport()
+    for r in (0, 3, 5):
+        _press_at(qapp, vp, _row_centre(table, r))
+        _press_at(qapp, vp, _row_centre(table, r), QEvent.Type.MouseButtonRelease)
+    scrims = [c for c in vp.children() if isinstance(c, press._PressScrim)]
+    assert len(scrims) == 1
+
+
+def test_a_cell_selecting_table_sinks_the_cell(qapp, filt):
+    from PySide6.QtWidgets import QAbstractItemView, QTableWidget, QTableWidgetItem
+
+    table = QTableWidget(3, 3)
+    table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
+    for r in range(3):
+        for c in range(3):
+            table.setItem(r, c, QTableWidgetItem("x"))
+    table.resize(400, 200)
+    table.show()
+    qapp.processEvents()
+    vp = table.viewport()
+    _press_at(qapp, vp, _row_centre(table, 1, 1))
+    scrim = _settled_region(qapp, vp)
+    assert scrim.geometry() == table.visualRect(table.model().index(1, 1))
+
+
+def test_a_read_only_view_does_not_pretend_to_be_a_button(qapp, filt):
+    from PySide6.QtWidgets import QAbstractItemView, QTableWidget, QTableWidgetItem
+
+    table = QTableWidget(2, 2)
+    table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+    table.setItem(0, 0, QTableWidgetItem("x"))
+    table.resize(300, 200)
+    table.show()
+    qapp.processEvents()
+    _press_at(qapp, table.viewport(), _row_centre(table, 0))
+    assert press.press_level(table) == 0.0
+
+
+def test_a_sortable_header_section_sinks(qapp, filt):
+    from PySide6.QtWidgets import QTableWidget
+
+    table = QTableWidget(2, 3)
+    table.setSortingEnabled(True)
+    table.resize(400, 200)
+    table.show()
+    qapp.processEvents()
+    header = table.horizontalHeader()
+    vp = header.viewport()
+    x = header.sectionViewportPosition(1) + 5
+    _press_at(qapp, vp, QPointF(x, 5).toPoint())
+    scrim = _settled_region(qapp, vp)
+    assert scrim.geometry().left() == header.sectionViewportPosition(1)
+    assert scrim.geometry().width() == header.sectionSize(1)
+
+
+def test_a_tab_sinks(qapp, filt):
+    from PySide6.QtWidgets import QTabWidget
+
+    tabs = QTabWidget()
+    tabs.addTab(QWidget(), "Profile")
+    tabs.addTab(QWidget(), "Key Metrics")
+    tabs.resize(400, 200)
+    tabs.show()
+    qapp.processEvents()
+    bar = tabs.tabBar()
+    _press_at(qapp, bar, bar.tabRect(1).center())
+    scrim = _settled_region(qapp, bar)
+    assert scrim.geometry() == bar.tabRect(1)
+    assert press.press_level(bar) > 0.0
+
+
+def test_a_heatmap_tile_sinks(qapp, filt):
+    from aurantium.panels.sector_heatmap import _Tile
+
+    tile = _Tile("Energy", "XLE")
+    tile.resize(120, 70)
+    assert press.corner_radius(tile) == _Tile.RADIUS
+    _click(qapp, tile, QEvent.Type.MouseButtonPress)
+    _settle(qapp, press.scrim_of(tile)._anim)
+    assert press.press_level(tile) > 0.0
+
+
+def test_an_editable_combo_is_a_text_field(qapp):
+    from PySide6.QtWidgets import QComboBox
+
+    plain, editable = QComboBox(), QComboBox()
+    editable.setEditable(True)
+    assert press.corner_radius(plain) == theme.RADIUS_SM
+    assert press.corner_radius(editable) is None
+
+
+def test_a_row_lands_without_travel_under_reduced_motion(qapp, filt, monkeypatch):
+    from PySide6.QtWidgets import QTableWidget, QTableWidgetItem
+
+    monkeypatch.setattr(motion, "animations_enabled", lambda: False)
+    table = QTableWidget(2, 2)
+    table.setItem(0, 0, QTableWidgetItem("x"))
+    table.resize(300, 200)
+    table.show()
+    qapp.processEvents()
+    vp = table.viewport()
+    _press_at(qapp, vp, _row_centre(table, 0))
+    assert press.press_level(table) == pytest.approx(1.0)  # no frames needed
+    _press_at(qapp, vp, _row_centre(table, 0), QEvent.Type.MouseButtonRelease)
+    assert press.press_level(table) == pytest.approx(0.0)

@@ -106,6 +106,30 @@ def test_widening_brings_every_chip_back(chart):
     assert chart._range_eyebrow.isVisibleTo(chart)
 
 
+def _visible_ranges(chart):
+    return [l for l, b in chart._range_buttons.items() if b.isVisibleTo(chart)]
+
+
+def test_the_range_row_at_each_width(chart):
+    """1h / 4h left the row (custom… covers them), which made room for 5y at
+    regular width. 2y stays wide-only: with it the regular row needs every
+    pixel of the narrowest regular panel, so any font change would clip it."""
+    from aurantium.panel import COMPACT_MAX, REGULAR, WIDE
+
+    chart.show()
+    chart.resize(320, 400)
+    assert _visible_ranges(chart) == ["1d", "5d", "1mo", "6mo", "1y", "max"]
+    chart.resize(COMPACT_MAX + 1, 400)
+    assert chart.size_class == REGULAR
+    assert _visible_ranges(chart) == ["1d", "5d", "1mo", "3mo", "6mo", "1y", "5y", "max"]
+    assert chart._custom_btn.isVisibleTo(chart)
+    chart.resize(1000, 400)
+    assert chart.size_class == WIDE
+    assert _visible_ranges(chart) == [
+        "1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "max",
+    ]
+
+
 def test_the_compact_range_row_fits_a_compact_panel(chart):
     chart.show()
     chart.resize(320, 400)

@@ -36,7 +36,11 @@ class ActionBar(QWidget):
         self._collapsed = False
         self.more_btn = QToolButton(self)
         self.more_btn.setObjectName("moreButton")
-        self.more_btn.setText("⋯")
+        from .. import icons
+        from ..theme import CHROME_TEXT
+
+        icons.set_icon(self.more_btn, "more", CHROME_TEXT)
+        self.more_btn.setAccessibleName("More")
         self.more_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self._menu = QMenu(self.more_btn)
         self.more_btn.setMenu(self._menu)

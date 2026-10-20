@@ -9,6 +9,7 @@ from __future__ import annotations
 import bisect
 import itertools
 import math
+import re
 from datetime import date, datetime, timedelta
 from typing import Any, Callable, Optional
 
@@ -29,7 +30,10 @@ from PySide6.QtGui import (
     QShortcut,
 )
 from PySide6.QtWidgets import (
+    QApplication,
+    QButtonGroup,
     QColorDialog,
+    QComboBox,
     QDateEdit,
     QDialog,
     QDialogButtonBox,
@@ -39,12 +43,14 @@ from PySide6.QtWidgets import (
     QLabel,
     QMenu,
     QPushButton,
+    QRadioButton,
+    QSpinBox,
     QVBoxLayout,
 )
 
 from ..guide import GuideSection, PanelGuide
 from ..components.empty_state import EmptyState
-from ..date_context import DateContext
+from ..date_context import DateContext, bar_datetime
 from ..panel import EMPTY_NO_SYMBOL, EMPTY_NO_SYMBOL_HINT, NULL_GLYPH, COMPACT, WIDE, Panel, register_panel
 from ..color import contrast
 from ..symbol_context import DEFAULT_GROUP, UNLINKED
@@ -52,6 +58,7 @@ from ..undo import UndoStack
 from ..theme import (
     ACCENT,
     BG,
+    CHROME_TEXT_DIM,
     DOWN,
     FG,
     FG_DIM,
@@ -69,30 +76,83 @@ from ..components.responsive_row import ResponsiveRow
 # -- range / interval model -------------------------------------------------
 #
 # Range (how much history to show) and candle interval are independent.
-# A range is either a preset label or a custom (start, end) date pair.
+# A range is a preset label, a custom (start, end) date pair, or a custom
+# lookback — the last N minutes, hours or days up to the latest bar.
 
-RANGE_PRESETS = ["1h", "4h", "1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "max"]
+RANGE_PRESETS = ["1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "max"]
 
 # Calendar span (days) of each preset — frames the visible window after we
 # fetch extra history so long moving averages have enough lookback.
 PERIOD_SPAN_DAYS = {
-    "1h": 1 / 24, "4h": 4 / 24,
     "1d": 1, "5d": 5, "1mo": 31, "3mo": 93, "6mo": 186,
     "1y": 372, "2y": 744, "5y": 1860, "max": 100000,
 }
 
-# Sub-day presets aren't yfinance periods. They fetch 5d — enough to reach the
-# last session over a weekend, and to warm up indicators — then frame the
+# Sub-day lookbacks aren't yfinance periods. They fetch 5d — enough to reach
+# the last session over a weekend, and to warm up indicators — then frame the
 # final hour(s) of bars.
 SUB_DAY_FETCH_PERIOD = "5d"
-SUB_DAY_PRESETS = ("1h", "4h")
+
+# Custom lookback ranges: {"lookback": "4h"} — a count and a unit.
+LOOKBACK_UNIT_DAYS = {"m": 1 / 1440, "h": 1 / 24, "d": 1.0}
+LOOKBACK_UNIT_NAMES = {"m": "minute", "h": "hour", "d": "day"}
+#: The shortest lookback that holds two 1m bars (see _combo_problem).
+MIN_LOOKBACK_DAYS = 10 / 1440
+#: 1h and 4h used to be chips on the range row; a layout saved with one of
+#: them opens as the same lookback.
+LEGACY_LOOKBACK_PRESETS = ("1h", "4h")
 
 # The interval a range switches to when the current one can't serve it
-# (e.g. 1d bars on a 1h range). Kept only when it is itself valid.
+# (e.g. 1d bars on a 1d range). Kept only when it is itself valid.
 PREFERRED_INTERVAL = {
-    "1h": "1m", "4h": "5m", "1d": "5m", "5d": "15m", "1mo": "1h",
+    "1d": "5m", "5d": "15m", "1mo": "1h",
     "3mo": "1d", "6mo": "1d", "1y": "1d", "2y": "1d", "5y": "1wk", "max": "1mo",
 }
+
+
+
+def lookback_days(token: Any) -> Optional[float]:
+    """Calendar days a lookback token ("90m", "4h", "3d") spans, or None if
+    it isn't one."""
+    m = re.fullmatch(r"(\d+)([mhd])", token) if isinstance(token, str) else None
+    if not m or int(m.group(1)) <= 0:
+        return None
+    return int(m.group(1)) * LOOKBACK_UNIT_DAYS[m.group(2)]
+
+
+def lookback_label(token: str) -> str:
+    """'4h' -> 'Last 4 hours'."""
+    n, unit = int(token[:-1]), LOOKBACK_UNIT_NAMES[token[-1]]
+    return f"Last {n} {unit}{'' if n == 1 else 's'}"
+
+
+def range_span_days(rng: dict) -> Optional[float]:
+    """Calendar span of a preset or lookback range; None for a date pair."""
+    if "preset" in rng:
+        return PERIOD_SPAN_DAYS.get(rng["preset"], 100000)
+    if "lookback" in rng:
+        return lookback_days(rng["lookback"]) or 100000
+    return None
+
+
+def preferred_interval(rng: dict) -> Optional[str]:
+    """The interval a preset or lookback range defaults to. Sub-day
+    lookbacks keep what the old 1h / 4h chips used: 1m up to an hour, 5m
+    beyond; longer ones borrow the nearest preset's."""
+    if "preset" in rng:
+        return PREFERRED_INTERVAL.get(rng["preset"])
+    days = lookback_days(rng.get("lookback"))
+    if days is None:
+        return None
+    if days <= 1 / 24:
+        return "1m"
+    if days < 1:
+        return "5m"
+    for preset in RANGE_PRESETS:
+        if PERIOD_SPAN_DAYS[preset] >= days:
+            return PREFERRED_INTERVAL[preset]
+    return PREFERRED_INTERVAL["max"]
+
 
 #: Width of the price axis, and of every pane stacked under it (indicator
 #: panes and the events lane). The panes share the price plot's time range, so
@@ -624,11 +684,40 @@ class CandlestickItem(pg.GraphicsObject):
         self._rows: list[tuple[float, float, float, float, float]] = []
         self._up = UP
         self._down = DOWN
+        self._log_y = False
         self._picture = QPicture()
 
     def set_colors(self, up: str, down: str) -> None:
         self._up, self._down = up, down
         self._generate()
+
+    def setLogMode(self, x_mode: bool, y_mode: bool) -> None:  # noqa: N802 (pyqtgraph API)
+        """Called by the PlotItem when log scale changes. pyqtgraph transforms
+        its own curves; a custom picture item has to draw in log10 itself."""
+        if bool(y_mode) != self._log_y:
+            self._log_y = bool(y_mode)
+            self._generate()
+
+    def _view_rows(self) -> list:
+        """The rows in view units: prices, or their log10 on a log axis."""
+        if not self._log_y:
+            return self._rows
+        return [
+            (t, math.log10(o), math.log10(h), math.log10(l), math.log10(c))
+            for t, o, h, l, c in self._rows
+            if min(o, h, l, c) > 0
+        ]
+
+    def _data_bounds(self, rows: list, half_width: float) -> QRectF:
+        """Exact extent of the marks. QPicture.boundingRect() is an integer
+        rect: harmless at prices, ten times too tall in log10 units."""
+        if not rows:
+            return QRectF()
+        x0 = min(r[0] for r in rows) - half_width
+        x1 = max(r[0] for r in rows) + half_width
+        y0 = min(r[3] for r in rows)
+        y1 = max(r[2] for r in rows)
+        return QRectF(x0, y0, x1 - x0, (y1 - y0) or 1e-6)
 
     def set_ohlc(self, t: list, o: list, h: list, l: list, c: list) -> None:
         rows = []
@@ -649,7 +738,9 @@ class CandlestickItem(pg.GraphicsObject):
         half_width = spacing * 0.35
         up_brush = pg.mkBrush(self._up)
         down_brush = pg.mkBrush(self._down)
-        for t, o, h, l, c in self._rows:
+        rows = self._view_rows()
+        self._bounds = self._data_bounds(rows, half_width)
+        for t, o, h, l, c in rows:
             is_up = c >= o
             painter.setPen(pg.mkPen(self._up if is_up else self._down))
             painter.drawLine(QPointF(t, l), QPointF(t, h))
@@ -663,7 +754,7 @@ class CandlestickItem(pg.GraphicsObject):
         painter.drawPicture(0, 0, self._picture)
 
     def boundingRect(self) -> QRectF:
-        return QRectF(self._picture.boundingRect())
+        return QRectF(getattr(self, "_bounds", QRectF()))
 
 
 class OHLCBarItem(pg.GraphicsObject):
@@ -675,11 +766,40 @@ class OHLCBarItem(pg.GraphicsObject):
         self._rows: list[tuple[float, float, float, float, float]] = []
         self._up = UP
         self._down = DOWN
+        self._log_y = False
         self._picture = QPicture()
 
     def set_colors(self, up: str, down: str) -> None:
         self._up, self._down = up, down
         self._generate()
+
+    def setLogMode(self, x_mode: bool, y_mode: bool) -> None:  # noqa: N802 (pyqtgraph API)
+        """Called by the PlotItem when log scale changes. pyqtgraph transforms
+        its own curves; a custom picture item has to draw in log10 itself."""
+        if bool(y_mode) != self._log_y:
+            self._log_y = bool(y_mode)
+            self._generate()
+
+    def _view_rows(self) -> list:
+        """The rows in view units: prices, or their log10 on a log axis."""
+        if not self._log_y:
+            return self._rows
+        return [
+            (t, math.log10(o), math.log10(h), math.log10(l), math.log10(c))
+            for t, o, h, l, c in self._rows
+            if min(o, h, l, c) > 0
+        ]
+
+    def _data_bounds(self, rows: list, half_width: float) -> QRectF:
+        """Exact extent of the marks. QPicture.boundingRect() is an integer
+        rect: harmless at prices, ten times too tall in log10 units."""
+        if not rows:
+            return QRectF()
+        x0 = min(r[0] for r in rows) - half_width
+        x1 = max(r[0] for r in rows) + half_width
+        y0 = min(r[3] for r in rows)
+        y1 = max(r[2] for r in rows)
+        return QRectF(x0, y0, x1 - x0, (y1 - y0) or 1e-6)
 
     def set_ohlc(self, t: list, o: list, h: list, l: list, c: list) -> None:
         rows = []
@@ -698,7 +818,9 @@ class OHLCBarItem(pg.GraphicsObject):
         painter = QPainter(self._picture)
         spacing = _median_spacing([r[0] for r in self._rows])
         tick = spacing * 0.35
-        for t, o, h, l, c in self._rows:
+        rows = self._view_rows()
+        self._bounds = self._data_bounds(rows, tick)
+        for t, o, h, l, c in rows:
             painter.setPen(pg.mkPen(self._up if c >= o else self._down, width=1))
             painter.drawLine(QPointF(t, l), QPointF(t, h))
             painter.drawLine(QPointF(t - tick, o), QPointF(t, o))
@@ -710,7 +832,7 @@ class OHLCBarItem(pg.GraphicsObject):
         painter.drawPicture(0, 0, self._picture)
 
     def boundingRect(self) -> QRectF:
-        return QRectF(self._picture.boundingRect())
+        return QRectF(getattr(self, "_bounds", QRectF()))
 
 
 def _next_nice(step: float) -> float:
@@ -724,6 +846,37 @@ def _next_nice(step: float) -> float:
         if n > m * (1 + 1e-9):
             return n * exp
     return 20.0 * exp
+
+
+class _PriceAxis(pg.AxisItem):
+    """The price axis. Linear, it is pyqtgraph's own. Log, it labels prices.
+
+    pyqtgraph's log axis only labels decades and their 2..9 multiples (100,
+    200, 300 ...), so a chart between 240 and 348 got one label or none. A
+    price chart lives inside a decade almost always, so here the ticks are
+    chosen as round *prices* across the visible range and placed at their
+    log10 — the same labels as linear, spaced logarithmically."""
+
+    def logTickValues(self, minVal, maxVal, size, stdTicks):  # noqa: N802 (pyqtgraph API)
+        lo, hi = 10.0 ** minVal, 10.0 ** maxVal
+        levels = []
+        seen: list[float] = []
+        for spacing, offset in self.tickSpacing(lo, hi, size):
+            start = math.ceil((lo - offset) / spacing) * spacing + offset
+            values = []
+            price = start
+            while price <= hi:
+                if price > 0 and not any(abs(price - p) < spacing * 0.01 for p in seen):
+                    values.append(math.log10(price))
+                    seen.append(price)
+                price += spacing
+            # the level carries its *price* spacing: logTickStrings formats with it
+            levels.append((spacing, values))
+        return levels
+
+    def logTickStrings(self, values, scale, spacing):  # noqa: N802 (pyqtgraph API)
+        places = max(0, math.ceil(-math.log10(spacing))) if spacing and spacing > 0 else 2
+        return [f"{10.0 ** v:.{places}f}" for v in values]
 
 
 class _SpacedAxis(pg.AxisItem):
@@ -845,7 +998,7 @@ class _BarClock:
             dts = []
             for v in t:
                 try:
-                    dts.append(datetime.fromtimestamp(v))
+                    dts.append(bar_datetime(v))
                 except (ValueError, OSError, OverflowError, TypeError):
                     dts.append(dts[-1] if dts else datetime(1970, 1, 1))
             self._dts = dts
@@ -939,12 +1092,40 @@ class _BarTimeAxis(pg.AxisItem):
 # -- custom range dialog ----------------------------------------------------
 
 class _RangeDialog(QDialog):
-    """Two date pickers, themed by the app-global stylesheet."""
+    """A trailing lookback (last N minutes / hours / days, with 1h and 4h as
+    quick picks) or two date pickers, themed by the app-global stylesheet."""
 
-    def __init__(self, parent, start: date, end: date) -> None:
+    UNITS = (("minutes", "m"), ("hours", "h"), ("days", "d"))
+
+    def __init__(
+        self, parent, start: date, end: date, lookback: Optional[str] = None
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Custom range")
         lay = QVBoxLayout(self)
+        self.last_radio = QRadioButton("Last", self)
+        self.dates_radio = QRadioButton("From", self)
+        group = QButtonGroup(self)
+        group.addButton(self.last_radio)
+        group.addButton(self.dates_radio)
+
+        last_row = ResponsiveRow()
+        self.count_spin = QSpinBox(self)
+        self.count_spin.setRange(1, 9999)
+        self.unit_combo = QComboBox(self)
+        for name, _ in self.UNITS:
+            self.unit_combo.addItem(name)
+        last_row.addWidget(self.last_radio)
+        last_row.addWidget(self.count_spin)
+        last_row.addWidget(self.unit_combo)
+        for token in LEGACY_LOOKBACK_PRESETS:
+            quick = QPushButton(token, self)
+            quick.setObjectName("chartChip")
+            quick.clicked.connect(lambda _=False, t=token: self._quick_pick(t))
+            last_row.addWidget(quick)
+        last_row.addStretch(1)
+        lay.addLayout(last_row)
+
         row = ResponsiveRow()
         self.start_edit = QDateEdit(QDate(start.year, start.month, start.day), self)
         self.end_edit = QDateEdit(QDate(end.year, end.month, end.day), self)
@@ -952,7 +1133,7 @@ class _RangeDialog(QDialog):
             edit.setCalendarPopup(True)
             edit.setDisplayFormat("yyyy-MM-dd")
             edit.setMaximumDate(QDate.currentDate())
-        row.addWidget(QLabel("From", self))
+        row.addWidget(self.dates_radio)
         row.addWidget(self.start_edit)
         row.addWidget(QLabel("to", self))
         row.addWidget(self.end_edit)
@@ -968,8 +1149,35 @@ class _RangeDialog(QDialog):
         btns.rejected.connect(self.reject)
         lay.addWidget(btns)
 
+        self._set_lookback(lookback if lookback_days(lookback) else "4h")
+        (self.last_radio if lookback else self.dates_radio).setChecked(True)
+        # touching either side's inputs selects that mode
+        self.count_spin.valueChanged.connect(lambda _: self.last_radio.setChecked(True))
+        self.unit_combo.currentIndexChanged.connect(
+            lambda _: self.last_radio.setChecked(True)
+        )
+        for edit in (self.start_edit, self.end_edit):
+            edit.dateChanged.connect(lambda _: self.dates_radio.setChecked(True))
+
+    def _set_lookback(self, token: str) -> None:
+        self.count_spin.setValue(int(token[:-1]))
+        units = [u for _, u in self.UNITS]
+        self.unit_combo.setCurrentIndex(units.index(token[-1]))
+
+    def _quick_pick(self, token: str) -> None:
+        self._set_lookback(token)
+        self.last_radio.setChecked(True)
+        self._try_accept()
+
+    def lookback(self) -> str:
+        return f"{self.count_spin.value()}{self.UNITS[self.unit_combo.currentIndex()][1]}"
+
     def _try_accept(self) -> None:
-        if self.start_edit.date() >= self.end_edit.date():
+        if self.last_radio.isChecked():
+            if lookback_days(self.lookback()) < MIN_LOOKBACK_DAYS:
+                self._hint.setText("Look back at least 10 minutes.")
+                return
+        elif self.start_edit.date() >= self.end_edit.date():
             self._hint.setText("Start must be before end.")
             return
         self.accept()
@@ -977,6 +1185,13 @@ class _RangeDialog(QDialog):
     def dates(self) -> tuple[date, date]:
         s, e = self.start_edit.date(), self.end_edit.date()
         return date(s.year(), s.month(), s.day()), date(e.year(), e.month(), e.day())
+
+    def chosen_range(self) -> dict:
+        """{"lookback": "4h"} or {"start": iso, "end": iso}."""
+        if self.last_radio.isChecked():
+            return {"lookback": self.lookback()}
+        start, end = self.dates()
+        return {"start": start.isoformat(), "end": end.isoformat()}
 
 
 # -- panel ------------------------------------------------------------------
@@ -988,8 +1203,9 @@ class ChartPanel(Panel):
         links="Follows the link group's symbol. A click on a mark in the EVENTS "
         "lane opens the Day Brief on that date.",
         interactions=(
-            "**RANGE** sets the window, 1h to max or **custom…** dates; **INTERVAL** "
-            "sets the bar size. A range the interval can't serve switches the interval for you. "
+            "**RANGE** sets the window, 1d to max. **custom…** picks a trailing "
+            "lookback (the last N minutes, hours or days, with 1h and 4h one click away) "
+            "or explicit from/to dates. **INTERVAL** sets the bar size. A range the interval can't serve switches the interval for you. "
             "Bars sit side by side, so nights, weekends and holidays leave no gaps.",
             "Hover for a crosshair with the bar's date and open/high/low/close. Drag to "
             "scroll through time, wheel to zoom, double-click to reset.",
@@ -997,7 +1213,10 @@ class ChartPanel(Panel):
             "MACD. Click a chip to switch it off and on; right-click it to recolor, "
             "change its period or remove it.",
             "Right-click the chart for chart type, colors, grid, log scale, the events "
-            "lane, drawing tools, **Export PNG…** and reset options.",
+            "lane, drawing tools, export and reset options.",
+            "The image button at the end of the indicator row exports the chart as it "
+            "stands: **Save as PNG…** or **Copy chart image** to paste elsewhere. Also on "
+            "the right-click menu.",
         ),
         fields=(
             ("SMA / EMA", "Simple and exponential moving averages of the close over N bars"),
@@ -1008,6 +1227,12 @@ class ChartPanel(Panel):
         ),
         shortcuts=(("D", "Explain the day under the crosshair in the Day Brief"),),
         sections=(
+            GuideSection("Export", "The export reproduces the chart on screen, whatever "
+                "range, interval, indicators, comparisons, log scale and theme are on: the "
+                "price pane, the events lane and every indicator pane with their axes, at "
+                "twice the on-screen pixels. A header names the symbol, interval and range, "
+                "with a legend entry in its plotted color for each series. The controls "
+                "above the chart are left out."),
             GuideSection("Drawing", "Right-click ▸ **Drawing** offers a trendline, a "
                 "horizontal line, and parallel, flat-bottom or disjoint channels. Click "
                 "to place each point; points snap to the nearest candle. Drawings are "
@@ -1037,7 +1262,8 @@ class ChartPanel(Panel):
     )
 
     def build(self) -> None:
-        # range is either {"preset": "6mo"} or {"start": iso, "end": iso}
+        # range is {"preset": "6mo"}, {"lookback": "4h"} or
+        # {"start": iso, "end": iso}
         self._range: dict = {"preset": "6mo"}
         self._interval = "1d"
         self._last_quote: dict = {}
@@ -1162,8 +1388,12 @@ class ChartPanel(Panel):
         # QPushButton padding is 13px a side, so inside a 28px fixed width Qt
         # had no room left for the glyph and elided it away — the only control
         # for adding an indicator rendered as an empty box.
-        self._add_btn = QPushButton("+", self)
+        self._add_btn = QPushButton(self)
         self._add_btn.setObjectName("chartChip")
+        from .. import icons
+
+        icons.set_icon(self._add_btn, "plus", CHROME_TEXT_DIM, disabled_color=FG_MUTED, size=14)
+        self._add_btn.setAccessibleName("Add an indicator")
         self._add_btn.setFixedWidth(26)
         self._add_btn.setToolTip("Add an indicator")
         self._add_btn.clicked.connect(self._show_add_menu)
@@ -1178,11 +1408,24 @@ class ChartPanel(Panel):
         )
         chips_row.addWidget(self._cmp_btn)
         chips_row.addStretch(1)
+        # export: the chart as it stands, saved or copied (_chart_export.py)
+        self._export_btn = QPushButton(self)
+        self._export_btn.setObjectName("chartChip")
+        icons.set_icon(self._export_btn, "export-image", CHROME_TEXT_DIM, disabled_color=FG_MUTED, size=14)
+        self._export_btn.setAccessibleName("Export chart image")
+        self._export_btn.setFixedWidth(26)
+        self._export_btn.setToolTip("Export chart image: save as PNG or copy, at 2× resolution")
+        self._export_btn.clicked.connect(
+            lambda: self._build_export_menu(self).exec(
+                self._export_btn.mapToGlobal(self._export_btn.rect().bottomLeft())
+            )
+        )
+        chips_row.addWidget(self._export_btn)
         self.content_layout.addLayout(chips_row)
 
         # -- price plot --------------------------------------------------------
         self.plot_widget = pg.PlotWidget(
-            axisItems={"bottom": _BarTimeAxis(self._clock)}
+            axisItems={"bottom": _BarTimeAxis(self._clock), "left": _PriceAxis(orientation="left")}
         )
         self.plot_widget.setBackground(self._colors["bg"])
         self.plot_widget.showGrid(x=True, y=True, alpha=0.15)
@@ -1249,14 +1492,14 @@ class ChartPanel(Panel):
 
     # -- responsive controls -------------------------------------------------
 
-    #: What a narrow chart keeps: a day, a month, half a year, a year, and
-    #: everything. Enough to cover the everyday moves without a horizontal row
-    #: that clips off the panel edge.
-    COMPACT_RANGES = ("4h", "1d", "1mo", "6mo", "1y", "max")
+    #: What a narrow chart keeps: a day, a week, a month, half a year, a year,
+    #: and everything. Enough to cover the everyday moves without a horizontal
+    #: row that clips off the panel edge.
+    COMPACT_RANGES = ("1d", "5d", "1mo", "6mo", "1y", "max")
     COMPACT_INTERVALS = ("1m", "1h", "1d", "1wk")
-    #: Hidden below WIDE: the sub-day presets pushed a regular-width range row
-    #: past the panel edge, and 1y / max already bracket these two.
-    WIDE_ONLY_RANGES = ("2y", "5y")
+    #: Hidden below WIDE so a regular-width range row stays inside the panel
+    #: edge; 1y and 5y already bracket it.
+    WIDE_ONLY_RANGES = ("2y",)
 
     def on_size_class(self, size_class: str) -> None:
         """Reorganize the control rows for the width the panel now has.
@@ -1312,7 +1555,7 @@ class ChartPanel(Panel):
             else:
                 self._empty.set_text(
                     EMPTY_NO_SYMBOL,
-                    "Click a ticker in any linked panel, or type one in the SYMBOL bar",
+                    "Click a ticker in any linked panel, or type one in the search box",
                 )
             self._empty.setGeometry(self.plot_widget.viewport().rect())
             self._empty.show()
@@ -1349,8 +1592,9 @@ class ChartPanel(Panel):
     # -- range / interval selection ------------------------------------------
 
     def _range_span_days(self) -> float:
-        if "preset" in self._range:
-            return PERIOD_SPAN_DAYS.get(self._range["preset"], 100000)
+        span = range_span_days(self._range)
+        if span is not None:
+            return span
         s = date.fromisoformat(self._range["start"])
         e = date.fromisoformat(self._range["end"])
         return max((e - s).days, 1)
@@ -1358,17 +1602,17 @@ class ChartPanel(Panel):
     def _range_back_days(self) -> float:
         """Calendar days from the earliest requested bar to today — what the
         yfinance intraday caps actually constrain."""
-        if "preset" in self._range:
-            return PERIOD_SPAN_DAYS.get(self._range["preset"], 100000)
+        span = range_span_days(self._range)
+        if span is not None:
+            return span
         s = date.fromisoformat(self._range["start"])
         return max((date.today() - s).days, 1)
 
     def _combo_problem(self, rng: dict, interval: str) -> Optional[str]:
         """Reason the (range, interval) pair is invalid, or None if fine.
         Encodes yfinance's real limits (see INTERVAL_MAX_BACK_DAYS)."""
-        if "preset" in rng:
-            span = back = PERIOD_SPAN_DAYS.get(rng["preset"], 100000)
-        else:
+        span = back = range_span_days(rng)
+        if span is None:
             s = date.fromisoformat(rng["start"])
             e = date.fromisoformat(rng["end"])
             span = max((e - s).days, 1)
@@ -1395,12 +1639,14 @@ class ChartPanel(Panel):
             )
             btn.setChecked(label == active_preset)
         self._custom_btn.setChecked(active_preset is None)
-        if active_preset is None:
+        if "lookback" in self._range:
+            self._custom_btn.setToolTip(lookback_label(self._range["lookback"]))
+        elif active_preset is None:
             self._custom_btn.setToolTip(
                 f"{self._range['start']} → {self._range['end']}"
             )
         else:
-            self._custom_btn.setToolTip("Pick an explicit start/end date")
+            self._custom_btn.setToolTip("Pick a lookback or explicit start/end dates")
         for label, btn in self._interval_buttons.items():
             problem = self._combo_problem(self._range, label)
             btn.setEnabled(problem is None)
@@ -1427,7 +1673,7 @@ class ChartPanel(Panel):
         else the range's preferred interval, else the finest valid one."""
         if not self._combo_problem(rng, self._interval):
             return self._interval
-        preferred = PREFERRED_INTERVAL.get(rng.get("preset", ""))
+        preferred = preferred_interval(rng)
         if preferred and not self._combo_problem(rng, preferred):
             return preferred
         for cand in INTERVALS:
@@ -1436,18 +1682,29 @@ class ChartPanel(Panel):
         return self._interval
 
     def _pick_custom_range(self) -> None:
-        if "preset" in self._range:
-            end = date.today()
-            start = end - timedelta(days=180)
-        else:
+        if "start" in self._range:
             start = date.fromisoformat(self._range["start"])
             end = date.fromisoformat(self._range["end"])
-        dlg = _RangeDialog(self, start, end)
+        else:
+            end = date.today()
+            start = end - timedelta(days=180)
+        dlg = _RangeDialog(self, start, end, self._range.get("lookback"))
         if dlg.exec() != QDialog.DialogCode.Accepted:
             self._update_range_interval_buttons()
             return
-        start, end = dlg.dates()
-        self._range = {"start": start.isoformat(), "end": end.isoformat()}
+        self._set_custom_range(dlg.chosen_range())
+
+    def _set_custom_range(self, rng: dict) -> None:
+        if "lookback" in rng:
+            # a lookback behaves like a preset: it has its own default interval
+            self._range = rng
+            fit = self._interval_for_range(rng)
+            if fit != self._interval:
+                self.set_status(f"{lookback_label(rng['lookback'])} — using {fit} bars")
+                self._interval = fit
+            self._range_or_interval_changed()
+            return
+        self._range = rng
         # a custom range can invalidate the current interval — fall back to
         # the finest still-valid one rather than fetching a combo that errors
         if self._combo_problem(self._range, self._interval):
@@ -1919,9 +2176,8 @@ class ChartPanel(Panel):
             lambda: self._frame_window(self._hist_t, self._hist_hi, self._hist_lo)
         )
         menu.addAction(reset_act)
-        png_act = QAction("Export PNG…", menu)
-        png_act.triggered.connect(self._export_png)
-        menu.addAction(png_act)
+        for act in self._build_export_menu(menu).actions():
+            menu.addAction(act)
         defaults_act = QAction("Reset chart to defaults", menu)
         defaults_act.triggered.connect(self._reset_defaults)
         menu.addAction(defaults_act)
@@ -2013,22 +2269,61 @@ class ChartPanel(Panel):
 
     def _toggle_log(self, checked: bool) -> None:
         self._log_on = checked
+        vb = self.plot_widget.getViewBox()
+        window = vb.viewRange()[0]
         self.plot_widget.setLogMode(y=checked)
+        # setLogMode re-enables auto-range on both axes: the chart jumped back
+        # to every loaded bar, and y fitted the candles only (a comparison,
+        # added with ignoreBounds, ran off the bottom). The chart frames
+        # itself, so put its window back and fit y the way it always does.
+        vb.disableAutoRange()
+        vb.setXRange(*window, padding=0)
+        self._render_annotations()  # channel fills are mapped when built
+        self._render_compares()  # re-anchored to the window's first bar
         self._fit_y_to_visible()
 
     # -- extras ----------------------------------------------------------------
 
+    def _build_export_menu(self, parent) -> QMenu:
+        menu = QMenu("Export", parent)
+        png_act = QAction("Save as PNG…", menu)
+        png_act.triggered.connect(self._export_png)
+        menu.addAction(png_act)
+        copy_act = QAction("Copy chart image", menu)
+        copy_act.triggered.connect(self._copy_chart_image)
+        menu.addAction(copy_act)
+        return menu
+
+    def chart_image(self):
+        """The chart as it stands, at twice its on-screen pixels, with a
+        header and legend; None when nothing is plotted. See _chart_export."""
+        from . import _chart_export
+
+        return _chart_export.render(self)
+
     def _export_png(self) -> None:
+        image = self.chart_image()
+        if image is None:
+            self.set_status("nothing to export — no bars plotted")
+            return
         sym = self.current_symbol or "chart"
         path, _ = QFileDialog.getSaveFileName(
             self, "Export chart as PNG", f"{sym}_chart.png", "PNG image (*.png)"
         )
         if not path:
             return
-        if self.grab().save(path, "PNG"):
+        if image.save(path, "PNG"):
             self.set_status(f"saved {path}")
         else:
             self.set_status("⚠ PNG export failed")
+
+    def _copy_chart_image(self) -> None:
+        image = self.chart_image()
+        if image is None:
+            self.set_status("nothing to copy — no bars plotted")
+            return
+        QApplication.clipboard().setImage(image)
+        self.set_status("chart image copied")
 
     def _reset_defaults(self) -> None:
         for inst in list(self._indicators):
@@ -2168,7 +2463,7 @@ class ChartPanel(Panel):
     def _update_readout(self, i: int) -> None:
         o, h, l, c = self._hist_o[i], self._hist_hi[i], self._hist_lo[i], self._hist_c[i]
         v = self._hist_v[i] if i < len(self._hist_v) else None
-        when = datetime.fromtimestamp(self._hist_t[i])
+        when = bar_datetime(self._hist_t[i])
         fmt = "%Y-%m-%d" if self._interval in ("1d", "1wk", "1mo") else "%Y-%m-%d %H:%M"
         col = self._colors["up"] if c >= o else self._colors["down"]
         vol = f"  V {_fmt_compact_num(v)}" if v else ""
@@ -2205,11 +2500,16 @@ class ChartPanel(Panel):
         """Snap a view-coordinate point to the nearest bar's time and to that
         bar's nearest O/H/L/C price, so drawings anchor to candles."""
         i = self._nearest_index(mp.x())
+        price = self._price_of_view_y(mp.y())
         if i is None:
-            return (mp.x(), mp.y())
+            return (mp.x(), price)
         ohlc = (self._hist_o[i], self._hist_hi[i], self._hist_lo[i], self._hist_c[i])
-        y = min(ohlc, key=lambda v: abs(v - mp.y()))
+        y = min(ohlc, key=lambda v: abs(v - price))
         return (self._hist_t[i], y)
+
+    def _price_of_view_y(self, y: float) -> float:
+        """A plot y as a price: on a log axis the view is in log10 units."""
+        return 10.0 ** y if self._log_on else y
 
     def _place_point(self, mp, index: int) -> tuple:
         """The coordinate for the point being placed. Most points snap to a
@@ -2218,7 +2518,9 @@ class ChartPanel(Panel):
         free = index in DRAW_TOOL_FREE_POINTS.get(self._draw_tool, ())
         # stored as (time, price), so a drawing survives a reload that brings
         # back a different number of bars
-        return (self._time_of_x(mp.x()), mp.y()) if free else self._snap_point(mp)
+        if free:
+            return (self._time_of_x(mp.x()), self._price_of_view_y(mp.y()))
+        return self._snap_point(mp)
 
     def _snapshot_drawings(self) -> tuple:
         return (
@@ -2298,6 +2600,10 @@ class ChartPanel(Panel):
     def _fill_item(self, fill: tuple, *, preview: bool) -> pg.FillBetweenItem:
         """A shaded channel interior between two boundary curves."""
         xs_a, ys_a, xs_b, ys_b = fill
+        if self._log_on:
+            # PlotCurveItem has no log mode (PlotDataItem does): map it here
+            ys_a = [math.log10(y) if y > 0 else np.nan for y in ys_a]
+            ys_b = [math.log10(y) if y > 0 else np.nan for y in ys_b]
         curve_a = pg.PlotCurveItem(xs_a, ys_a)
         curve_b = pg.PlotCurveItem(xs_b, ys_b)
         brush_color = QColor(self._drawing_color)
@@ -2408,8 +2714,6 @@ class ChartPanel(Panel):
         lookback = self._max_lookback_bars()
         if "preset" in self._range:
             preset = self._range["preset"]
-            if preset in SUB_DAY_PRESETS:
-                return SUB_DAY_FETCH_PERIOD, interval
             if interval != "1d":
                 return preset, interval
             vis_days = int(PERIOD_SPAN_DAYS.get(preset, 100000) * 0.69)  # ~trading days
@@ -2418,10 +2722,19 @@ class ChartPanel(Panel):
                 if days >= need:
                     return cand, "1d"
             return "max", "1d"
+        if "lookback" in self._range:
+            days = lookback_days(self._range["lookback"]) or 1
+            if days <= 1:
+                return SUB_DAY_FETCH_PERIOD, interval
+            # N days back from today, plus a weekend's slack so the window
+            # ending at the latest bar is full on a Monday morning
+            start = date.today() - timedelta(days=math.ceil(days) + 4)
+            end = date.today()
+        else:
+            start = date.fromisoformat(self._range["start"])
+            end = date.fromisoformat(self._range["end"])
         # custom range: widen the fetched start so indicators warm up before
         # the visible window, clamped to what the interval can legally reach
-        start = date.fromisoformat(self._range["start"])
-        end = date.fromisoformat(self._range["end"])
         widen = int(lookback * INTERVAL_APPROX_DAYS.get(interval, 1.0) * 1.7) + 3
         fetch_start = start - timedelta(days=widen)
         cap = INTERVAL_MAX_BACK_DAYS.get(interval)
@@ -2552,7 +2865,7 @@ class ChartPanel(Panel):
         if idx is None or not (0 <= idx < len(self._hist_t)):
             return ""
         try:
-            return datetime.fromtimestamp(self._hist_t[idx]).date().isoformat()
+            return bar_datetime(self._hist_t[idx]).date().isoformat()
         except (ValueError, OSError, OverflowError):
             return ""
 
@@ -2952,9 +3265,10 @@ class ChartPanel(Panel):
         been fetched, and fit Y to just the visible candles."""
         if not t:
             return
-        if "preset" in self._range:
+        span_days = range_span_days(self._range)
+        if span_days is not None:
             end = t[-1]
-            span = PERIOD_SPAN_DAYS.get(self._range["preset"], 100000) * 86400
+            span = span_days * 86400
             start = max(end - span, t[0])
         else:
             start = datetime.fromisoformat(self._range["start"]).timestamp()
@@ -3022,8 +3336,10 @@ class ChartPanel(Panel):
         self._render_lane()  # unusual-move flags depend on the loaded closes
         self._realign_compares()
 
-        rng = self._range.get("preset") or (
-            f"{self._range.get('start')}→{self._range.get('end')}"
+        rng = (
+            self._range.get("preset")
+            or self._range.get("lookback")
+            or f"{self._range.get('start')}→{self._range.get('end')}"
         )
         self.set_status(f"{rng} · {self._interval}")
         self._sync_empty()
@@ -3096,8 +3412,12 @@ class ChartPanel(Panel):
             settings = self._migrate_legacy(settings)
 
         rng = settings.get("range")
+        if isinstance(rng, dict) and rng.get("preset") in LEGACY_LOOKBACK_PRESETS:
+            # 1h / 4h left the chip row for custom…; open them as lookbacks
+            rng = {"lookback": rng["preset"]}
         if isinstance(rng, dict) and (
             rng.get("preset") in PERIOD_SPAN_DAYS
+            or lookback_days(rng.get("lookback")) is not None
             or ("start" in rng and "end" in rng)
         ):
             self._range = dict(rng)

@@ -76,6 +76,10 @@ class _ChartCell(QWidget):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setMinimumHeight(120)
         self.setObjectName("chartCell")
+        # the whole cell is the click target, so the whole cell sinks
+        from ..press import PRESS_RADIUS_PROPERTY
+
+        self.setProperty(PRESS_RADIUS_PROPERTY, 0)
         self.setStyleSheet(
             f"QWidget#chartCell {{ background: {BG}; border: 1px solid {BORDER_STRONG}; }}"
             f"QWidget#chartCell:hover {{ border-color: {ACCENT}; }}"

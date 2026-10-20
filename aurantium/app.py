@@ -44,6 +44,7 @@ from .date_context import WINDOW_SPAN_DAYS, WINDOWS, DateContext, parse_iso
 from . import motion
 from .layout_store import LayoutStore
 from .notifier import Notifier
+from .title_bar import NativeFrame, TitleBar
 from .components.fit_width import relax_min_widths
 from .panel import Panel, PanelRegistry
 from .paths import BUNDLE_DIR
@@ -93,6 +94,9 @@ WORKSPACE_CHOOSER_SHOWN_KEY = "workspaceChooser/shown"
 
 # Name of the monitor the main window was last closed on (QScreen.name()).
 MAIN_SCREEN_KEY = "window/screen"
+#: Row height the wordmark is sized against (see _build_logo_label): the mark
+#: comes out about 16px tall, quiet beside the 34px title bar.
+LOGO_ROW_HEIGHT = 30
 
 
 class _DockParentWatch(QObject):
@@ -114,10 +118,13 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Aurantium — personal terminal")
+        # Windows: frameless, with one integrated title bar (title_bar.py);
+        # everywhere else the native frame stays.
+        self.setWindowFlags(NativeFrame.window_flags(self.windowFlags()))
         self.resize(1500, 900)
         self._instance_seq: dict[str, int] = {}
         self._docks: dict[str, QtAds.CDockWidget] = {}  # instance_id -> dock
-        # full-screen (maximize-in-window) state
+        # panel-maximize (one panel fills its window) state
         self._maximize_actions: dict[str, QAction] = {}  # instance_id -> title-bar action
         self._maximized_instance: str | None = None
         self._pre_maximize_state = None  # QByteArray snapshot to restore on exit
@@ -135,24 +142,26 @@ class MainWindow(QMainWindow):
         self._tray_hidden_windows: list = []
         self._maximizing = False  # guard: hiding siblings is not a real close
         self._last_refresh_all = 0.0  # monotonic timestamp, debounces F5
-        # OS full-screen (borderless, covers the taskbar). Distinct from the
-        # in-window panel-maximize on F11. Tracked so restoring from the tray
-        # returns to full screen rather than a small window.
-        self._want_fullscreen = False
         self.layout_store = LayoutStore()
 
         # -- command bar (Bloomberg command-line analog): type ticker, Enter
         bar = QWidget(self)
         bar.setObjectName("commandBar")
         bl = QHBoxLayout(bar)
-        bl.setContentsMargins(10, 4, 10, 4)
-        bl.setSpacing(10)
-        lbl = QLabel("SYMBOL", bar)
-        lbl.setObjectName("commandLabel")
+        bl.setContentsMargins(0, 0, 0, 0)
+        bl.setSpacing(0)
         self._cmd = CommandBar(bar)
         self._cmd.setObjectName("commandInput")
-        self._cmd.setPlaceholderText(
-            "Symbol or name (AAPL, nvidia, gold…) or a /command — ↑↓ history · Tab cycles suggestions"
+        self._cmd.setPlaceholderText("Search a symbol or name (AAPL, nvidia, gold…) or type a /command")
+        self._cmd.setAccessibleName("Symbol search")
+        # A search glyph inside the field, where the SYMBOL label beside it
+        # used to be: the label pushed the field off the title bar's centre.
+        from . import icons
+        from .theme import FG_MUTED
+
+        self._cmd.addAction(
+            icons.icon("search", FG_MUTED, icons.device_pixel_ratio(self)),
+            QLineEdit.ActionPosition.LeadingPosition,
         )
         self._cmd.returnPressed.connect(self._on_command)
         from .components.symbol_search import SuggestField, shared_engine
@@ -165,9 +174,8 @@ class MainWindow(QMainWindow):
             on_pick=self._on_suggestion_picked,
             slash_completions=self._command_completions,
         )
-        bl.addWidget(lbl)
         bl.addWidget(self._cmd, 1)
-        self.setMenuWidget(self._wrap_menu_and_bar(bar))
+        self.setMenuWidget(self._build_title_bar(bar))
 
         # Docking behaviour: a panel opened from the menu arrives as its own
         # window; dragged into the layout it snaps in. Dragged out past the
@@ -206,10 +214,11 @@ class MainWindow(QMainWindow):
         self._register_dock_icons()
 
         self._build_menus()
+        self._native_frame = NativeFrame(self, self._title_bar)
         from . import guide
 
         guide.open_guide_hook = self.show_guide  # every panel's ? opens here
-        self._install_fullscreen()
+        self._install_panel_maximize()
         self._install_refresh_all()
         self._install_search_shortcut()
         self._install_more_shortcuts()
@@ -235,15 +244,34 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event) -> None:  # noqa: N802 (Qt override)
         super().resizeEvent(event)
-        # keep the notice pinned to the bottom-right corner as the window,
-        # or the full-screen toggle, changes its size
+        # keep the notice pinned to the bottom-right corner as the window
+        # changes its size
         notifier = getattr(self, "_notifier", None)
         if notifier is not None:
             notifier.reposition()
 
-    # -- full screen (maximize one panel in the window) ----------------------
+    # -- native frame (Windows): see title_bar.py ----------------------------
 
-    def _install_fullscreen(self) -> None:
+    def showEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        super().showEvent(event)
+        self._native_frame.attach()
+        self._title_bar.sync_window_state()
+
+    def changeEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.WindowStateChange:
+            self._title_bar.sync_window_state()
+
+    def nativeEvent(self, event_type, message):  # noqa: N802 (Qt override)
+        frame = getattr(self, "_native_frame", None)
+        answer = frame.handle(message) if frame is not None else None
+        if answer is not None:
+            return answer
+        return super().nativeEvent(event_type, message)
+
+    # -- panel maximize (one panel fills its window) --------------------------
+
+    def _install_panel_maximize(self) -> None:
         """Set up the F11 hotkey, the Esc-to-restore shortcut, and cache the
         maximize/restore title-bar icons."""
         self._icon_maximize = self._chrome_icon("expand")
@@ -271,7 +299,7 @@ class MainWindow(QMainWindow):
         self.addAction(f5)
 
     def _install_search_shortcut(self) -> None:
-        """Ctrl+F (Cmd+F on macOS): focus the SYMBOL command bar and select its
+        """Ctrl+F (Cmd+F on macOS): focus the search box and select its
         text so typing a new ticker overwrites the old one immediately."""
         find = QAction(self)
         find.setShortcut(QKeySequence.StandardKey.Find)
@@ -394,10 +422,11 @@ class MainWindow(QMainWindow):
         and the single-instance handler that fires when a second launch asks the
         already-running instance to surface (from the tray or from behind other
         windows) instead of opening a duplicate."""
-        if self._want_fullscreen:
-            self.showFullScreen()  # un-hide back into full screen, not a small window
+        # also un-hides a window closed to the tray, at the size it had
+        if self.windowState() & Qt.WindowState.WindowMaximized:
+            self.showMaximized()
         else:
-            self.showNormal()  # also un-hides a window closed to the tray
+            self.showNormal()
         hidden, self._tray_hidden_windows = self._tray_hidden_windows, []
         for fw in hidden:
             try:
@@ -407,20 +436,15 @@ class MainWindow(QMainWindow):
         self.raise_()
         self.activateWindow()
 
-    # -- OS full screen (borderless; distinct from F11 panel-maximize) -------
+    # -- launch -----------------------------------------------------------------
 
-    def enter_fullscreen(self) -> None:
-        """Show the window borderless, filling the screen. Called at launch so
-        aurantium opens in full screen; keeps the Settings ▸ Full Screen check in
-        sync without re-triggering the toggle."""
-        self._want_fullscreen = True
-        act = getattr(self, "_fullscreen_act", None)
-        if act is not None and not act.isChecked():
-            act.blockSignals(True)
-            act.setChecked(True)
-            act.blockSignals(False)
+    def enter_maximized(self) -> None:
+        """Open maximized on the monitor the window was last closed on. There
+        is no full-screen mode: the window is normal or maximized, and the
+        taskbar stays visible either way. (aurantium used to open in borderless
+        full screen; it now opens maximized instead.)"""
         self._move_to_saved_screen()
-        self.showFullScreen()
+        self.showMaximized()
 
     def _move_to_saved_screen(self) -> None:
         """Open on the monitor the main window was last closed on, when that
@@ -437,32 +461,6 @@ class MainWindow(QMainWindow):
         handle = self.windowHandle()
         if handle is not None:
             handle.setScreen(screen)
-
-    def _on_fullscreen_toggled(self, on: bool) -> None:
-        """Shift+F11 acts on the window it is pressed in: a panel window on a
-        second monitor goes full screen on that monitor and leaves the main
-        window alone, along with the menu's check mark, which tracks it."""
-        fw = self._active_panel_window()
-        if fw is None:
-            self._set_window_fullscreen(on)
-            return
-        act = self._fullscreen_act
-        act.blockSignals(True)
-        act.setChecked(not on)  # undo the toggle: it describes the main window
-        act.blockSignals(False)
-        if fw.isFullScreen():
-            fw.showNormal()
-        else:
-            fw.showFullScreen()
-
-    def _set_window_fullscreen(self, on: bool) -> None:
-        """Settings ▸ Full Screen / Shift+F11 handler. Leaving full screen returns
-        to a maximized window (the app's normal un-fullscreen size)."""
-        self._want_fullscreen = on
-        if on:
-            self.showFullScreen()
-        else:
-            self.showMaximized()
 
     def _quit_app(self) -> None:
         self._force_quit = True
@@ -682,26 +680,12 @@ class MainWindow(QMainWindow):
 
     # -- chrome ----------------------------------------------------------------
 
-    def _wrap_menu_and_bar(self, bar: QWidget) -> QWidget:
-        """Stack the menu row (logo + menu bar) and the symbol command bar."""
-        from PySide6.QtWidgets import QMenuBar, QVBoxLayout
-
-        holder = QWidget(self)
-        vl = QVBoxLayout(holder)
-        vl.setContentsMargins(0, 0, 0, 0)
-        vl.setSpacing(0)
-
-        menu_row = QWidget(holder)
-        menu_row.setObjectName("menuBarRow")
-        self._menu_row_layout = QHBoxLayout(menu_row)
-        self._menu_row_layout.setContentsMargins(0, 0, 0, 0)
-        self._menu_row_layout.setSpacing(0)
-        self._menubar = QMenuBar(menu_row)
-        self._menu_row_layout.addWidget(self._menubar, 1)
-        vl.addWidget(menu_row)
-
-        vl.addWidget(bar)
-        return holder
+    def _build_title_bar(self, bar: QWidget) -> QWidget:
+        """The one title bar: logo, Panels and Settings icons, the symbol
+        command bar centred, and (on Windows) the caption buttons."""
+        logo = self._build_logo_label(self, LOGO_ROW_HEIGHT)
+        self._title_bar = TitleBar(self, bar, logo)
+        return self._title_bar
 
     def _build_logo_label(self, parent: QWidget, max_height: int) -> QLabel | None:
         """Wordmark right before the Panels menu, sized to fill ``max_height``
@@ -749,31 +733,28 @@ class MainWindow(QMainWindow):
 
     def _build_menus(self) -> None:
         # Panels is the one primary top-level menu; everything else (theme,
-        # toggles, layouts, API keys, help, quit) lives under Settings.
-        self._m_panels = self._menubar.addMenu("&Panels")
+        # toggles, layouts, API keys, help, quit) lives under Settings. Both
+        # open from icon buttons on the title bar.
+        self._m_panels = QMenu("&Panels", self)
         self._rebuild_panels_menu()
 
         self._build_settings_menu()
+        self._title_bar.set_menus(self._m_panels, self._m_settings)
 
-        # QSS-derived sizing isn't resolved until the widget is polished — an
-        # unpolished QMenuBar under-reports its height (measured 31px instead
-        # of the true 45px), which would clamp the logo far smaller than the
-        # real ceiling. ensurePolished() forces that resolution synchronously,
-        # so this is accurate immediately with no dependence on event-loop
-        # timing (a deferred QTimer.singleShot(0, ...) measured right in one
-        # test but isn't guaranteed to on a different system).
-        self._menubar.ensurePolished()
-        bar_height = self._menubar.sizeHint().height()
-        logo = self._build_logo_label(self._menubar.parentWidget(), bar_height)
-        if logo is not None:
-            self._menu_row_layout.insertWidget(0, logo)
+        # Alt+P / Alt+S, the mnemonics the text menus had
+        for key, button in (
+            ("Alt+P", self._title_bar.panels_button),
+            ("Alt+S", self._title_bar.settings_button),
+        ):
+            sc = QShortcut(QKeySequence(key), self)
+            sc.activated.connect(button.showMenu)
 
     def _build_settings_menu(self) -> None:
         """The consolidated Settings menu — appearance, accessibility, layouts,
-        data keys, help, and quit. Sits beside Panels on the menu bar."""
+        data keys, help, and quit. Opens from the title bar beside Panels."""
         from .theme import THEMES, colorblind_enabled, current_theme
 
-        m = self._menubar.addMenu("&Settings")
+        m = QMenu("&Settings", self)
         self._m_settings = m
 
         # -- appearance: theme + color-blind mode ---------------------------
@@ -811,16 +792,6 @@ class MainWindow(QMainWindow):
         a_tray.toggled.connect(self._set_close_to_tray)
         self._settings_tray_act = a_tray
         m.addAction(a_tray)
-
-        a_fs = QAction("Full Screen", self)
-        a_fs.setCheckable(True)
-        a_fs.setChecked(self._want_fullscreen)  # set before connecting
-        # F11 is panel-maximize; Ctrl+Shift+F for F-row-less laptops
-        a_fs.setShortcuts([QKeySequence("Shift+F11"), QKeySequence("Ctrl+Shift+F")])
-        a_fs.setToolTip("Borderless full screen (covers the taskbar)")
-        a_fs.toggled.connect(self._on_fullscreen_toggled)
-        self._fullscreen_act = a_fs
-        m.addAction(a_fs)
 
         m.addSeparator()
 
@@ -1739,6 +1710,10 @@ class MainWindow(QMainWindow):
                 self._opening_windows -= 1
             for fw in self.dock_manager.floatingWidgets():
                 self._keep_on_screen(fw)
+                # full screen is gone; a panel window saved in it comes back
+                # maximized on the same monitor
+                if fw.isFullScreen():
+                    fw.showMaximized()
         return True
 
     # -- layout file sharing (export a saved layout / import one) -------------

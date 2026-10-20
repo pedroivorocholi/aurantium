@@ -43,54 +43,160 @@ def _bars(n=600, step=60.0, t0=1_750_000_000.0):
 
 # -- sub-day ranges ------------------------------------------------------------
 
-def test_there_are_ranges_shorter_than_a_day(chart):
-    assert "1h" in chart._range_buttons
-    assert "4h" in chart._range_buttons
+def test_sub_day_ranges_live_behind_custom_not_on_the_chip_row(chart):
+    """1h / 4h moved off the row to make room for 5y; custom… reaches them."""
+    assert "1h" not in chart._range_buttons
+    assert "4h" not in chart._range_buttons
 
 
 def test_a_range_is_never_greyed_out(chart):
-    """On the default 1d interval, 1d / 4h / 1h all used to be disabled —
-    the user had to discover that the interval row gated the range row."""
+    """On the default 1d interval, 1d used to be disabled — the user had to
+    discover that the interval row gated the range row."""
     for label, btn in chart._range_buttons.items():
         assert btn.isEnabled(), label
 
 
-def test_picking_a_short_range_switches_to_an_intraday_interval(chart):
+def test_a_one_hour_lookback_switches_to_1m_bars(chart):
     assert chart._interval == "1d"
-    chart._set_range_preset("1h")
-    assert chart._range == {"preset": "1h"}
+    chart._set_custom_range({"lookback": "1h"})
+    assert chart._range == {"lookback": "1h"}
     assert chart._interval == "1m"
     assert chart._combo_problem(chart._range, chart._interval) is None
 
 
+def test_a_four_hour_lookback_loads_5m_bars(chart):
+    chart._set_custom_range({"lookback": "4h"})
+    assert chart._interval == "5m"
+    assert chart._custom_btn.isChecked()
+    assert not any(b.isChecked() for b in chart._range_buttons.values())
+    assert chart._custom_btn.toolTip() == "Last 4 hours"
+
+
 def test_a_still_valid_interval_is_kept(chart):
     chart._set_interval("5m")
-    chart._set_range_preset("4h")
+    chart._set_custom_range({"lookback": "4h"})
     assert chart._interval == "5m"
 
 
 def test_a_long_range_after_intraday_falls_back_to_daily(chart):
-    chart._set_range_preset("1h")
+    chart._set_custom_range({"lookback": "1h"})
     chart._set_range_preset("1y")
     assert chart._interval == "1d"
 
 
-def test_sub_day_ranges_fetch_enough_to_cover_a_weekend(chart):
+def test_lookback_default_intervals():
+    from aurantium.panels.chart import preferred_interval
+
+    assert preferred_interval({"lookback": "30m"}) == "1m"
+    assert preferred_interval({"lookback": "1h"}) == "1m"
+    assert preferred_interval({"lookback": "90m"}) == "5m"
+    assert preferred_interval({"lookback": "4h"}) == "5m"
+    assert preferred_interval({"lookback": "3d"}) == "15m"  # as the 5d preset
+
+
+def test_lookback_tokens_parse():
+    from aurantium.panels.chart import lookback_days, lookback_label
+
+    assert lookback_days("4h") == pytest.approx(4 / 24)
+    assert lookback_days("90m") == pytest.approx(90 / 1440)
+    assert lookback_days("2d") == 2
+    for bad in ("0h", "4x", "h", "", None, 4):
+        assert lookback_days(bad) is None
+    assert lookback_label("1h") == "Last 1 hour"
+    assert lookback_label("15m") == "Last 15 minutes"
+
+
+def test_sub_day_lookbacks_fetch_enough_to_cover_a_weekend(chart):
     """A 1h window on Saturday is the last hour of Friday's session; fetching
     period=1d alone would also leave indicators without warm-up bars."""
-    chart._set_range_preset("1h")
+    chart._set_custom_range({"lookback": "1h"})
     period, interval = chart._fetch_spec()
     assert period == "5d"
     assert interval == "1m"
 
 
-def test_a_sub_day_range_frames_just_that_window(chart):
-    chart._set_range_preset("1h")
+def test_a_day_lookback_fetches_back_from_today(chart):
+    from datetime import date
+
+    chart._set_custom_range({"lookback": "3d"})
+    period, _ = chart._fetch_spec()
+    start, _, end = period.partition("..")
+    assert end == date.today().isoformat()
+    assert (date.today() - date.fromisoformat(start)).days >= 3
+
+
+@pytest.mark.parametrize("token, hours", [("1h", 1), ("4h", 4)])
+def test_a_lookback_frames_just_that_window(chart, token, hours):
+    """The window ends at the latest bar and starts N hours before it."""
+    chart._set_custom_range({"lookback": token})
     data = _bars()
     chart._on_history(data)
     (x0, x1), _ = chart.plot_widget.getViewBox().viewRange()
     # x is the bar slot: an hour of 1-minute bars is 60 slots wide
-    assert x1 - x0 == pytest.approx(60, rel=0.1)
+    assert x1 - x0 == pytest.approx(60 * hours, rel=0.1)
+
+
+@pytest.mark.parametrize("old", ["1h", "4h"])
+def test_a_layout_saved_with_an_old_sub_day_preset_opens_as_a_lookback(chart, old):
+    chart.restore({"range": {"preset": old}, "interval": "5m", "indicators": []})
+    assert chart._range == {"lookback": old}
+    assert chart._interval == "5m"
+    chart._update_range_interval_buttons()
+    assert chart._custom_btn.isChecked()
+    assert chart.settings()["range"] == {"lookback": old}
+
+
+def test_a_lookback_survives_a_save_and_restore(chart, qapp):
+    from aurantium.panels.chart import ChartPanel
+
+    chart._set_custom_range({"lookback": "90m"})
+    other = ChartPanel()
+    other.build()
+    other.restore(chart.settings())
+    assert other._range == {"lookback": "90m"}
+    assert other._interval == chart._interval
+
+
+def test_the_dialog_returns_a_lookback_from_a_quick_pick(chart):
+    from datetime import date
+
+    from aurantium.panels.chart import _RangeDialog
+
+    dlg = _RangeDialog(chart, date(2026, 1, 1), date(2026, 6, 1))
+    assert dlg.dates_radio.isChecked()  # opens on dates, as before
+    dlg._quick_pick("4h")
+    assert dlg.result() == dlg.DialogCode.Accepted
+    assert dlg.chosen_range() == {"lookback": "4h"}
+
+
+def test_the_dialog_keeps_the_date_pair_mode(chart):
+    from datetime import date
+
+    from aurantium.panels.chart import _RangeDialog
+
+    dlg = _RangeDialog(chart, date(2026, 1, 1), date(2026, 6, 1))
+    assert dlg.chosen_range() == {"start": "2026-01-01", "end": "2026-06-01"}
+
+
+def test_the_dialog_reopens_on_the_current_lookback(chart):
+    from datetime import date
+
+    from aurantium.panels.chart import _RangeDialog
+
+    dlg = _RangeDialog(chart, date(2026, 1, 1), date(2026, 6, 1), "90m")
+    assert dlg.last_radio.isChecked()
+    assert dlg.chosen_range() == {"lookback": "90m"}
+
+
+def test_the_dialog_refuses_a_lookback_too_short_for_two_bars(chart):
+    from datetime import date
+
+    from aurantium.panels.chart import _RangeDialog
+
+    dlg = _RangeDialog(chart, date(2026, 1, 1), date(2026, 6, 1), "5m")
+    dlg._try_accept()
+    assert dlg.result() != dlg.DialogCode.Accepted
+    assert dlg._hint.text()
 
 
 def test_intraday_history_refreshes_quickly(qapp):

@@ -1,20 +1,15 @@
-"""The painted icon family — one stroke weight, one optical size, one grid.
+"""The icon family: one set, one optical size, tinted from the palette.
 
-aurantium already had a good icon set: six 16x16 glyphs painted into a pixmap
-for the panel title bars, antialiased, on a 1.4px cosmetic round-cap stroke and
-device-pixel-ratio aware so they stay hairline-sharp on a HiDPI display. It
-lived as a private method on ``MainWindow``.
+Every icon in aurantium comes from Reicon (https://reicon.dev, MIT licensed),
+vendored into ``reicon_icons.py`` by ``tools/vendor_reicon.py``. That replaced
+a hand-painted 16px set (1.4px strokes drawn with QPainter) that never read as
+one consistent family next to the unicode glyphs (``?``, ``+``, ``⋯``, ``◀``)
+still set as button text elsewhere. Those are icons from this set now too.
 
-The problem was everything *outside* it. Affordances elsewhere in the app were
-unicode characters set as button text — ``✕`` for remove, ``⠿`` for a drag
-grip — which means the system picks whichever installed font happens to carry
-the codepoint. That font is almost never the UI font: on a stock Windows 11
-install ``⠿`` comes from a braille fallback and ``✕`` from Segoe UI Symbol,
-each with its own stroke weight, its own vertical metrics and its own idea of
-how big a 10px glyph should be. Beside a painted 1.4px icon they visibly
-disagree, and there is no stylesheet property that can make them agree.
-
-So the affordances are painted too, on the same grid and with the same pen.
+Each glyph is a 24x24 SVG painted in ``currentColor``; it is rendered with
+QtSvg at the family's logical size, for the screen's device pixel ratio, in
+whatever palette colour the caller passes, so a theme switch never needs new
+assets.
 
 What is deliberately NOT here
 -----------------------------
@@ -27,110 +22,36 @@ accessibility path, not decoration.
 
 ``▸`` stays as text. It is a menu-path separator in prose ("Settings ▸ Theme"),
 not something the user can click.
-
-The grid
---------
-
-16x16 logical units, painted into a ``round(16 * dpr)`` pixmap tagged with that
-ratio. Strokes are cosmetic, so the 1.4px weight is 1.4 *device* pixels at any
-scale factor — which is what keeps a hairline a hairline rather than letting it
-bloat to 2.8px on a 200% display. Round caps and round joins throughout.
-
-Marks are drawn on integer or half-integer coordinates depending on whether the
-stroke needs to straddle a pixel boundary or sit inside one: a 1.4px stroke
-centred on x=4.0 covers 3.3 to 4.7, which antialiases across two columns, while
-``drawRect(4, 4, 8, 8)`` lands its edges where the existing ``maximize`` glyph
-has always put them. Values here match what shipped; do not "tidy" them without
-looking at the result at 100% and 200%.
 """
 
 from __future__ import annotations
 
-from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
+from functools import lru_cache
+
+from PySide6.QtCore import QByteArray, QRectF, Qt
+from PySide6.QtGui import QIcon, QPainter, QPixmap
+from PySide6.QtSvg import QSvgRenderer
+
+from .reicon_icons import SVG, VIEWBOX
 
 #: Logical size of every glyph in the family. One optical size, so an icon
 #: never has to be scaled to sit beside another one.
 SIZE = 16
 
-#: The one stroke weight. Cosmetic, so it means 1.4 device pixels at any
-#: device-pixel-ratio rather than 1.4 logical units scaled up with everything
-#: else.
-STROKE = 1.4
-
-#: Dot diameter, for the one glyph made of dots rather than lines.
-#:
-#: Not ``STROKE``, and the difference is the point. A dot's *diameter* and a
-#: line's *thickness* are different quantities: a 1.4px dot carries about a
-#: sixth of the ink of a 6px line at 1.4px, so matching the two numbers makes
-#: the dots read as a sixth of the family's weight — which is exactly how the
-#: first attempt looked, rendered side by side with the other six glyphs at
-#: 1x, 2x and 4x. 2.4px is where a dot's mass matches a stroke's. Going on to
-#: 2.8 starts to merge the columns at 100%.
-DOT = 2.4
-
 #: Every kind this module can paint. Used by the tests to hold the family
-#: closed — a seventh glyph added as unicode text somewhere else in the app is
+#: closed — an affordance added as unicode text somewhere else in the app is
 #: exactly the regression this module exists to prevent.
-KINDS = (
-    "close",
-    "expand",
-    "maximize",
-    "restore",
-    "menu",
-    "pin",
-    "grip",
-)
+KINDS = tuple(SVG)
 
 
-def _paint(painter: QPainter, kind: str, color: QColor) -> None:
-    """Draw one glyph into ``painter``, which is already set up on the 16x16
-    logical grid with antialiasing on."""
-    pen = QPen(color)
-    pen.setWidthF(STROKE)
-    pen.setCosmetic(True)
-    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-    painter.setPen(pen)
-    painter.setBrush(Qt.BrushStyle.NoBrush)
-
-    if kind == "close":
-        painter.drawLine(QPointF(5, 5), QPointF(11, 11))
-        painter.drawLine(QPointF(11, 5), QPointF(5, 11))
-    elif kind == "expand":  # diagonal arrows to opposite corners → fill window
-        painter.drawLine(QPointF(7, 7), QPointF(4, 4))
-        painter.drawLine(QPointF(4, 4), QPointF(4, 7))
-        painter.drawLine(QPointF(4, 4), QPointF(7, 4))
-        painter.drawLine(QPointF(9, 9), QPointF(12, 12))
-        painter.drawLine(QPointF(12, 12), QPointF(12, 9))
-        painter.drawLine(QPointF(12, 12), QPointF(9, 12))
-    elif kind == "maximize":
-        painter.drawRect(4, 4, 8, 8)
-    elif kind == "restore":
-        painter.drawRect(QRectF(5.5, 3.5, 6, 6))  # back square (upper-right)
-        painter.drawRect(QRectF(3.5, 5.5, 6, 6))  # front square (lower-left)
-    elif kind == "menu":
-        for y in (5, 8, 11):
-            painter.drawLine(QPointF(4, y), QPointF(12, y))
-    elif kind == "pin":
-        painter.drawEllipse(QPointF(8, 6), 2.6, 2.6)
-        painter.drawLine(QPointF(8, 8.6), QPointF(8, 12.5))
-    elif kind == "grip":
-        # Two columns of three dots, the same arrangement as the ⠿ it replaces.
-        #
-        # Painted as round-capped points rather than as filled ellipses so the
-        # dots stay *cosmetic*, like every stroke in the family: a filled
-        # ellipse is in logical units and would grow with the device pixel
-        # ratio while the lines beside it did not, which is precisely the
-        # optical-size disagreement this module exists to remove.
-        #
-        # 4px between columns and 3.5px between rows: tight enough to read as
-        # one object at 16px, open enough that the dots do not merge at 100%.
-        pen.setWidthF(DOT)
-        painter.setPen(pen)
-        for x in (6.0, 10.0):
-            for y in (4.5, 8.0, 11.5):
-                painter.drawPoint(QPointF(x, y))
+@lru_cache(maxsize=256)
+def _renderer(kind: str, color: str) -> QSvgRenderer:
+    body = SVG[kind].replace("currentColor", color)
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {VIEWBOX} {VIEWBOX}" '
+        f'fill="none">{body}</svg>'
+    )
+    return QSvgRenderer(QByteArray(svg.encode("utf-8")))
 
 
 def icon(kind: str, color: str, dpr: float = 1.0) -> QIcon:
@@ -138,15 +59,15 @@ def icon(kind: str, color: str, dpr: float = 1.0) -> QIcon:
     return QIcon(pixmap(kind, color, dpr))
 
 
-def pixmap(kind: str, color: str, dpr: float = 1.0) -> QPixmap:
+def pixmap(kind: str, color: str, dpr: float = 1.0, size: int = SIZE) -> QPixmap:
     """The glyph as a pixmap — for a QLabel, which takes no QIcon."""
     dpr = dpr or 1.0
-    px = QPixmap(round(SIZE * dpr), round(SIZE * dpr))
+    px = QPixmap(round(size * dpr), round(size * dpr))
     px.setDevicePixelRatio(dpr)
     px.fill(Qt.GlobalColor.transparent)
     painter = QPainter(px)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-    _paint(painter, kind, QColor(color))
+    _renderer(kind, str(color)).render(painter, QRectF(0, 0, size, size))
     painter.end()
     return px
 
@@ -162,14 +83,42 @@ def two_tone_icon(
     pixmap while the mouse is over the control and ``Normal`` otherwise, so the
     hover colour survives the move.
 
-    Used by the list editor's row-delete button, whose ``✕`` went from grey to
-    the loss red on hover and would otherwise have gone flat.
+    Used by the list editor's row-delete button (grey to the loss red) and the
+    title bar's close button (white on the red hover fill).
     """
     result = QIcon()
     result.addPixmap(pixmap(kind, color, dpr), QIcon.Mode.Normal)
     result.addPixmap(pixmap(kind, hover_color, dpr), QIcon.Mode.Active)
     result.addPixmap(pixmap(kind, hover_color, dpr), QIcon.Mode.Selected)
     return result
+
+
+def set_icon(
+    button,
+    kind: str,
+    color: str,
+    hover_color: str | None = None,
+    disabled_color: str | None = None,
+    size: int = SIZE,
+) -> None:
+    """Put glyph ``kind`` on a QToolButton/QPushButton in place of its text,
+    painted for the button's screen, with optional hover (``Active``) and
+    disabled tints — Qt's own disabled tint of an icon is a grey wash that
+    matches nothing in the palette."""
+    from PySide6.QtCore import QSize
+
+    dpr = device_pixel_ratio(button)
+    result = QIcon()
+    result.addPixmap(pixmap(kind, color, dpr, size), QIcon.Mode.Normal)
+    if hover_color:
+        hover = pixmap(kind, hover_color, dpr, size)
+        result.addPixmap(hover, QIcon.Mode.Active)
+        result.addPixmap(hover, QIcon.Mode.Selected)
+    if disabled_color:
+        result.addPixmap(pixmap(kind, disabled_color, dpr, size), QIcon.Mode.Disabled)
+    button.setText("")
+    button.setIcon(result)
+    button.setIconSize(QSize(size, size))
 
 
 def device_pixel_ratio(widget=None) -> float:

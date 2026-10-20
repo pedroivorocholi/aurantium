@@ -104,6 +104,7 @@ SPACE_XL = 12
 # Two control rungs, not one, is the price of making it proportional. It is
 # still a scale and not the five ad-hoc values it replaced: one ratio, applied
 # at the two control sizes this app has.
+RADIUS_NONE = 0    # window caption buttons: square and flush to the edge, as Windows draws them
 RADIUS_XS = 3      # 12px indicators: the check and menu-tick squares
 RADIUS_SM = 6      # controls: buttons, inputs, chips, tabs
 RADIUS_MD = 7      # surfaces: menus, tooltips, tiles, cards
@@ -536,8 +537,7 @@ QToolButton#moreButton {{
     background: {p['BG_ELEV']}; color: {p['CHROME_TEXT']};
 }}
 QToolButton#moreButton:hover {{ border-color: {p['ACCENT_DEEP']}; }}
-QToolButton#moreButton::menu-indicator {{ image: none; width: 0px; }}
-QLabel#profilePrice {{
+QToolButton#moreButton::menu-indicator {{ image: none; width: 0px; }}QLabel#profilePrice {{
     background: transparent; color: {p['FG']};
     font-family: "{MONO_FONT}"; font-size: {FONT_TITLE}px; font-weight: {WEIGHT_BOLD};
 }}
@@ -576,7 +576,30 @@ QMenuBar::item:disabled {{ color: {p['FG_MUTED']}; }}
 /* The blanket QWidget rule above paints every plain widget BG (true black),
    which is visibly darker than CHROME — override it so the logo's transparent
    PNG shows the same chrome grey as the rest of the row, not a black box. */
-QLabel#menuBarLogo {{ background: transparent; padding: {SPACE_SM}px 0px 0px {SPACE_LG}px; }}
+QLabel#menuBarLogo {{ background: transparent; padding: 0px 0px 0px {SPACE_LG}px; }}
+/* The title bar (title_bar.py): the menu row grew the command bar and, on
+   Windows, the caption buttons. Panels and Settings are icons now, with the
+   fills the text menu items had. */
+QToolButton#titleMenuButton {{
+    background: transparent; border: none; border-radius: {RADIUS_SM}px; padding: 6px;
+}}
+QToolButton#titleMenuButton:hover {{ background: {p['CHROME_HOVER']}; }}
+QToolButton#titleMenuButton:pressed, QToolButton#titleMenuButton:open {{
+    background: {p['CHROME_BORDER']};
+}}
+QToolButton#titleMenuButton::menu-indicator {{ image: none; width: 0px; }}
+QToolButton#titleMin, QToolButton#titleMax, QToolButton#titleClose {{
+    background: transparent; border: none; border-radius: {RADIUS_NONE}px;
+}}
+QToolButton#titleMin:hover, QToolButton#titleMax:hover,
+QToolButton#titleMax[ncHover="true"] {{ background: {p['CHROME_HOVER']}; }}
+QToolButton#titleMin:pressed, QToolButton#titleMax[ncPressed="true"] {{
+    background: {p['CHROME_BORDER']};
+}}
+/* the Windows 11 close-button red, in both themes, as Windows and VS Code
+   draw it */
+QToolButton#titleClose:hover {{ background: #c42b1c; }}
+QToolButton#titleClose:pressed {{ background: #c84031; }}
 
 /* -- depth: chrome above, data below --------------------------------------
    The app was flat. The menu row, the command bar, every panel header strip
@@ -598,16 +621,15 @@ QWidget#commandBar {{
     border-top: 1px solid {p['CHROME_EDGE']};
     border-bottom: 1px solid {p['CHROME_BORDER']};
 }}
-/* The blanket QWidget rule paints every plain widget BG, which on the chrome
-   bar is a black box around the label — the same trap QLabel#menuBarLogo
-   documents. */
-QLabel#commandLabel {{
-    background: transparent; color: {p['ACCENT']};
-    font-size: {FONT_MD}px; font-weight: {WEIGHT_BOLD}; letter-spacing: 2px;
+/* The command bar moved into the title bar (title_bar.py). There the bar is
+   the raised surface; edges on the command bar too would draw a box inside
+   it. */
+QWidget#menuBarRow QWidget#commandBar {{
+    background: transparent; border: none;
 }}
 QLineEdit#commandInput {{
     background: {p['BG']}; border: 1px solid {p['BORDER_STRONG']}; border-radius: {RADIUS_SM}px;
-    padding: 4px 10px; color: {p['LABEL']}; font-family: "{MONO_FONT}"; font-size: {FONT_LG}px;
+    padding: 2px 10px 2px 4px; color: {p['LABEL']}; font-family: "{MONO_FONT}"; font-size: {FONT_LG}px;
     selection-background-color: {p['ACCENT']}; selection-color: {p['ON_ACCENT']};
     /* without this Qt fades the placeholder from `color` — LABEL at half
        alpha, a pale wash that on white is the "inverted colours" look */
@@ -640,7 +662,8 @@ QHeaderView::section {{
 QHeaderView::section:hover {{ background: {p['CHROME_HOVER']}; color: {p['CHROME_TEXT']}; }}
 /* Clicking a column header sorts by it, so it is a control and gets the full
    set. Sub-control, so the press snaps — see the QTabBar note. */
-QHeaderView::section:pressed {{ background: {p['CHROME_BORDER']}; color: {p['CHROME_TEXT']}; }}
+/* press.py sinks the pressed section; pressed holds the hover tone */
+QHeaderView::section:pressed {{ background: {p['CHROME_HOVER']}; color: {p['CHROME_TEXT']}; }}
 QHeaderView::section:disabled {{ color: {p['FG_MUTED']}; }}
 QHeaderView::section[kbFocus="true"] {{ border: 1px solid {p['FOCUS']}; }}
 QHeaderView::section:last {{ border-right: 0; }}
@@ -709,13 +732,16 @@ QTabBar::tab {{
     font-weight: {WEIGHT_MEDIUM};
 }}
 QTabBar::tab:hover {{ background: {p['CHROME_LOW']}; color: {p['CHROME_TEXT']}; }}
-/* A tab is a *sub-control*, not a widget, so it cannot carry the animated
-   press scrim the way a QPushButton does — there is no child to attach to.
-   Sub-controls therefore get their press as a stylesheet fill, which snaps
-   rather than eases. Same sink direction as everything else, just without the
-   travel; that limitation is Qt's, and it is confined to this group. */
-QTabBar::tab:pressed {{ background: {p['CHROME_BORDER']}; color: {p['CHROME_TEXT']}; }}
+/* A tab is a sub-control, so press.py sinks it with a region scrim on the
+   tab bar (the pressed tab's rect). Pressed holds the hover tone, as on
+   buttons: a fill swap here would land on the first frame and hide the eased
+   sink. */
+QTabBar::tab:pressed {{ background: {p['CHROME_LOW']}; color: {p['CHROME_TEXT']}; }}
 QTabBar::tab:selected {{ color: {p['CHROME_TEXT']}; border-bottom: 2px solid {p['ACCENT']}; }}
+/* A bar with a sliding indicator (transitions.py) has the underline painted
+   by the indicator, which travels between tabs; the static one goes clear so
+   there are not two. The 2px border stays, so no tab changes height. */
+QTabBar[slidingIndicator="true"]::tab:selected {{ border-bottom-color: transparent; }}
 QTabBar::tab:disabled {{ color: {p['FG_MUTED']}; }}
 QTabBar::tab[kbFocus="true"] {{ color: {p['FOCUS']}; border-bottom-color: {p['FOCUS']}; }}
 
@@ -988,6 +1014,12 @@ ads--CDockAreaTitleBar {{
     border-bottom: 1px solid {p['CHROME_BORDER']};
     padding: 0 2px;
 }}
+/* The tabs sit in a scroll area's viewport, in a plain QWidget QtAds names
+   tabsContainerWidget. The app-wide QWidget rule painted both BG, so every
+   inactive tab showed the page colour inside the CHROME bar (a white band in
+   the light theme). They are holders, not surfaces: let the bar show through. */
+ads--CDockAreaTabBar, ads--CDockAreaTabBar QWidget#qt_scrollarea_viewport,
+ads--CDockAreaTabBar QWidget#tabsContainerWidget {{ background: transparent; }}
 ads--CDockWidgetTab {{
     background: transparent; border: 0; border-right: 1px solid {p['CHROME_BORDER']};
     border-bottom: 2px solid transparent; padding: 4px 12px;
@@ -1000,6 +1032,11 @@ ads--CDockWidgetTab:hover {{ background: {p['CHROME_HOVER']}; }}
 ads--CDockWidgetTab:pressed {{ background: {p['CHROME_HOVER']}; }}
 ads--CDockWidgetTab[activeTab="true"] {{
     background: {p['CHROME_HOVER']}; border-bottom: 2px solid {p['ACCENT']};
+}}
+/* The same box, drawn by a sliding indicator under the tabs (transitions.py)
+   so it travels to the next active tab; the tab itself goes clear over it. */
+ads--CDockAreaTabBar[slidingIndicator="true"] ads--CDockWidgetTab[activeTab="true"] {{
+    background: transparent; border-bottom-color: transparent;
 }}
 ads--CDockWidgetTab QLabel {{
     background: transparent; color: {p['CHROME_TEXT_DIM']};
@@ -1034,6 +1071,10 @@ ads--CTitleBarButton[kbFocus="true"] {{
     border: 1px solid {p['FOCUS']}; border-radius: {RADIUS_SM}px;
 }}
 ads--CTitleBarButton:disabled {{ color: {p['FG_MUTED']}; }}
+/* "List all tabs" opens a menu, and Qt pins its own small arrow to the
+   corner of any tool button that does: clutter at 12px, on a button whose
+   glyph already says it opens a list */
+ads--CTitleBarButton::menu-indicator {{ image: none; width: 0px; }}
 /* The focused dock area. F11 maximizes "the focused panel" and Ctrl+W closes
    it, but nothing on screen said which one that was. QtAds already sets the
    ``focused`` property on the active tab and title bar — CDockManager
@@ -1070,67 +1111,73 @@ ADS_STYLESHEET = _build_ads_stylesheet(_ACTIVE)
 # as a plain text box with nothing to say it opens, and every spin box showed a
 # blank grey block where its stepper arrows belonged. QSS cannot draw a glyph
 # (no ``content:``, and border-triangles render as boxes in Qt), so the arrows
-# are painted here — palette colours, 1x/2x/3x for scaled displays — written to
-# a per-palette folder, and the sheet points the arrow sub-controls at them.
+# are rendered here from the icon family — palette colours, 1x/2x/3x for scaled
+# displays — written to a per-palette folder, and the sheet points the arrow
+# sub-controls at them.
 
-#: (name, logical width, logical height, points as fractions of the box)
+#: (file name, icon kind from the family in icons.py, logical size in px)
 _ARROWS = (
-    ("chevron-down", 10, 6, ((0.1, 0.2), (0.5, 0.8), (0.9, 0.2))),
-    ("chevron-up", 8, 5, ((0.1, 0.8), (0.5, 0.2), (0.9, 0.8))),
-    ("chevron-down-small", 8, 5, ((0.1, 0.2), (0.5, 0.8), (0.9, 0.2))),
+    ("chevron-down", "chevron-down", 12),
+    ("chevron-up", "chevron-up", 10),
+    ("chevron-down-small", "chevron-down", 10),
+    ("chevron-right", "chevron-right", 12),
 )
 
 
 def _arrow_sheet(p: dict) -> str:
-    """Paint the arrow images for palette ``p`` and return the QSS that uses
-    them. Best-effort: on any failure the arrows are simply absent, as before."""
+    """Render the arrow images for palette ``p`` from the icon family and
+    return the QSS that uses them. Best-effort: on any failure the arrows are
+    simply absent, as before."""
     import hashlib
     import tempfile
     from pathlib import Path
 
-    from PySide6.QtCore import QPointF, Qt
-    from PySide6.QtGui import QImage, QPainter, QPen
+    from PySide6.QtCore import QRectF, Qt
+    from PySide6.QtGui import QImage, QPainter
+
+    from . import icons
 
     tones = {"": p["CHROME_TEXT_DIM"], "-off": p["FG_MUTED"]}
-    key = hashlib.sha1(repr(sorted(tones.items())).encode()).hexdigest()[:10]
+    key = hashlib.sha1(
+        (repr(sorted(tones.items())) + repr(_ARROWS) + "reicon").encode()
+    ).hexdigest()[:10]
     folder = Path(tempfile.gettempdir()) / "aurantium-theme" / key
     try:
         folder.mkdir(parents=True, exist_ok=True)
-        for name, w, h, pts in _ARROWS:
+        for name, kind, size in _ARROWS:
             for suffix, color in tones.items():
                 for scale in (1, 2, 3):
                     path = folder / (f"{name}{suffix}" + (f"@{scale}x" if scale > 1 else "") + ".png")
                     if path.is_file():
                         continue
-                    img = QImage(w * scale, h * scale, QImage.Format.Format_ARGB32_Premultiplied)
+                    img = QImage(size * scale, size * scale, QImage.Format.Format_ARGB32_Premultiplied)
                     img.fill(Qt.GlobalColor.transparent)
                     painter = QPainter(img)
                     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-                    pen = QPen(QColor(color), 1.6 * scale)
-                    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-                    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-                    painter.setPen(pen)
-                    painter.drawPolyline([QPointF(x * w * scale, y * h * scale) for x, y in pts])
+                    icons._renderer(kind, color).render(
+                        painter, QRectF(0, 0, size * scale, size * scale)
+                    )
                     painter.end()
                     img.save(str(path))
     except Exception:
         return ""
     url = folder.as_posix()
     return f"""
-QComboBox::down-arrow {{ image: url({url}/chevron-down.png); width: 10px; height: 6px; }}
+QComboBox::down-arrow {{ image: url({url}/chevron-down.png); width: 12px; height: 12px; }}
 QComboBox::down-arrow:disabled {{ image: url({url}/chevron-down-off.png); }}
-QDateEdit::down-arrow {{ image: url({url}/chevron-down.png); width: 10px; height: 6px; }}
+QDateEdit::down-arrow {{ image: url({url}/chevron-down.png); width: 12px; height: 12px; }}
 QDateEdit::down-arrow:disabled {{ image: url({url}/chevron-down-off.png); }}
 QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
-    image: url({url}/chevron-up.png); width: 8px; height: 5px;
+    image: url({url}/chevron-up.png); width: 10px; height: 10px;
 }}
 QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
-    image: url({url}/chevron-down-small.png); width: 8px; height: 5px;
+    image: url({url}/chevron-down-small.png); width: 10px; height: 10px;
 }}
 QSpinBox::up-arrow:disabled, QDoubleSpinBox::up-arrow:disabled {{ image: url({url}/chevron-up-off.png); }}
 QSpinBox::down-arrow:disabled, QDoubleSpinBox::down-arrow:disabled {{
     image: url({url}/chevron-down-small-off.png);
 }}
+QMenu::right-arrow {{ image: url({url}/chevron-right.png); width: 12px; height: 12px; }}
 """
 
 

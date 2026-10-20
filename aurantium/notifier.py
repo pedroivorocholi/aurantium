@@ -72,6 +72,10 @@ class Notifier(QWidget):
     def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
         self.setObjectName("notifier")
+        # a click dismisses the card: it sinks first, like any control
+        from .press import PRESS_RADIUS_PROPERTY
+
+        self.setProperty(PRESS_RADIUS_PROPERTY, RADIUS_MD)
         # A bare QWidget ignores `background`/`border` from a stylesheet unless
         # it opts into style-drawn backgrounds — without this the card renders
         # as bare text floating over whatever panel is underneath.

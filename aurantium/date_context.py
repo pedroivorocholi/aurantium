@@ -19,7 +19,7 @@ badge UI and the user's mental model stay identical.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Optional
 
 from PySide6.QtCore import QObject, Signal
@@ -56,6 +56,20 @@ WINDOWS: tuple[str, ...] = ("1D", "3D", "1W", "1M")
 #: weekend, so the default sweep reaches one day either side; "1D" stays
 #: available for the strict single session.
 DEFAULT_WINDOW = "3D"
+
+
+def bar_datetime(ts: float) -> datetime:
+    """A bar's epoch-second time as a local datetime, like
+    ``datetime.fromtimestamp`` — including before 1970, which Windows'
+    localtime() rejects with OSError 22 (``max`` on an old index or a stock
+    listed in the 1960s). Those fall back to the epoch's local offset; a
+    pre-1970 bar is daily or coarser, so the date is what matters."""
+    try:
+        return datetime.fromtimestamp(ts)
+    except (OSError, OverflowError, ValueError):
+        if ts != ts:  # NaN: not a time at all
+            raise ValueError("bar time is NaN") from None
+        return datetime.fromtimestamp(0) + timedelta(seconds=ts)
 
 
 def window_radius(window: str) -> int:

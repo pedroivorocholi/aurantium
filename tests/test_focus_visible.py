@@ -222,6 +222,6 @@ def test_previously_unstyled_surfaces_are_styled(selector):
 
 
 def test_the_checkable_menu_indicator_is_filled():
-    """It was sized but never given a fill, so Full Screen / Colour-blind mode /
+    """It was sized but never given a fill, so Close to tray / Colour-blind mode /
     the Theme radio group drew their ticks with the native style."""
     assert "QMenu::indicator:checked" in theme.STYLESHEET
