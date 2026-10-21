@@ -23,7 +23,15 @@ from __future__ import annotations
 import sys
 
 import shiboken6
-from PySide6.QtCore import QPoint, QSize, Qt
+from PySide6.QtCore import (
+    QAbstractNativeEventFilter,
+    QCoreApplication,
+    QEvent,
+    QObject,
+    QPoint,
+    QSize,
+    Qt,
+)
 from PySide6.QtWidgets import QHBoxLayout, QMenu, QToolButton, QWidget
 
 from . import icons
@@ -44,9 +52,10 @@ COMMAND_MIN_W = 220
 
 class TitleBar(QWidget):
     """Logo, the Panels and Settings icon menus, the centred command bar and
-    (Windows only) the caption buttons."""
+    (Windows only) the caption buttons. Panel windows get one with no command
+    bar (``command=None``)."""
 
-    def __init__(self, window, command: QWidget, logo: QWidget | None) -> None:
+    def __init__(self, window, command: QWidget | None, logo: QWidget | None) -> None:
         super().__init__(window)
         # keeps the old menu row's chrome fill and bottom hairline (theme.py)
         self.setObjectName("menuBarRow")
@@ -54,7 +63,8 @@ class TitleBar(QWidget):
         self.setFixedHeight(HEIGHT)
         self._window = window
         self._command = command
-        command.setParent(self)
+        if command is not None:
+            command.setParent(self)
 
         lay = QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
@@ -179,6 +189,8 @@ class TitleBar(QWidget):
     def _place_command(self) -> None:
         """Centre the command bar on the window, as VS Code centres its search,
         shrinking it to the gap between the side groups when it can't."""
+        if self._command is None:
+            return
         lay = self.layout()
         lay.activate()
         left = 0
@@ -208,7 +220,9 @@ class TitleBar(QWidget):
         if not self.rect().contains(local):
             return False
         child = self.childAt(local)
-        return child is None or child is self._logo or child is self._command
+        return child is None or child is self._logo or (
+            self._command is not None and child is self._command
+        )
 
     def over_max_button(self, local: QPoint) -> bool:
         b = self.max_button
@@ -434,7 +448,12 @@ class NativeFrame:
         )
         _user32.ScreenToClient(self._hwnd, ctypes.byref(pt))
         dpr = w.devicePixelRatioF() or 1.0
-        pos = QPoint(int(pt.x / dpr), int(pt.y / dpr))
+        return self.hit_at(QPoint(int(pt.x / dpr), int(pt.y / dpr)))
+
+    def hit_at(self, pos: QPoint) -> int:
+        """What the window's point ``pos`` (logical pixels) is to Windows:
+        a resize edge, the caption, the maximize button or plain client."""
+        w = self._window
         x, y = pos.x(), pos.y()
         if not w.isMaximized():
             b = RESIZE_BORDER
@@ -470,3 +489,84 @@ class NativeFrame:
         tme.hwndTrack = self._hwnd
         tme.dwHoverTime = 0
         _user32.TrackMouseEvent(ctypes.byref(tme))
+
+
+
+# -- panel windows (Windows) ----------------------------------------------------
+#
+# A panel dragged out onto another monitor lives in a window QtAds makes
+# (``CFloatingDockContainer``), so there is no ``nativeEvent`` of ours to
+# override. Each such window gets the main window's bar minus the command bar,
+# goes frameless the same way, and an application-wide native event filter
+# hands its messages to its ``NativeFrame``.
+
+
+class _PanelWindowFrames(QAbstractNativeEventFilter):
+    """hwnd -> ``NativeFrame`` for every framed panel window."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.frames: dict[int, NativeFrame] = {}
+        self._installed = False
+
+    def add(self, frame: NativeFrame) -> None:
+        if not self._installed:
+            QCoreApplication.instance().installNativeEventFilter(self)
+            self._installed = True
+        self.frames = {h: f for h, f in self.frames.items() if f is not frame}
+        self.frames[frame._hwnd] = frame
+
+    def remove(self, window) -> None:
+        self.frames = {h: f for h, f in self.frames.items() if f._window is not window}
+
+    def nativeEventFilter(self, event_type, message):  # noqa: N802 (Qt override)
+        if self.frames and IS_WINDOWS:
+            hwnd = wintypes.MSG.from_address(int(message)).hWnd
+            frame = self.frames.get(hwnd or 0)
+            if frame is not None:
+                answer = frame.handle(message)
+                if answer is not None:
+                    return answer
+        return False, 0
+
+
+_panel_frames = _PanelWindowFrames()
+
+
+class _PanelWindowWatch(QObject):
+    """Re-attaches the frame when the window (re)gets its native handle,
+    keeps the maximize glyph in step, and forgets the window when it goes."""
+
+    def __init__(self, window, frame: NativeFrame, bar: TitleBar) -> None:
+        super().__init__(window)
+        self._frame = frame
+        self._bar = bar
+        window.installEventFilter(self)
+        window.destroyed.connect(lambda *_: _panel_frames.remove(window))
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt override)
+        t = event.type()
+        if t == QEvent.Type.Show:
+            self._frame.attach()
+            _panel_frames.add(self._frame)
+            self._bar.sync_window_state()
+        elif t == QEvent.Type.WindowStateChange:
+            self._bar.sync_window_state()
+        return False
+
+
+def frame_panel_window(window, logo: QWidget | None, panels: QMenu, settings: QMenu) -> None:
+    """Give a panel window the main window's title bar, without the command
+    bar, in place of the native caption. Windows only; elsewhere the native
+    frame stays. Call before the window is first shown."""
+    if not IS_WINDOWS:
+        return
+    window.setWindowFlags(NativeFrame.window_flags(window.windowFlags()))
+    bar = TitleBar(window, None, logo)
+    bar.set_menus(panels, settings)
+    window.layout().insertWidget(0, bar)
+    frame = NativeFrame(window, bar)
+    _PanelWindowWatch(window, frame, bar)
+    if window.isVisible():  # shown already: attach now, not on the next Show
+        frame.attach()
+        _panel_frames.add(frame)

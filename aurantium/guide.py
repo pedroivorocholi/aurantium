@@ -242,7 +242,8 @@ LINKING = Page(
             "panels into it and they dock and snap just as in the main window. "
             "A drag released inside a window but not on a drop target goes back "
             "where it came from. Panels in every window share the link groups, and "
-            "<b>F11</b> maximizes a panel within its own window. Each window's "
+            "<b>F11</b> maximizes a panel within its own window; on a panel alone "
+            "in its window it maximizes the window on that monitor. Each window's "
             "position, monitor and maximized state are saved with the layout; "
             "a window whose monitor is gone reopens on this one.")),
         Detail("Panel sizes", _p(

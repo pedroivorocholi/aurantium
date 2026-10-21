@@ -122,6 +122,60 @@ def test_panel_windows_get_the_app_shortcuts(win):
     assert "F5" in keys and "F11" in keys
 
 
+def test_a_new_panel_window_keeps_the_title_bar(win, qapp, monkeypatch):
+    """Regression: collecting shortcuts called QMainWindow.menuBar(), which
+    builds an empty QMenuBar and installs it in place of the title bar —
+    deleting it. The bar vanished on the first drag to another monitor and
+    the next window-state change crashed on its dead buttons."""
+    import shiboken6
+    from PySide6.QtCore import QPoint
+
+    win.show()
+    win.add_panel("chart")
+    first = win.add_panel("company")
+    second = win.add_panel("watchlist")
+    qapp.processEvents()
+    far = win.frameGeometry().bottomRight() + QPoint(4000, 4000)
+    _tear_off(win, qapp, monkeypatch, first, far)
+    _tear_off(win, qapp, monkeypatch, second, far)
+    qapp.processEvents()
+    assert shiboken6.isValid(win._title_bar)
+    assert win.menuWidget() is win._title_bar
+    assert win._title_bar.isVisible()
+    win._title_bar.sync_window_state()  # its buttons are still alive
+
+
+def test_panel_window_shortcuts_include_the_menus(win):
+    dock = win.add_panel("company", floating=True)
+    container = dock.dockContainer().floatingWidget()
+    menu_keys = {
+        a.shortcut().toString()
+        for m in (win._m_panels, win._m_settings)
+        for a in m.actions()
+        if a.menu() is None and a.shortcuts()
+    }
+    keys = {a.shortcut().toString() for a in container.actions()}
+    assert menu_keys <= keys
+
+
+def test_f11_on_a_lone_panel_maximizes_its_window(win, qapp):
+    """A panel alone in its window has no siblings to hide, so F11 used to do
+    nothing there; it maximizes that window on its monitor instead."""
+    win.show()
+    win.add_panel("chart")
+    dock = win.add_panel("company", floating=True)
+    fw = dock.dockContainer().floatingWidget()
+    fw.show()
+    qapp.processEvents()
+    win._set_maximized(dock.objectName(), True)
+    qapp.processEvents()
+    assert fw.isMaximized()
+    assert win._maximized_instance is None, "no panel-maximize state to undo"
+    win._set_maximized(dock.objectName(), True)  # F11 again restores
+    qapp.processEvents()
+    assert not fw.isMaximized()
+
+
 def test_maximize_stays_inside_its_own_window(win, qapp):
     main = win.add_panel("chart")
     win.add_panel("watchlist")

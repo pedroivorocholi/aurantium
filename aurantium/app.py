@@ -44,7 +44,7 @@ from .date_context import WINDOW_SPAN_DAYS, WINDOWS, DateContext, parse_iso
 from . import motion
 from .layout_store import LayoutStore
 from .notifier import Notifier
-from .title_bar import NativeFrame, TitleBar
+from .title_bar import NativeFrame, TitleBar, frame_panel_window
 from .components.fit_width import relax_min_widths
 from .panel import Panel, PanelRegistry
 from .paths import BUNDLE_DIR
@@ -588,6 +588,16 @@ class MainWindow(QMainWindow):
         target = self._docks.get(instance_id)
         if target is None:
             return
+        window = self._lone_panel_window(target)
+        if window is not None and not self._maximized_instance:
+            # alone in its own window there is nothing to hide: F11 (or the
+            # title-bar button) maximizes / restores that window instead
+            if window.isMaximized():
+                window.showNormal()
+            else:
+                window.showMaximized()
+            self._sync_maximize_action(instance_id, False)
+            return
         if not on:
             self._exit_maximize()
             return
@@ -614,6 +624,15 @@ class MainWindow(QMainWindow):
         self.notify(
             "Panel maximized — press F11 or Esc to restore.", 4000
         )
+
+    @staticmethod
+    def _lone_panel_window(dock):
+        """The panel window ``dock`` is the only open panel in, else None."""
+        container = dock.dockContainer()
+        fw = container.floatingWidget() if container is not None else None
+        if fw is None or len(container.openedDockWidgets()) != 1:
+            return None
+        return fw
 
     def _exit_maximize(self) -> None:
         if not self._maximized_instance:
@@ -1331,6 +1350,13 @@ class MainWindow(QMainWindow):
         # fire in a window their action belongs to; without this a panel on a
         # second monitor would ignore every one of them.
         container.addActions(self._shortcut_actions())
+        # the main window's bar (no command bar) instead of the grey native one
+        frame_panel_window(
+            container,
+            self._build_logo_label(container, LOGO_ROW_HEIGHT),
+            self._m_panels,
+            self._m_settings,
+        )
         if self._opening_windows:
             return  # a menu open or a layout restore placed it on purpose
         self._pending_windows.add(container)
@@ -1348,7 +1374,10 @@ class MainWindow(QMainWindow):
                     found.append(act)
 
         walk(self.actions())
-        walk(self.menuBar().actions())
+        # The menus live on the title bar. Never self.menuBar() here: with no
+        # QMenuBar it makes an empty one and installs it in place of the
+        # title bar, deleting it.
+        walk([self._m_panels.menuAction(), self._m_settings.menuAction()])
         return found
 
     def _settle_new_window(self, container) -> None:
