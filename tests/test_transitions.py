@@ -368,3 +368,49 @@ def test_the_trackers_survive_garbage_collection(qapp, filt, animated):
     assert ind is not None and hasattr(ind, "_paint")
     bar.setCurrentIndex(1)
     ind.repaint()
+
+
+# -- teardown: the underline must never take the app down ------------------------
+
+_TORN_DOWN_PAINT = r"""
+import os, sys
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PySide6.QtWidgets import QApplication, QLabel, QTabWidget
+import shiboken6
+app = QApplication([])
+from aurantium import transitions
+tabs = QTabWidget()
+for i in range(3):
+    tabs.addTab(QLabel(str(i)), f"Tab {i}")
+tabs.resize(300, 120)
+tabs.show()
+app.processEvents()
+ind = transitions.slide_tab_bar(tabs.tabBar())
+# The state Qt leaves while it destroys a tab bar: the bar's wrapper is dead,
+# its underline child is still alive and still gets painted.
+shiboken6.invalidate(tabs.tabBar())
+ind.repaint()
+app.processEvents()
+print("survived")
+"""
+
+
+def test_underline_paint_survives_its_tab_bar_being_torn_down():
+    """An error escaping ``paintEvent`` with a QPainter open aborts the whole
+    process (0xc0000409 in the frozen build) — the 1.12.0 crash on closing a
+    window with tabs. Run in a subprocess: the failure mode is an abort."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    app_dir = Path(transitions.__file__).resolve().parent.parent
+    result = subprocess.run(
+        [sys.executable, "-c", _TORN_DOWN_PAINT],
+        cwd=app_dir,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0 and "survived" in result.stdout, (
+        f"exit {result.returncode}\n{result.stdout}\n{result.stderr[-2000:]}"
+    )

@@ -145,9 +145,18 @@ class SlidingIndicator(QWidget):
             self.snap_to(rect)
 
     def paintEvent(self, _event) -> None:  # noqa: N802 (Qt override)
+        # Qt can still paint the indicator while it destroys the strip it
+        # serves, after that strip's wrapper is dead (see _TabBarTracker._KINDS).
+        # An error escaping here with the painter open aborts the process —
+        # 0xc0000409, the 1.12.0 crash on closing a window with tabs — so a
+        # torn-down host skips the frame and the painter is always ended.
         p = QPainter(self)
-        self._paint(p, self.rect())
-        p.end()
+        try:
+            self._paint(p, self.rect())
+        except (AttributeError, RuntimeError):
+            pass  # host torn down underneath us; nothing left to draw under
+        finally:
+            p.end()
 
 
 _DIRECT = Qt.FindChildOption.FindDirectChildrenOnly

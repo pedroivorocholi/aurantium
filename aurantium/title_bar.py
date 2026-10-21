@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import sys
 
+import shiboken6
 from PySide6.QtCore import QPoint, QSize, Qt
 from PySide6.QtWidgets import QHBoxLayout, QMenu, QToolButton, QWidget
 
@@ -372,6 +373,11 @@ class NativeFrame:
     def handle(self, message) -> tuple[bool, int] | None:
         """Answer one native message, or None to let Qt have it."""
         if not IS_WINDOWS or not self._hwnd:
+            return None
+        if not shiboken6.isValid(self._bar):
+            # Mid-teardown: Qt destroys the title bar (a child) before the
+            # window, and Windows keeps hit-testing in between. Qt's default
+            # answer is right for a window on its way out.
             return None
         msg = wintypes.MSG.from_address(int(message))
         if msg.hWnd != self._hwnd:
