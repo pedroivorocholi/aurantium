@@ -20,6 +20,67 @@
     <language>en</language>
 
     <item>
+      <title>Aurantium 1.12.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.12.2</h3>
+        <ul>
+          <li>Aurantium 1.12.2</li>
+          <li>Fixed: the top bar disappeared after dragging a panel to a second monitor</li>
+          <li>Fixed: a crash when adding another panel after moving one to a second monitor</li>
+          <li>Panel windows now use the same dark title bar as the main window instead of the grey Windows bar</li>
+          <li>F11 on a panel that is alone in its window now maximizes that window on its monitor</li>
+          <li>F1, Shift+F1 and Ctrl+Q now work inside panel windows</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 21 Oct 2026 23:24:10 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.12.2/aurantium-setup.exe"
+        sparkle:version="1.12.2"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75441145"
+        sparkle:edSignature="USjFBmQn2XjocxDPuGsx9kXGgwYcFiKLaN8FAA7Glrr03fKMO5K+Eko7Cs8ehxM+PBvVYGjKAVCiJCeyQKIxCg=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.12.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.12.2</h3>
+        <ul>
+          <li>Aurantium 1.12.2</li>
+          <li>Fixed: the top bar disappeared after dragging a panel to a second monitor</li>
+          <li>Fixed: a crash when adding another panel after moving one to a second monitor</li>
+          <li>Panel windows now use the same dark title bar as the main window instead of the grey Windows bar</li>
+          <li>F11 on a panel that is alone in its window now maximizes that window on its monitor</li>
+          <li>F1, Shift+F1 and Ctrl+Q now work inside panel windows</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 21 Oct 2026 23:24:10 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.12.2/aurantium-mac.zip"
+        sparkle:version="1.12.2"
+        sparkle:os="macos"
+        length="292296030"
+        sparkle:edSignature="2mo82uRzlC9JzorFZspqnjudr8dt1yXFTpc1fqtnOuoO66dghmmzMSJQ4Wf5lrOY4gUTAjpv2Kts92c/rrI0BQ=="
+        type="application/zip" />
+    </item>
+    <item>
       <title>Aurantium 1.12.1</title>
       <description><![CDATA[
         <style>
