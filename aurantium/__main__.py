@@ -68,29 +68,58 @@ def _surface_on_second_instance(server, win) -> None:
 # Tk→Qt handoff is pixel-identical. The status line is repainted on a copy of
 # the bitmap in physical coordinates, matching the baked text exactly.
 _SPLASH_TEXT_Y = 262  # top of the status-line rect (physical px, under logo)
-_SPLASH_AMBER = "#c8842a"  # theme ACCENT_DEEP
+# The progress hairline: centred under the status line, about the width of
+# the LOADING text — a quiet readout, not a loading screen.
+_SPLASH_BAR_Y = 294  # physical px
+_SPLASH_BAR_W = 160
+_SPLASH_BAR_H = 2
 
 
-def _splash_pixmap(base, dpr: float, text: str):
+def _splash_colors() -> dict:
+    """The card is always dark, whatever theme the app will open in: it shows
+    before the saved theme is read. Same amber as the baked LOADING text."""
+    from .theme import palette_colors
+
+    dark = palette_colors("dark")
+    return {
+        "ground": dark["BG"],
+        "amber": dark["ACCENT_DEEP"],
+        "track": dark["CHROME_EDGE"],
+    }
+
+
+def _splash_pixmap(base, dpr: float, text: str, progress: float | None = None):
     """The card bitmap with the status line reading ``text``: erase the band
-    under the logo, redraw the message the same way make_splash baked it."""
+    under the logo, redraw the message the same way make_splash baked it.
+
+    ``progress`` (0..1) draws the determinate hairline under it. It is a
+    count of real startup steps, not a timer, and it steps rather than
+    glides: the event loop is not running yet, and pumping it to tween the
+    bar would make startup slower in order to look faster."""
     from PySide6.QtCore import QRect, Qt
     from PySide6.QtGui import QColor, QFont, QPainter, QPixmap
 
     from .theme import MONO_FONT
 
+    colors = _splash_colors()
     pix = QPixmap(base)  # copy; physical-pixel coordinates
     p = QPainter(pix)
-    p.fillRect(QRect(1, _SPLASH_TEXT_Y - 6, pix.width() - 2, 34), QColor("#000000"))
+    p.fillRect(QRect(1, _SPLASH_TEXT_Y - 6, pix.width() - 2, 34), QColor(colors["ground"]))
     font = QFont(MONO_FONT, 8)
     font.setLetterSpacing(QFont.SpacingType.PercentageSpacing, 115)
     p.setFont(font)
-    p.setPen(QColor(_SPLASH_AMBER))
+    p.setPen(QColor(colors["amber"]))
     p.drawText(
         QRect(0, _SPLASH_TEXT_Y, pix.width(), 24),
         Qt.AlignmentFlag.AlignHCenter,
         text,
     )
+    if progress is not None:
+        x0 = (pix.width() - _SPLASH_BAR_W) // 2
+        p.fillRect(QRect(x0, _SPLASH_BAR_Y, _SPLASH_BAR_W, _SPLASH_BAR_H), QColor(colors["track"]))
+        filled = int(round(_SPLASH_BAR_W * min(1.0, max(0.0, progress))))
+        if filled:
+            p.fillRect(QRect(x0, _SPLASH_BAR_Y, filled, _SPLASH_BAR_H), QColor(colors["amber"]))
     p.end()
     pix = _fit_to_window_px(pix, dpr)
     # Physical-size bitmap + screen DPR = shown 1:1, no scaling anywhere.
@@ -199,12 +228,17 @@ def _show_splash(app):
     return splash
 
 
-def _splash_message(splash, text: str) -> None:
+#: Where each counted startup step leaves the bar. The layout restore owns
+#: the rest, one step per panel (MainWindow.layout_progress).
+_SPLASH_STEPS = {"providers": 0.1, "panels": 0.25, "workspace": 0.4}
+
+
+def _splash_message(splash, text: str, progress: float | None = None) -> None:
     """Advance the splash status line (no-op when the splash isn't up)."""
     if splash is None:
         return
     splash.setPixmap(
-        _splash_pixmap(splash._aurantium_base, splash._aurantium_dpr, text)
+        _splash_pixmap(splash._aurantium_base, splash._aurantium_dpr, text, progress)
     )
     from PySide6.QtWidgets import QApplication
 
@@ -398,12 +432,12 @@ def main() -> int:
     app._aurantium_transition_filter = transitions.install(app)
 
     # Providers first (so panels' initial subscriptions resolve), then panels.
-    _splash_message(splash, "LOADING · PROVIDERS")
+    _splash_message(splash, "LOADING · PROVIDERS", 0.0)
     from .providers import register_all_providers
 
     register_all_providers()
 
-    _splash_message(splash, "LOADING · PANELS")
+    _splash_message(splash, "LOADING · PANELS", _SPLASH_STEPS["providers"])
     from .panel import PanelRegistry, discover_panels
 
     # Built-in panels load as a package (frozen-safe); a user's optional
@@ -414,7 +448,7 @@ def main() -> int:
     for err in errors:
         print(f"[aurantium] panel failed to load:\n{err}", file=sys.stderr)
 
-    _splash_message(splash, "LOADING · WORKSPACE")
+    _splash_message(splash, "LOADING · WORKSPACE", _SPLASH_STEPS["panels"])
     from .app import MainWindow
 
     win = MainWindow()
@@ -433,7 +467,13 @@ def main() -> int:
     # The 1500x900 set in MainWindow stays as the restore size.
     win.enter_maximized()
 
-    _splash_message(splash, "LOADING · LAYOUT")
+    start = _SPLASH_STEPS["workspace"]
+    _splash_message(splash, "LOADING · LAYOUT", start)
+
+    def _layout_step(done: int, total: int) -> None:
+        _splash_message(splash, "LOADING · LAYOUT", start + (1.0 - start) * done / total)
+
+    win.layout_progress = _layout_step
     startup_err = ""
     try:
         # On the no-saved-session branch, default_startup shows a modal
@@ -447,6 +487,8 @@ def main() -> int:
         import traceback as _tb
 
         startup_err = _tb.format_exc()
+    finally:
+        win.layout_progress = None  # later workspace loads have no splash
 
     # Panels are built and the layout restored — hand off from splash to window.
     # Harmless no-op if the no-session branch already closed it above:

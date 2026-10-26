@@ -130,6 +130,9 @@ class MainWindow(QMainWindow):
         self._pre_maximize_state = None  # QByteArray snapshot to restore on exit
         self._last_closed: dict | None = None  # for reopen-last-closed (Ctrl+Shift+T)
         self._loading_layout = False  # guard: mass-close during layout swap isn't a user close
+        #: Called with (panels built, total) as apply_layout restores a
+        #: workspace; startup points it at the splash card's progress bar.
+        self.layout_progress: Callable[[int, int], None] | None = None
         self._dock_watch = _DockParentWatch(self)
         # Multi-screen: a panel (or a whole tab stack) dragged out past every
         # aurantium window becomes a window of its own, a full docking area
@@ -1722,8 +1725,9 @@ class MainWindow(QMainWindow):
         # each one in (the guard used to drop before this loop, so every
         # restored panel faded). The skeletons below carry the arrival instead.
         self._loading_layout = True
+        specs = doc.get("panels", [])
         try:
-            for spec in doc.get("panels", []):
+            for done, spec in enumerate(specs, 1):
                 self.add_panel(
                     spec.get("panel_id", ""),
                     instance_id=spec.get("instance"),
@@ -1731,6 +1735,8 @@ class MainWindow(QMainWindow):
                     settings=spec.get("settings"),
                     restore_floating=bool(spec.get("floating")),
                 )
+                if self.layout_progress is not None:
+                    self.layout_progress(done, len(specs))
         finally:
             self._loading_layout = False
         state = doc.get("ads_state", "")
