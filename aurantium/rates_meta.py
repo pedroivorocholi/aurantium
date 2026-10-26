@@ -2,7 +2,7 @@
 the mapping between a country's ISO code, its BIS policy-rate key, the source
 that publishes its yield curve, and the attribution string the UI must render.
 
-Every entry was verified against the live sources by tools/verify_rates.py
+Every entry was verified against the live sources by tools/data/verify_rates.py
 before being listed here. Widening coverage is an edit to COUNTRIES, not a
 code change.
 

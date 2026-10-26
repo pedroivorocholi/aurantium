@@ -15,7 +15,7 @@ class attribute holding a :class:`PanelGuide`::
 
 That declaration is the single source of truth. The F1 window builds each
 panel's page from it, the panel's ``?`` button and context menu open that
-page, and ``tests/test_panel_guides.py`` fails for any registered panel that
+page, and ``tests/panels/test_panel_guides.py`` fails for any registered panel that
 has no guide — an unlisted panel is effectively a hidden one.
 
 The static pages (Getting Started, Shortcuts, Linking & Workspaces, Settings)

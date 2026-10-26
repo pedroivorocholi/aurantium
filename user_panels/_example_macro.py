@@ -20,7 +20,7 @@ The four things every panel needs:
                           what its columns mean. The F1 window builds the
                           panel's page from it and the header's ``?`` opens
                           that page. Required: a panel without one fails
-                          ``tests/test_panel_guides.py``. See PANELS.md.
+                          ``tests/panels/test_panel_guides.py``. See docs/guides/PANELS.md.
   1. ``build()``       — construct widgets, add them to ``self.content_layout``.
   2. ``on_symbol(sym)`` — react when the linked symbol changes (optional —
                           skip it entirely if your panel isn't symbol-driven).

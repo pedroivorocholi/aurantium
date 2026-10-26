@@ -12,7 +12,7 @@ A panel is one Python class in one file::
             self.subscribe(f"quote:{sym}", self.on_quote)
 
 Drop the file into ``user_panels/``, restart, and it appears in the
-Panels ▸ Add Panel menu. See PANELS.md.
+Panels ▸ Add Panel menu. See docs/guides/PANELS.md.
 """
 
 from __future__ import annotations
@@ -612,7 +612,7 @@ class Panel(QWidget):
     #: This panel's quick guide — purpose, linking, key interactions, fields
     #: and shortcuts (see ``guide.PanelGuide``). Required for every registered
     #: panel: the F1 window builds the panel's page from it, the header's ``?``
-    #: opens that page, and ``tests/test_panel_guides.py`` fails without it.
+    #: opens that page, and ``tests/panels/test_panel_guides.py`` fails without it.
     GUIDE: Optional[PanelGuide] = None
 
     #: ``(key, tab label, panel class)`` for a host whose tabs are themselves

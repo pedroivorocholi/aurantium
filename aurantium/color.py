@@ -17,7 +17,7 @@ place the code that needed it could not import from.
 ``tests/palette_checks.py`` now re-exports from here and keeps only the
 *thresholds* and the ``check()`` orchestrator. That seam is deliberate —
 transforms are app code, thresholds are test policy — and
-``test_chart_palette.py::test_the_port_reproduces_the_reference_validator``
+``tests/charts/test_chart_palette.py::test_the_port_reproduces_the_reference_validator``
 still pins the numbers against the reference implementation, so it doubles as
 the guard that moving them did not drift them.
 

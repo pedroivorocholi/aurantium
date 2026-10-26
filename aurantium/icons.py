@@ -1,7 +1,7 @@
 """The icon family: one set, one optical size, tinted from the palette.
 
 Every icon in aurantium comes from Reicon (https://reicon.dev, MIT licensed),
-vendored into ``reicon_icons.py`` by ``tools/vendor_reicon.py``. That replaced
+vendored into ``reicon_icons.py`` by ``tools/codegen/vendor_reicon.py``. That replaced
 a hand-painted 16px set (1.4px strokes drawn with QPainter) that never read as
 one consistent family next to the unicode glyphs (``?``, ``+``, ``⋯``, ``◀``)
 still set as button text elsewhere. Those are icons from this set now too.

@@ -4,7 +4,7 @@ Vetted FRED series the rates provider may fetch. Series whose FRED metadata
 notes contain "Copyright" are excluded: they are third-party copyrighted and
 their commercial redistribution is not permitted.
 
-Regenerate with:  .venv/Scripts/python.exe tools/verify_rates.py
+Regenerate with:  .venv/Scripts/python.exe tools/data/verify_rates.py
 """
 
 from __future__ import annotations

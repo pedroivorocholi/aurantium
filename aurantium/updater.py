@@ -16,7 +16,7 @@ appcast/EdDSA contract in pure Python. Every function below just dispatches to
 it on ``sys.platform == "darwin"`` — callers (``app.py``, ``__main__.py``)
 don't need to know which backend is active.
 
-Release/signing steps live in ``RELEASING.md``; key generation and signing
+Release/signing steps live in ``docs/guides/RELEASING.md``; key generation and signing
 helpers live in ``tools/``.
 """
 
@@ -25,7 +25,7 @@ from __future__ import annotations
 import sys
 
 from . import __version__
-from .paths import BUNDLE_DIR
+from .paths import WINSPARKLE_DLL
 
 # --------------------------------------------------------------------------
 # Configuration — the only lines you edit to point at your own release feed.
@@ -42,7 +42,7 @@ APPCAST_URL = (
     "/main/appcast.xml"
 )
 
-# Base64 Ed25519 public key, printed by ``tools/gen_keys.py``. Paste it here.
+# Base64 Ed25519 public key, printed by ``tools/release/gen_keys.py``. Paste it here.
 # Leave blank to disable signature checking (NOT recommended — the updater
 # stays disabled until this is set, so unsigned downloads never run).
 EDDSA_PUBLIC_KEY = "7uoEAAvngbcIiyHRnkEKbqHveq7yfNaKsC646v3omxw="
@@ -82,7 +82,7 @@ def _load_dll():
         return None
     import ctypes
 
-    dll_path = BUNDLE_DIR / "WinSparkle.dll"
+    dll_path = WINSPARKLE_DLL
     try:
         lib = ctypes.CDLL(str(dll_path))
     except OSError:

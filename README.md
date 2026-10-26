@@ -1,4 +1,4 @@
-![Aurantium](aurantium_logo_ondark.png)
+![Aurantium](assets/images/aurantium_logo_ondark.png)
 
 # Aurantium
 
@@ -26,14 +26,14 @@ python -m venv .venv
 
 Optional: `copy .env.example .env` and add free API keys (FRED, EIA, NewsAPI).
 
-Or double-click: `aurantium.bat` (or a desktop shortcut pointing at
-`.venv\Scripts\pythonw.exe -m aurantium` with `aurantium.ico`) launches the app
+Or double-click: `scripts/aurantium.bat` (or a desktop shortcut pointing at
+`.venv\Scripts\pythonw.exe -m aurantium` with `assets/icons/aurantium.ico`) launches the app
 without a console window.
 
 ## Ship it as a standalone app
 
 Build a single `aurantium.exe` (no Python needed) — or a full `Setup.exe`
-installer — to hand to anyone on Windows. See **[BUILD.md](BUILD.md)**.
+installer — to hand to anyone on Windows. See **[BUILD.md](docs/guides/BUILD.md)**.
 
 ## Arrange it
 
@@ -46,8 +46,24 @@ Layout* shares one as a file.
 
 ## Customize it
 
-See **[PANELS.md](PANELS.md)** — how topics work, the 5-method panel API, a
+See **[PANELS.md](docs/guides/PANELS.md)** — how topics work, the 5-method panel API, a
 copy-paste example panel, custom providers, and layout sharing.
+
+## Repository layout
+
+```
+aurantium/        the app package (panels/, providers/, components/ inside)
+user_panels/      drop-in panels loaded at startup; _example_macro.py is the tutorial
+layouts/          seed layouts bundled with the app; presets/ = shipped workspaces
+assets/           app art bundled into the build: icons/ (.ico, .icns), images/ (logos, splash)
+packaging/        aurantium.spec + PyInstaller entry point; windows/ = Inno Setup + WinSparkle.dll
+scripts/          dev conveniences (aurantium.bat: launch without a console)
+tools/            maintenance scripts, by job: release/ codegen/ data/ design/
+tests/            pytest suite, grouped by area (see tests/README.md); fixtures/ = recorded data
+docs/             guides/ (BUILD, RELEASING, PANELS, MACOS_HANDOFF) and superpowers/ (specs, plans, notes)
+appcast.xml       live auto-update feed. Installed apps fetch it from this exact path: never move it
+logs/             dev-run logs (gitignored; a frozen build writes them next to the exe)
+```
 
 ## Design lineage
 

@@ -210,7 +210,7 @@ MIN_VISIBLE_BARS = 10
 # more than four indicators cycle, and the labeled color chip above the plot
 # is what disambiguates them.
 #
-# Every value is computed, not picked: see tests/test_chart_palette.py, which
+# Every value is computed, not picked: see tests/charts/test_chart_palette.py, which
 # re-runs the lightness, chroma, color-vision, contrast and reserved-color
 # checks on each release. Do not hand-edit these without re-running it.
 #: Kept as a name because tests and older code reference it. The values now

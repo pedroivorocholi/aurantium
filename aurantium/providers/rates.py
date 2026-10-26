@@ -64,7 +64,7 @@ class FredNotAllowed(RuntimeError):
     """Raised when a FRED series is not on the vetted allowlist.
 
     FRED carries third-party copyrighted series whose commercial
-    redistribution is not permitted; see tools/verify_rates.py."""
+    redistribution is not permitted; see tools/data/verify_rates.py."""
 
 
 def fred_allowed(series_id: str) -> bool:
@@ -381,7 +381,7 @@ def _get_text(url: str, **kwargs) -> str:
 class RatesProvider(Provider):
     """Serves ``rates:policy`` and ``rates:curve:<CC>``."""
 
-    # URLs confirmed live by tools/probe_rates.py — see
+    # URLs confirmed live by tools/data/probe_rates.py — see
     # docs/superpowers/2026-08-07-rates-probe-findings.md. Both BIS's and
     # Treasury's first-choice candidates 404'd; these are the ones that work.
     # Do NOT "modernize" them back to the v2/fiscaldata paths.

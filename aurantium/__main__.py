@@ -7,7 +7,7 @@ import sys
 
 from dotenv import load_dotenv
 
-from .paths import BUNDLE_DIR, EXT_DIR
+from .paths import ASSETS_DIR, BUNDLE_DIR, EXT_DIR, log_file
 
 APP_ID = "aurantium.terminal.desktop.1"
 
@@ -61,10 +61,10 @@ def _surface_on_second_instance(server, win) -> None:
         win.bring_to_front()
 
 
-# Splash card: aurantium_splash.png (640x360, logo + LOADING line + border) is
+# Splash card: assets/images/aurantium_splash.png (640x360, logo + LOADING line + border) is
 # both the bootloader splash image and the Qt card's bitmap, shown 1:1 at
 # PHYSICAL pixel size — the exe manifest declares per-monitor DPI awareness
-# (see aurantium.spec), so neither window is ever re-scaled by Windows and the
+# (see packaging/aurantium.spec), so neither window is ever re-scaled by Windows and the
 # Tk→Qt handoff is pixel-identical. The status line is repainted on a copy of
 # the bitmap in physical coordinates, matching the baked text exactly.
 _SPLASH_TEXT_Y = 262  # top of the status-line rect (physical px, under logo)
@@ -170,7 +170,7 @@ def _show_splash(app):
     from PySide6.QtGui import QPixmap
     from PySide6.QtWidgets import QSplashScreen
 
-    base = QPixmap(str(BUNDLE_DIR / "aurantium_splash.png"))
+    base = QPixmap(str(ASSETS_DIR / "images" / "aurantium_splash.png"))
     if base.isNull():
         return None
     screen = app.primaryScreen()
@@ -239,10 +239,9 @@ def _install_crash_logging() -> None:
     import threading
     import traceback as _tb
 
-    log_path = EXT_DIR / "aurantium.log"
-
     def _write(header: str, text: str) -> None:
         try:
+            log_path = log_file("aurantium.log")
             if log_path.exists() and log_path.stat().st_size > 512 * 1024:
                 tail = log_path.read_text(encoding="utf-8", errors="replace")[-256 * 1024:]
                 log_path.write_text(tail, encoding="utf-8")
@@ -284,7 +283,7 @@ def _maybe_capture_output() -> None:
     to a log next to the exe so tracebacks (incl. panel build failures) surface."""
     if os.environ.get("AURANTIUM_DEBUG"):
         try:
-            f = open(EXT_DIR / "aurantium_stderr.log", "w", encoding="utf-8")
+            f = open(log_file("aurantium_stderr.log"), "w", encoding="utf-8")
             sys.stdout = f
             sys.stderr = f
         except OSError:
@@ -355,7 +354,7 @@ def main() -> int:
 
     from PySide6.QtGui import QIcon
 
-    icon_path = BUNDLE_DIR / "aurantium.ico"
+    icon_path = ASSETS_DIR / "icons" / "aurantium.ico"
     app_icon = QIcon(str(icon_path)) if icon_path.is_file() else None
     if app_icon is not None:
         app.setWindowIcon(app_icon)
@@ -457,7 +456,7 @@ def main() -> int:
     if os.environ.get("AURANTIUM_DEBUG") or startup_err or errors:
         try:
             default_json = BUNDLE_DIR / "layouts" / "default.json"
-            (EXT_DIR / "aurantium_startup.log").write_text(
+            log_file("aurantium_startup.log").write_text(
                 f"frozen: {getattr(sys, 'frozen', False)}\n"
                 f"panels registered: {len(PanelRegistry.all())}\n"
                 f"BUNDLE_DIR: {BUNDLE_DIR}\n"

@@ -5,7 +5,7 @@ A preset is an ordinary layout document — the same shape
 ``description``, stored as JSON under ``layouts/presets/``.
 
 Presets are *generated*, never hand-written and never hand-captured from a
-running app: ``tools/generate_presets.py`` drives a real dock manager
+running app: ``tools/codegen/generate_presets.py`` drives a real dock manager
 headlessly to build each desk, so the bundled file carries a genuine
 ``ads_state`` and restores the intended arrangement instead of QtAds' default
 tiling. To change a desk — its panels, their arrangement or its seed symbol —

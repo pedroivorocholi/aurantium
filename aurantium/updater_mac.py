@@ -7,7 +7,7 @@ outcome with plain Python: it reads the *same* ``appcast.xml`` used by the
 Windows WinSparkle path (looking for the ``<enclosure>`` tagged
 ``sparkle:os="macos"``), verifies the download against the *same* EdDSA
 public key using ``cryptography`` directly (the signing format documented in
-``tools/sign_update.py`` is a generic Ed25519 signature over raw file bytes —
+``tools/release/sign_update.py`` is a generic Ed25519 signature over raw file bytes —
 nothing WinSparkle-specific about it), and swaps the app bundle in place.
 
 The swap itself never touches files the running process has open: it hands

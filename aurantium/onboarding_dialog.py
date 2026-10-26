@@ -10,7 +10,7 @@ It used to be two ``QTextBrowser`` tabs of long HTML: a cheat sheet and a guide
 that read top to bottom, which users found overwhelming and which drifted out of
 step with the panels it described. Panel pages are now generated from each
 panel's own ``GUIDE`` declaration (see ``guide.py``), so content lives in one
-place and a panel without a guide fails ``tests/test_panel_guides.py``.
+place and a panel without a guide fails ``tests/panels/test_panel_guides.py``.
 
 Shown automatically on first launch (gated by a ``QSettings`` flag), on F1 /
 Settings ▸ Keyboard Shortcuts & Guide…, and from every panel's ``?`` button,

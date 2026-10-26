@@ -7,9 +7,9 @@
   the enclosure url, verifies sparkle:edSignature against the app's embedded
   EdDSA public key, then runs the installer.
 
-  Per release (see RELEASING.md): add a new <item> at the TOP with the new
+  Per release (see docs/guides/RELEASING.md): add a new <item> at the TOP with the new
   version, the GitHub release download url, and the length + signature printed
-  by tools/sign_update.py. Keep older <item>s for history (optional).
+  by tools/release/sign_update.py. Keep older <item>s for history (optional).
 
   This file must be reachable at the APPCAST_URL set in aurantium/updater.py.
 -->

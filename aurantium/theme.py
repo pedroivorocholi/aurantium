@@ -318,7 +318,7 @@ def set_theme(name: str) -> None:
 # in ``panels/chart.py``.
 #
 # Every value is computed against ``aurantium.color`` and re-checked by
-# ``tests/test_chart_palette.py`` and ``tests/test_series_palette.py``.
+# ``tests/charts/test_chart_palette.py`` and ``tests/charts/test_series_palette.py``.
 # Do not hand-edit without re-running them.
 _SERIES_PALETTES = {
     # blue · olive · violet · teal

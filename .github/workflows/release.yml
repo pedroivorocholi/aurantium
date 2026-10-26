@@ -4,7 +4,7 @@ name: Release
 # this builds the Windows installer AND the macOS app in parallel, signs both
 # with the same EdDSA key (EDDSA_PRIVATE_KEY secret), publishes both to one
 # GitHub release, and commits both appcast.xml entries to main. Manual,
-# single-platform releases are still documented in RELEASING.md — this just
+# single-platform releases are still documented in docs/guides/RELEASING.md — this just
 # means you don't have to hand a Mac build to a friend every time.
 on:
   push:
@@ -13,7 +13,7 @@ on:
 
 jobs:
   # Gate the whole release on the suite. The palette guard
-  # (tests/test_chart_palette.py) documents itself as re-running "on each
+  # (tests/charts/test_chart_palette.py) documents itself as re-running "on each
   # release" — until this job existed, it did not, which is how colours the
   # suite already condemns kept shipping. Runs before the expensive builds so a
   # red test costs seconds, not a full PyInstaller cycle. On windows-latest
@@ -53,23 +53,23 @@ jobs:
 
       - name: Write signing key
         shell: bash
-        run: printf '%s' "${{ secrets.EDDSA_PRIVATE_KEY }}" > tools/eddsa_private.key
+        run: printf '%s' "${{ secrets.EDDSA_PRIVATE_KEY }}" > tools/release/eddsa_private.key
 
       - name: Build exe
-        run: pyinstaller aurantium.spec --noconfirm --clean
+        run: pyinstaller packaging/aurantium.spec --noconfirm --clean
 
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
 
       - name: Compile installer
         shell: bash
-        run: iscc installer.iss
+        run: iscc packaging/windows/installer.iss
 
       - name: Sign installer
         id: sign
         shell: bash
         run: |
-          out=$(python tools/sign_update.py dist/aurantium-setup.exe)
+          out=$(python tools/release/sign_update.py dist/aurantium-setup.exe)
           echo "$out"
           length=$(echo "$out" | sed -n 's/^length:[[:space:]]*//p')
           sig=$(echo "$out" | sed -n 's/.*sparkle:edSignature="\(.*\)"/\1/p')
@@ -79,7 +79,7 @@ jobs:
       - name: Remove signing key
         if: always()
         shell: bash
-        run: rm -f tools/eddsa_private.key
+        run: rm -f tools/release/eddsa_private.key
 
       - uses: actions/upload-artifact@v4
         with:
@@ -103,10 +103,10 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Write signing key
-        run: printf '%s' "${{ secrets.EDDSA_PRIVATE_KEY }}" > tools/eddsa_private.key
+        run: printf '%s' "${{ secrets.EDDSA_PRIVATE_KEY }}" > tools/release/eddsa_private.key
 
       - name: Build app bundle
-        run: pyinstaller aurantium.spec --noconfirm --clean
+        run: pyinstaller packaging/aurantium.spec --noconfirm --clean
 
       - name: Zip app bundle
         run: cd dist && zip -r aurantium-mac.zip aurantium.app && cd ..
@@ -114,7 +114,7 @@ jobs:
       - name: Sign zip
         id: sign
         run: |
-          out=$(python tools/sign_update.py dist/aurantium-mac.zip)
+          out=$(python tools/release/sign_update.py dist/aurantium-mac.zip)
           echo "$out"
           length=$(echo "$out" | sed -n 's/^length:[[:space:]]*//p')
           sig=$(echo "$out" | sed -n 's/.*sparkle:edSignature="\(.*\)"/\1/p')
@@ -123,7 +123,7 @@ jobs:
 
       - name: Remove signing key
         if: always()
-        run: rm -f tools/eddsa_private.key
+        run: rm -f tools/release/eddsa_private.key
 
       - uses: actions/upload-artifact@v4
         with:
@@ -160,7 +160,7 @@ jobs:
           code_version=$(grep -oP '(?<=__version__ = ")[^"]+' aurantium/__init__.py)
           if [ "$code_version" != "$version" ]; then
             echo "Tag $GITHUB_REF_NAME doesn't match aurantium/__init__.py's __version__ ($code_version) on main." >&2
-            echo "Bump __version__ (and installer.iss's AppVersion) on main, then re-tag." >&2
+            echo "Bump __version__ (and packaging/windows/installer.iss's AppVersion) on main, then re-tag." >&2
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -182,7 +182,7 @@ jobs:
 
       - name: Update appcast.xml
         run: |
-          python tools/ci_update_appcast.py \
+          python tools/release/ci_update_appcast.py \
             --appcast appcast.xml \
             --version "${{ steps.ver.outputs.version }}" \
             --notes-file /tmp/notes.txt \

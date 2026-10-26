@@ -47,7 +47,7 @@ from .notifier import Notifier
 from .title_bar import NativeFrame, TitleBar, frame_panel_window
 from .components.fit_width import relax_min_widths
 from .panel import Panel, PanelRegistry
-from .paths import BUNDLE_DIR
+from .paths import ASSETS_DIR, BUNDLE_DIR
 from .presets import Preset, available_presets
 from .symbol_context import DEFAULT_GROUP, GROUPS, SymbolContext
 from .undo import UndoStack
@@ -372,7 +372,7 @@ class MainWindow(QMainWindow):
 
         icon = QApplication.instance().windowIcon()
         if icon.isNull():
-            ico = BUNDLE_DIR / "aurantium.ico"
+            ico = ASSETS_DIR / "icons" / "aurantium.ico"
             if ico.is_file():
                 icon = QIcon(str(ico))
         if icon.isNull():
@@ -719,7 +719,7 @@ class MainWindow(QMainWindow):
             if current_theme() == "dark"
             else "aurantium_logo.png"
         )
-        logo_path = BUNDLE_DIR / name
+        logo_path = ASSETS_DIR / "images" / name
         if not logo_path.is_file():
             return None
         pixmap = QPixmap(str(logo_path))

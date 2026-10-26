@@ -1,6 +1,6 @@
-"""Reicon glyphs (https://reicon.dev), vendored by tools/vendor_reicon.py.
+"""Reicon glyphs (https://reicon.dev), vendored by tools/codegen/vendor_reicon.py.
 
-GENERATED FILE: do not edit. Change ICONS in tools/vendor_reicon.py and
+GENERATED FILE: do not edit. Change ICONS in tools/codegen/vendor_reicon.py and
 re-run it. Each value is the inner markup of a 24x24 SVG, Outline weight,
 painted in ``currentColor``.
 
