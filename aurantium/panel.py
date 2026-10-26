@@ -876,7 +876,7 @@ class Panel(QWidget):
         from . import icons
         from .theme import CHROME_TEXT, FG_MUTED
 
-        icons.set_icon(self._guide_btn, "help", FG_MUTED, hover_color=CHROME_TEXT, size=14)
+        icons.set_icon(self._guide_btn, "help", FG_MUTED, hover_color=CHROME_TEXT)
         self._guide_btn.setAccessibleName("Quick guide")
         self._guide_btn.setToolTip("Quick guide to this panel (Shift+F1)")
         self._guide_btn.clicked.connect(self.open_guide)

@@ -110,6 +110,11 @@ RADIUS_SM = 6      # controls: buttons, inputs, chips, tabs
 RADIUS_MD = 7      # surfaces: menus, tooltips, tiles, cards
 RADIUS_ROUND = 8   # the radio indicator, which is a circle — not a fourth size
 
+#: The icon family's one optical size, logical px (``icons.SIZE``). Every
+#: icon is shown at exactly this size: drawn smaller, Qt resamples the
+#: pixmap and a pixel-snapped glyph goes soft again.
+ICON_PX = 16
+
 
 # -- palettes --------------------------------------------------------------
 # Dark is the original, byte-for-byte. Light is a clean paper variant that
@@ -1053,7 +1058,7 @@ ads--CDockWidgetTab:hover QLabel {{ color: {p['CHROME_TEXT']}; }}
 /* small, borderless close button inside each tab */
 ads--CDockWidgetTab QPushButton, ads--CDockWidgetTab QToolButton {{
     background: transparent; border: 0; padding: 0; margin-left: 5px;
-    qproperty-iconSize: 11px 11px;
+    qproperty-iconSize: {ICON_PX}px {ICON_PX}px;
 }}
 ads--CDockWidgetTab QPushButton:hover, ads--CDockWidgetTab QToolButton:hover {{
     background: rgba(128,128,128,0.22); border-radius: {RADIUS_SM}px;
@@ -1069,7 +1074,7 @@ ads--CDockWidgetTab QToolButton[kbFocus="true"] {{
 /* the area's controls — small and quiet */
 ads--CTitleBarButton {{
     background: transparent; border: 0; padding: 1px;
-    color: {p['CHROME_TEXT_DIM']}; qproperty-iconSize: 12px 12px;
+    color: {p['CHROME_TEXT_DIM']}; qproperty-iconSize: {ICON_PX}px {ICON_PX}px;
 }}
 ads--CTitleBarButton:hover {{ background: rgba(128,128,128,0.22); border-radius: {RADIUS_SM}px; }}
 ads--CTitleBarButton:pressed {{ background: rgba(128,128,128,0.22); border-radius: {RADIUS_SM}px; }}

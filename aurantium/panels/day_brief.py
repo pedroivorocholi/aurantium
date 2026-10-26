@@ -214,7 +214,7 @@ class DayBriefPanel(Panel):
             (self.next_btn, "chevron-right", "Next session"),
         ):
             btn.setObjectName("chartChip")
-            icons.set_icon(btn, kind, CHROME_TEXT_DIM, disabled_color=FG_MUTED, size=14)
+            icons.set_icon(btn, kind, CHROME_TEXT_DIM, disabled_color=FG_MUTED)
             btn.setToolTip(tip)
             btn.setAccessibleName(tip)
             btn.setFixedWidth(22)

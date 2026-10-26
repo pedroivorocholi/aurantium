@@ -26,6 +26,7 @@ not something the user can click.
 
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 
 from PySide6.QtCore import QByteArray, QRectF, Qt
@@ -33,10 +34,11 @@ from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
 from .reicon_icons import SVG, VIEWBOX
+from .theme import ICON_PX
 
 #: Logical size of every glyph in the family. One optical size, so an icon
 #: never has to be scaled to sit beside another one.
-SIZE = 16
+SIZE = ICON_PX
 
 #: Every kind this module can paint. Used by the tests to hold the family
 #: closed — an affordance added as unicode text somewhere else in the app is
@@ -44,11 +46,42 @@ SIZE = 16
 KINDS = tuple(SVG)
 
 
-@lru_cache(maxsize=256)
-def _renderer(kind: str, color: str) -> QSvgRenderer:
-    body = SVG[kind].replace("currentColor", color)
+#: Reicon's stroke weight, in grid units.
+_STROKE = 1.5
+_STROKE_WIDTH = re.compile(r'stroke-width="[\d.]+"')
+
+
+def _hint(kind: str, device_px: int) -> tuple[str, float]:
+    """The glyph's markup and grid offset for a ``device_px``-wide render.
+
+    Reicon strokes are 1.5 units wide and centred on whole grid lines. Drawn
+    as-is at 24 device pixels (16px at 150%) each one straddles two pixels at
+    half intensity — the blur. So a stroked glyph gets a line width of a whole
+    number of device pixels, and is shifted so the lines its strokes are
+    centred on (the grid's centre line, and the rest of the grid with it at
+    the family's sizes) land on pixel centres for an odd width, or pixel edges
+    for an even one. Filled glyphs are drawn as authored: their outlines are
+    curves, which antialias whatever the grid.
+    """
+    body = SVG[kind]
+    if 'stroke="currentColor"' not in body:
+        return body, 0.0
+    scale = device_px / VIEWBOX
+    # just under the true weight, rounded: 1px at 16px/150%, 2px at 200%
+    width_px = max(1, round(_STROKE * scale - 0.25))
+    body = _STROKE_WIDTH.sub(f'stroke-width="{width_px / scale:.4f}"', body)
+    target = 0.5 if width_px % 2 else 0.0
+    shift_px = (target - (VIEWBOX / 2 * scale) % 1.0) % 1.0
+    return body, shift_px / scale
+
+
+@lru_cache(maxsize=512)
+def _renderer(kind: str, color: str, device_px: int = 0) -> QSvgRenderer:
+    body, shift = _hint(kind, device_px) if device_px else (SVG[kind], 0.0)
+    body = body.replace("currentColor", color)
     svg = (
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {VIEWBOX} {VIEWBOX}" '
+        f'<svg xmlns="http://www.w3.org/2000/svg" '
+        f'viewBox="{-shift:.4f} {-shift:.4f} {VIEWBOX} {VIEWBOX}" '
         f'fill="none">{body}</svg>'
     )
     return QSvgRenderer(QByteArray(svg.encode("utf-8")))
@@ -62,12 +95,15 @@ def icon(kind: str, color: str, dpr: float = 1.0) -> QIcon:
 def pixmap(kind: str, color: str, dpr: float = 1.0, size: int = SIZE) -> QPixmap:
     """The glyph as a pixmap — for a QLabel, which takes no QIcon."""
     dpr = dpr or 1.0
-    px = QPixmap(round(size * dpr), round(size * dpr))
-    px.setDevicePixelRatio(dpr)
+    device_px = round(size * dpr)
+    px = QPixmap(device_px, device_px)
+    # the exact ratio this pixmap has, so Qt draws it 1:1 at ``size`` logical
+    # pixels rather than resampling it (which blurs even a crisp glyph)
+    px.setDevicePixelRatio(device_px / size)
     px.fill(Qt.GlobalColor.transparent)
     painter = QPainter(px)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-    _renderer(kind, str(color)).render(painter, QRectF(0, 0, size, size))
+    _renderer(kind, str(color), device_px).render(painter, QRectF(0, 0, size, size))
     painter.end()
     return px
 
