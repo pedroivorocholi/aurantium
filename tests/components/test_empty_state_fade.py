@@ -49,11 +49,26 @@ def test_showing_fades_in_and_lands_opaque(host, animate):
     assert motion.fade_opacity(state) == pytest.approx(1.0)
 
 
-def test_hiding_fades_out_and_lands_hidden(host, animate):
+def test_hiding_is_immediate(host, animate):
+    """Content arriving takes the message away at once: never "empty" over
+    real rows, even for a frame."""
     state = EmptyState(host, "No data")
     state.set_shown(True)
     _settle(state)
     state.set_shown(False)
+    assert state.isHidden()
+    state.set_shown(True)
+    if animate:
+        assert motion.fade_opacity(state) < 1.0  # back in, from transparent
+    _settle(state)
+    assert motion.fade_opacity(state) == pytest.approx(1.0)
+
+
+def test_hiding_mid_fade_in_is_immediate(host, animate):
+    state = EmptyState(host, "No data")
+    state.set_shown(True)
+    state.set_shown(False)
+    assert state.isHidden()
     _settle(state)
     assert state.isHidden()
 

@@ -423,11 +423,10 @@ class MarketTable(QTableWidget):
             # ancestor is hidden, so during layout restore — every panel built
             # before the window is shown — the fade-out would never run and the
             # message would still be sitting there when the window appeared.
-            if not self._empty.isHidden():
-                # Rows arriving is the moment the message stops being true;
-                # crossfading it out reads as the data replacing it rather than
-                # as the panel blinking.
-                motion.fade(self._empty, 0.0, hide_when_done=True)
+            # Rows arriving is the moment the message stops being true, so it
+            # goes at once (EmptyState.set_shown): fading out, it sat over a
+            # full table through a busy startup.
+            self._empty.set_shown(False)
             return
         if self._filter_text and self.rowCount():
             self._empty.set_text(
@@ -437,9 +436,7 @@ class MarketTable(QTableWidget):
         else:
             self._empty.set_text(self._empty_title, self._empty_hint)
         self._empty.setGeometry(self.viewport().rect())
-        self._empty.raise_()
-        self._empty.update()
-        motion.fade(self._empty, 1.0)
+        self._empty.set_shown(True)
 
     def _resize_overlays(self) -> None:
         # Both unconditionally: the resizes that matter happen while the window

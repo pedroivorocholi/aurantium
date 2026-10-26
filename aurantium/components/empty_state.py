@@ -90,9 +90,13 @@ class EmptyState(QWidget):
         return super().eventFilter(obj, event)
 
     def set_shown(self, on: bool) -> None:
-        """Crossfade the message in or out (``OVERLAY_MS``), as MarketTable's
-        own empty state always has. Opacity only — the overlay is out of
-        layout, so nothing underneath moves.
+        """Fade the message in (``OVERLAY_MS``); take it away at once.
+
+        Opacity only — the overlay is out of layout, so nothing underneath
+        moves. Leaving is instant on purpose: it leaves because content has
+        arrived, and a message fading out over real rows reads as wrong — at
+        startup, with the UI thread busy, "Watchlist is empty" sat over a full
+        watchlist for a visible quarter second.
 
         Keyed on ``isHidden()``, not ``isVisible()``: the latter is False
         whenever an ancestor is hidden, which during a layout restore is every
@@ -108,7 +112,11 @@ class EmptyState(QWidget):
                 self._aurantium_fade_effect.setOpacity(0.0)
             motion.fade(self, 1.0)
         elif not self.isHidden():
-            motion.fade(self, 0.0, hide_when_done=True)
+            anim = getattr(self, "_aurantium_fade", None)
+            if anim is not None:
+                anim.stop()
+                self._aurantium_fade_effect.setOpacity(1.0)
+            self.hide()
 
     # -- loading --------------------------------------------------------------
 
