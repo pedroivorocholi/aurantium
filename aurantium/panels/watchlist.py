@@ -188,15 +188,13 @@ class WatchlistPanel(Panel):
         change_pct = data.get("change_pct")
         volume = data.get("volume")
 
-        # Flash the price cell when it actually moved. Every poll calls this
-        # method, so comparing against the last value we rendered is what keeps
-        # the flash meaningful — tinting on every refresh, including the ones
-        # that changed nothing, would be noise the eye learns to ignore.
-        previous = cells.get("_last_price")
-        if previous is not None and price is not None and price != previous:
-            self.table.flash_cell(cells["last"], price - previous)
-        if price is not None:
-            cells["_last_price"] = price
+        # Flash the cells that actually moved. Every poll calls this method, so
+        # comparing against the last value shown is what keeps the flash
+        # meaningful — tinting on every refresh, including the ones that
+        # changed nothing, would be noise the eye learns to ignore.
+        self.table.flash_on_change(cells["last"], price)
+        self.table.flash_on_change(cells["chg"], change)
+        self.table.flash_on_change(cells["pct"], change_pct)
 
         # update via cached item references — correct even after the user has
         # sorted the table (visual row indices no longer track symbols). The

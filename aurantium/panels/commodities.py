@@ -210,6 +210,10 @@ class CommoditiesPanel(Panel):
         last_item.setText(_fmt_num(price))
         chg_item.setText(signed(change))
         pct_item.setText(signed_pct(change_pct))
+        # the tick flash: only the cells whose value really moved
+        self.table.flash_on_change(last_item, price)
+        self.table.flash_on_change(chg_item, change)
+        self.table.flash_on_change(pct_item, change_pct)
         range_item.setText(_fmt_range(day_low, day_high))
 
         if change is not None:

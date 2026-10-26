@@ -372,6 +372,10 @@ class MacroPanel(Panel):
         chg_item.setText(signed(change))
         change_pct = data.get("change_pct")
         pct_item.setText(signed_pct(change_pct))
+        # the tick flash: only the cells whose value really moved
+        self.inst_table.flash_on_change(last_item, data.get("price"))
+        self.inst_table.flash_on_change(chg_item, change)
+        self.inst_table.flash_on_change(pct_item, change_pct)
         if change is not None:
             apply_tick(chg_item, change, glyph=False)
             apply_tick(pct_item, change)

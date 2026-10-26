@@ -153,6 +153,9 @@ _FLASH_ALPHA = 90
 #: The app's ease-out, applied to the decay so the flash matches every other
 #: animation's curve instead of falling off linearly.
 _DECAY = QEasingCurve(motion.EASE_OUT)
+#: Item data role holding the last value ``flash_on_change`` saw in a cell.
+#: Well clear of the UserRole slots panels use for their own payloads.
+_LAST_VALUE_ROLE = Qt.ItemDataRole.UserRole + 0x100
 
 
 #: ``set_column_priority(stretch=STRETCH_ALL)``: every visible column shares
@@ -315,6 +318,26 @@ class MarketTable(QTableWidget):
             self._flashes.append([item, 1.0, color, 0.0])
         if not self._flash_timer.isActive():
             self._flash_timer.start()
+
+    def flash_on_change(self, item, value) -> None:
+        """Flash ``item`` if ``value`` differs from the last one seen in it.
+
+        Quote callbacks fire on every poll, and most polls change nothing; the
+        flash only means something if it fires on a real move. The last value
+        lives on the item itself, so it survives sorting and needs no
+        per-panel bookkeeping. Recorded under reduced motion too, so turning
+        animations back on never flashes a stale comparison.
+        """
+        if item is None or value is None:
+            return
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            return
+        previous = item.data(_LAST_VALUE_ROLE)
+        item.setData(_LAST_VALUE_ROLE, value)
+        if previous is not None and value != previous:
+            self.flash_cell(item, value - previous)
 
     def _step_flashes(self) -> None:
         """Advance every live flash one frame.

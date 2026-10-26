@@ -661,6 +661,9 @@ class PortfolioPanel(Panel):
         if not (last_item and mktval_item and pnl_item and pnlpct_item):
             return
         last_item.setText(fmt.price(last))
+        # the price is what ticked; market value and P&L follow from it, so
+        # flashing them too would light the whole row for one move
+        self.table.flash_on_change(last_item, last)
         mktval_item.setText(_fmt(mkt_val))
         pnl_item.setText(fmt.signed(pnl))
         pnlpct_item.setText(fmt.signed_pct(pnl_pct))
