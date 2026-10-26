@@ -94,6 +94,7 @@ def test_attach_gives_a_plain_view_an_empty_state(qapp):
 
     view.insertRow(0)
     view.setItem(0, 0, QTableWidgetItem("headline"))
+    _finish_fades(state)  # it crossfades out now, like MarketTable's
     assert not state.isVisibleTo(view)
 
     view.setRowHidden(0, True)

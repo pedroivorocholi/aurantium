@@ -1805,10 +1805,9 @@ class ChartPanel(Panel):
                     "Click a ticker in any linked panel, or type one in the search box",
                 )
             self._empty.setGeometry(self.plot_widget.viewport().rect())
-            self._empty.show()
-            self._empty.raise_()
+            self._empty.set_shown(True)
         else:
-            self._empty.hide()
+            self._empty.set_shown(False)
 
     def _size_selector_btn(self, btn: QPushButton) -> None:
         """Size a range/interval chip to its label.

@@ -165,9 +165,7 @@ class PerformancePanel(Panel):
         for side in ("left", "bottom"):
             item.showAxis(side, not empty)
         self._zero_line.setVisible(not empty)
-        self._empty.setVisible(empty)
-        if empty:
-            self._empty.raise_()
+        self._empty.set_shown(empty)
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt override)
         if obj is self.plot_widget.viewport() and event.type() == QEvent.Type.Resize:

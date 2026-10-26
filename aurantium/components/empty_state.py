@@ -16,6 +16,7 @@ from PySide6.QtCore import QEvent, QRect, Qt
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter
 from PySide6.QtWidgets import QWidget
 
+from .. import motion
 from ..theme import ACCENT, FG_DIM, FG_MUTED, FONT_LG, FONT_MD, MONO_FONT, SPACE_MD, SPACE_XL, UI_FONT
 
 
@@ -76,11 +77,7 @@ class EmptyState(QWidget):
             not view.isRowHidden(r) for r in range(view.model().rowCount())
         )
         self.setGeometry(view.viewport().rect())
-        self.setVisible(not visible)
-        self.update()
-        if not visible:
-            self.raise_()
-            self.update()
+        self.set_shown(not visible)
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt override)
         view = getattr(self, "_view", None)
@@ -91,6 +88,27 @@ class EmptyState(QWidget):
         ):
             self.setGeometry(view.viewport().rect())
         return super().eventFilter(obj, event)
+
+    def set_shown(self, on: bool) -> None:
+        """Crossfade the message in or out (``OVERLAY_MS``), as MarketTable's
+        own empty state always has. Opacity only — the overlay is out of
+        layout, so nothing underneath moves.
+
+        Keyed on ``isHidden()``, not ``isVisible()``: the latter is False
+        whenever an ancestor is hidden, which during a layout restore is every
+        panel, and the message would be left up when the window appeared.
+        """
+        if on:
+            self.raise_()
+            self.update()
+            if self.isHidden():
+                # a hidden overlay sits at full opacity; start the fade low so
+                # it arrives instead of popping
+                motion.fade_animation(self)
+                self._aurantium_fade_effect.setOpacity(0.0)
+            motion.fade(self, 1.0)
+        elif not self.isHidden():
+            motion.fade(self, 0.0, hide_when_done=True)
 
     # -- loading --------------------------------------------------------------
 
