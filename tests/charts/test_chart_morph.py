@@ -72,7 +72,7 @@ def _assert_final(p):
 
 def _settle(p):
     anim = p._morph.anim
-    if anim.state() == anim.State.Running:
+    if anim.state() != anim.State.Stopped:
         anim.setCurrentTime(anim.duration())
     QApplication.processEvents()
 
@@ -215,3 +215,56 @@ def test_closing_the_panel_mid_morph_is_safe(qapp, monkeypatch, feeds):
     p.close()
     p.deleteLater()
     QApplication.processEvents()
+
+
+def test_a_stalled_ui_thread_delays_the_morph_instead_of_skipping_it(
+    qapp, monkeypatch, feeds
+):
+    """A linked symbol change re-renders every panel in the group on the UI
+    thread. However long that holds the thread, the morph's clock advances at
+    most two frames per tick, so its frames still reach the screen."""
+    p = _make_chart(monkeypatch, animate=True, feeds=feeds)
+    _load_first(p, monkeypatch)
+    p.on_symbol("BBB")
+    anim = p._morph.anim
+    time.sleep(0.5)  # the thread is away for longer than the whole morph
+    anim._tick()
+    assert 0 < anim.currentTime() <= motion.PacedAnimation.MAX_STEP_MS
+    assert p._morph.running()
+    _settle(p)
+    _assert_final(p)
+
+
+def test_a_paced_morph_runs_to_the_end_on_its_own(qapp, monkeypatch, feeds):
+    from PySide6.QtTest import QTest
+
+    p = _make_chart(monkeypatch, animate=True, feeds=feeds)
+    _load_first(p, monkeypatch)
+    p.on_symbol("BBB")
+    QTest.qWait(motion.CHART_MORPH_MS * 4)
+    _assert_final(p)
+
+
+def test_volume_rises_with_the_morph(qapp, monkeypatch, feeds):
+    p = _make_chart(monkeypatch, animate=True, feeds=feeds)
+    p._add_indicator("volume", {}, color="#3399ff")
+    vol = p._indicators[-1]
+    _load_first(p, monkeypatch)
+    p.on_symbol("BBB")
+    assert vol.anim is not None and vol.anim.state() != vol.anim.State.Stopped
+    for anim in [vol.anim, p._morph.anim]:
+        anim.setCurrentTime(anim.duration())
+    QApplication.processEvents()
+    assert list(vol.pane_items[0].opts["height"]) == pytest.approx([1000] * 80)
+    assert vol.pane_items[0].opacity() == pytest.approx(1.0)
+    _assert_final(p)
+
+
+def test_volume_does_not_animate_with_reduced_motion(qapp, monkeypatch, feeds):
+    p = _make_chart(monkeypatch, animate=False, feeds=feeds)
+    p._add_indicator("volume", {}, color="#3399ff")
+    vol = p._indicators[-1]
+    _load_first(p, monkeypatch)
+    p.on_symbol("BBB")
+    assert vol.anim is None or vol.anim.state() == vol.anim.State.Stopped
+    assert list(vol.pane_items[0].opts["height"]) == pytest.approx([1000] * 80)

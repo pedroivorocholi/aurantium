@@ -416,3 +416,43 @@ def test_the_tick_flash_decays_on_the_house_curve(table):
     assert frames_to_half < linear_frames * 0.8, (
         "a strong ease-out should pass half intensity well before the midpoint"
     )
+
+
+def test_a_paced_animation_never_jumps_more_than_two_frames(qapp):
+    import time as _time
+
+    anim = motion.PacedAnimation()
+    anim.setStartValue(0.0)
+    anim.setEndValue(1.0)
+    anim.setDuration(200)
+    anim.start()
+    assert anim.state() != anim.State.Stopped
+    _time.sleep(0.3)  # longer than the whole animation
+    anim._tick()
+    assert anim.currentTime() <= motion.PacedAnimation.MAX_STEP_MS
+    assert anim.state() != anim.State.Stopped
+
+
+def test_a_paced_animation_lands_and_stops_its_timer(qapp):
+    from PySide6.QtTest import QTest
+
+    anim = motion.PacedAnimation()
+    anim.setStartValue(0.0)
+    anim.setEndValue(1.0)
+    anim.setDuration(60)
+    finished = []
+    anim.finished.connect(lambda: finished.append(True))
+    anim.start()
+    QTest.qWait(400)
+    assert finished
+    assert anim.state() == anim.State.Stopped
+    assert anim.currentValue() == 1.0
+    assert not anim._ticker.isActive()  # nothing ticks at idle
+
+
+def test_stopping_a_paced_animation_stops_its_timer(qapp):
+    anim = motion.PacedAnimation()
+    anim.setDuration(200)
+    anim.start()
+    anim.stop()
+    assert not anim._ticker.isActive()

@@ -27,7 +27,7 @@ conditions that keep it narrow, so neither can spread by accident.
 **Chart data transitions** (``CHART_MORPH_MS``). When the chart panel's linked
 symbol changes, its price series morphs from the old symbol's shape into the
 new one — the line's y-values interpolate, the price axis rescales, and the
-real candles crossfade in over the second half. Up to 300ms, on ``EASE_OUT``.
+real candles crossfade in over the second half. Up to 300ms, on ``EASE_TRAVEL``.
 It is allowed only because it is the moment the product exists for (a click
 re-centring the workspace) and only under all of these conditions:
 
@@ -55,8 +55,9 @@ zero once the workspace is up. Under reduced motion the skeleton is static.
 from __future__ import annotations
 
 import sys
+import time
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QTimer
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt, QTimer, QVariantAnimation
 from PySide6.QtWidgets import QGraphicsOpacityEffect
 
 #: Durations, in ms. Kept well under the 300ms ceiling for interface motion —
@@ -74,6 +75,12 @@ NOTICE_SWAP_FROM = 0.4
 #: that UI motion actually wants — it moves immediately, which is the moment
 #: the user is watching, then settles.
 EASE_OUT = QEasingCurve.Type.OutQuint
+
+#: For data travelling a distance — a series morphing, a line drawing in. What
+#: is watched there is the path, not the arrival, and OutQuint covers 80% of
+#: it in the first fifth of the time: on a chart busy repainting, that fifth is
+#: one or two frames and the motion reads as a cut.
+EASE_TRAVEL = QEasingCurve.Type.OutCubic
 
 
 def _windows_animations_on() -> bool:
@@ -161,6 +168,57 @@ SKELETON_MAX_MS = 8000
 #: fading out. The removal is quicker: the user already chose it gone.
 INDICATOR_IN_MS = 240
 INDICATOR_OUT_MS = 160
+
+
+class PacedAnimation(QVariantAnimation):
+    """A QVariantAnimation whose clock never jumps more than ``MAX_STEP_MS``.
+
+    For data travelling across a chart, started while the UI thread is busy —
+    a linked symbol change re-renders every panel in the group at once, and
+    the thread can be away for half a second. A wall-clock animation spends
+    its whole duration inside that gap and lands as a cut; this one is
+    delayed instead, and every step still reaches the screen.
+
+    Driven by its own frame timer while the Qt animation itself sits paused,
+    so ``state() != Stopped`` means "under way". The timer runs only while an
+    animation is, so it costs nothing at idle. ``setCurrentTime`` still jumps
+    anywhere, and reaching the end stops it and emits ``finished`` as usual.
+    """
+
+    FRAME_MS = 16
+    MAX_STEP_MS = 34  # two frames at 60Hz
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._last = 0.0
+        self._ticker = QTimer(self)
+        self._ticker.setTimerType(Qt.TimerType.PreciseTimer)
+        self._ticker.setInterval(self.FRAME_MS)
+        self._ticker.timeout.connect(self._tick)
+
+    def start(self) -> None:  # noqa: D102 (QAbstractAnimation API)
+        self._ticker.stop()
+        super().start()
+        if self.state() == self.State.Stopped:
+            return  # zero duration: already landed
+        super().pause()
+        self._last = time.monotonic()
+        self._ticker.start()
+
+    def stop(self) -> None:  # noqa: D102 (QAbstractAnimation API)
+        self._ticker.stop()
+        super().stop()
+
+    def _tick(self) -> None:
+        if self.state() == self.State.Stopped:
+            self._ticker.stop()
+            return
+        now = time.monotonic()
+        step = min((now - self._last) * 1000.0, self.MAX_STEP_MS)
+        self._last = now
+        self.setCurrentTime(min(self.duration(), self.currentTime() + max(1, round(step))))
+        if self.state() == self.State.Stopped:
+            self._ticker.stop()
 
 
 def fade_animation(widget) -> QPropertyAnimation:

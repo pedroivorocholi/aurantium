@@ -622,7 +622,8 @@ class _IndicatorInstance:
         self.pane_items: list = []  # pg items inside self.pane
         #: the draw-in reveal, created on first use (ChartPanel._draw_in)
         self.anim: Optional[QVariantAnimation] = None
-        self._reveal: tuple[list, list] = ([], [])  # (items, (curve, xs, ys))
+        #: (items, [(curve, xs, ys)], [(bars, heights)]) while drawing in
+        self._reveal: tuple[list, list, list] = ([], [], [])
 
     @property
     def spec(self) -> _IndicatorSpec:
@@ -1161,10 +1162,10 @@ class _SeriesMorph:
         self.overlay = _MorphOverlay(panel.plot_widget.viewport(), self)
         # One persistent animation per chart (see motion.fade_animation for
         # why throwaway DeleteWhenStopped animations are not used here).
-        self.anim = QVariantAnimation(panel)
+        self.anim = motion.PacedAnimation(panel)
         self.anim.setStartValue(0.0)
         self.anim.setEndValue(1.0)
-        self.anim.setEasingCurve(motion.EASE_OUT)
+        self.anim.setEasingCurve(motion.EASE_TRAVEL)
         self.anim.valueChanged.connect(self._step)
         self.anim.finished.connect(self.finish)
         # a drag or wheel on the plot is the user taking over: stop at once
@@ -1173,7 +1174,8 @@ class _SeriesMorph:
         )
 
     def running(self) -> bool:
-        return self.anim.state() == QVariantAnimation.State.Running
+        """Under way (a PacedAnimation runs while its Qt state is Paused)."""
+        return self.anim.state() != QVariantAnimation.State.Stopped
 
     # -- the three moments ---------------------------------------------------
 
@@ -1222,6 +1224,11 @@ class _SeriesMorph:
         self.anim.setDuration(ms)
         self._step(0.0)
         self.anim.start()
+        # the volume pane answers the same change: its bars rise from the
+        # baseline alongside the price line
+        for inst in panel._indicators:
+            if inst.kind == "volume":
+                panel._draw_in(inst)
 
     def cancel(self) -> None:
         """Not a symbol change after all (a range or interval change, an empty
@@ -1437,7 +1444,8 @@ class ChartPanel(Panel):
     GUIDE = PanelGuide(
         purpose="Price chart for the linked symbol, with indicators, drawings and an events lane.",
         links="Follows the link group's symbol: the old line morphs into the new "
-        "symbol's and the price axis rescales to it (instant when Windows "
+        "symbol's, the price axis rescales to it and volume rises from its "
+        "baseline (instant when Windows "
         "animations are off, or when you step through symbols quickly). A click "
         "on a mark in the EVENTS lane opens the Day Brief on that date.",
         interactions=(
@@ -1448,7 +1456,8 @@ class ChartPanel(Panel):
             "Hover for a crosshair with the bar's date and open/high/low/close. Drag to "
             "scroll through time, wheel to zoom, double-click to reset.",
             "**INDICATORS**: **+** adds SMA, EMA, Bollinger Bands, VWAP, Volume, RSI or "
-            "MACD; a new one draws in from the left, and a removed one fades out. "
+            "MACD; a new one draws in from the left (volume and MACD bars rise), and "
+            "a removed one fades out. "
             "Click a chip to switch it off and on; right-click it to recolor, "
             "change its period or remove it.",
             "Right-click the chart for chart type, colors, grid, log scale, the events "
@@ -1636,7 +1645,7 @@ class ChartPanel(Panel):
         self._add_btn.setObjectName("chartChip")
         from .. import icons
 
-        icons.set_icon(self._add_btn, "plus", CHROME_TEXT_DIM, disabled_color=FG_MUTED, size=14)
+        icons.set_icon(self._add_btn, "plus", CHROME_TEXT_DIM, disabled_color=FG_MUTED)
         self._add_btn.setAccessibleName("Add an indicator")
         self._add_btn.setFixedWidth(26)
         self._add_btn.setToolTip("Add an indicator")
@@ -1655,7 +1664,7 @@ class ChartPanel(Panel):
         # export: the chart as it stands, saved or copied (_chart_export.py)
         self._export_btn = QPushButton(self)
         self._export_btn.setObjectName("chartChip")
-        icons.set_icon(self._export_btn, "export-image", CHROME_TEXT_DIM, disabled_color=FG_MUTED, size=14)
+        icons.set_icon(self._export_btn, "export-image", CHROME_TEXT_DIM, disabled_color=FG_MUTED)
         self._export_btn.setAccessibleName("Export chart image")
         self._export_btn.setFixedWidth(26)
         self._export_btn.setToolTip(
@@ -2144,8 +2153,9 @@ class ChartPanel(Panel):
     def _draw_in(self, inst: _IndicatorInstance) -> None:
         """Reveal a just-added indicator left to right as it fades up.
 
-        Curves are re-sliced frame by frame from their own full data; bars and
-        fills only fade. Any refresh of the indicator mid-reveal lands it
+        Curves are re-sliced frame by frame from their own full data; bars
+        (volume, the MACD histogram) rise from their baseline, their pane's
+        scale held at the final one so the growth is not autoranged away. Any refresh of the indicator mid-reveal lands it
         (``_refresh_indicator``), and so does the end of the reveal, so the
         last word on its data is always the real computation.
         """
@@ -2153,18 +2163,26 @@ class ChartPanel(Panel):
         items = inst.items + inst.pane_items
         if ms == 0 or not inst.on or not items:
             return
-        curves = []
+        curves, bars = [], []
         for item in items:
             if isinstance(item, pg.PlotDataItem):
                 xs, ys = item.xData, item.yData
                 if xs is not None and len(xs) > 1:
                     curves.append((item, xs, ys))
-        inst._reveal = (items, curves)
+            elif isinstance(item, pg.BarGraphItem):
+                heights = item.opts.get("height")
+                if heights is not None and len(heights):
+                    bars.append((item, np.asarray(heights, dtype=float)))
+        if bars and inst.pane is not None:
+            vb = inst.pane.getViewBox()
+            vb.updateAutoRange()
+            vb.disableAutoRange(axis=pg.ViewBox.YAxis)
+        inst._reveal = (items, curves, bars)
         if inst.anim is None:
-            inst.anim = QVariantAnimation(self)
+            inst.anim = motion.PacedAnimation(self)
             inst.anim.setStartValue(0.0)
             inst.anim.setEndValue(1.0)
-            inst.anim.setEasingCurve(motion.EASE_OUT)
+            inst.anim.setEasingCurve(motion.EASE_TRAVEL)
             inst.anim.valueChanged.connect(lambda v, i=inst: self._reveal_step(i, v))
             inst.anim.finished.connect(lambda i=inst: self._refresh_indicator(i))
         inst.anim.stop()
@@ -2174,22 +2192,29 @@ class ChartPanel(Panel):
 
     def _reveal_step(self, inst: _IndicatorInstance, value) -> None:
         t = float(value)
-        items, curves = inst._reveal
+        items, curves, bars = inst._reveal
         try:
             for item in items:
                 item.setOpacity(t)
             for item, xs, ys in curves:
                 k = max(2, int(round(len(xs) * t)))
                 item.setData(xs[:k], ys[:k])
+            for item, heights in bars:
+                item.setOpts(height=heights * t)
         except RuntimeError:
             pass  # torn down mid-reveal
 
     def _land_reveal(self, inst: _IndicatorInstance) -> None:
         """Stop a running reveal and put the indicator at full opacity. Its
         data is restored by whoever called (``_refresh_indicator``)."""
-        if inst.anim is not None and inst.anim.state() == QVariantAnimation.State.Running:
+        if inst.anim is not None and inst.anim.state() != QVariantAnimation.State.Stopped:
             inst.anim.stop()
-        inst._reveal = ([], [])
+        if inst._reveal[2] and inst.pane is not None:
+            try:
+                inst.pane.getViewBox().enableAutoRange(axis=pg.ViewBox.YAxis)
+            except RuntimeError:
+                pass
+        inst._reveal = ([], [], [])
         for item in inst.items + inst.pane_items:
             try:
                 item.setOpacity(1.0)
@@ -2235,9 +2260,9 @@ class ChartPanel(Panel):
         return True
 
     def _indicator_anims_for_tests(self) -> list:
-        running = QVariantAnimation.State.Running
-        anims = [i.anim for i in self._indicators if i.anim is not None and i.anim.state() == running]
-        return anims + [a for a in self._fading_out if a.state() == running]
+        stopped = QVariantAnimation.State.Stopped
+        anims = [i.anim for i in self._indicators if i.anim is not None and i.anim.state() != stopped]
+        return anims + [a for a in self._fading_out if a.state() != stopped]
 
     def _maybe_widen_fetch(self) -> None:
         """A new/longer indicator may need more lookback than what's fetched."""

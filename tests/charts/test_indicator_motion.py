@@ -65,7 +65,7 @@ def _add_sma(p):
 def test_reduced_motion_adds_the_full_series_at_once(qapp, monkeypatch):
     p = _chart(monkeypatch, animate=False)
     inst = _add_sma(p)
-    assert inst.anim is None or not inst.anim.state() == inst.anim.State.Running
+    assert inst.anim is None or inst.anim.state() == inst.anim.State.Stopped
     curve = inst.items[0]
     assert curve.opacity() == pytest.approx(1.0)
     assert _points(curve) == 200 - 20 + 1
@@ -90,7 +90,7 @@ def test_a_refresh_mid_draw_in_lands_on_the_full_series(qapp, monkeypatch):
     inst.anim.setCurrentTime(inst.anim.duration() // 3)
     p._on_history(_bars())  # live data arrives mid-reveal
     curve = inst.items[0]
-    assert inst.anim.state() != inst.anim.State.Running
+    assert inst.anim.state() == inst.anim.State.Stopped
     assert _points(curve) == 200 - 20 + 1
     assert curve.opacity() == pytest.approx(1.0)
 
@@ -103,7 +103,7 @@ def test_the_add_menu_path_draws_in(qapp, monkeypatch):
     monkeypatch.setattr(p, "_pick_new_indicator_color", lambda label: "#3399ff")
     p._add_indicator_ui("sma")
     inst = p._indicators[-1]
-    assert inst.anim is not None and inst.anim.state() == inst.anim.State.Running
+    assert inst.anim is not None and inst.anim.state() != inst.anim.State.Stopped
     _settle(p)
 
 
@@ -161,4 +161,53 @@ def test_removing_mid_draw_in_leaves_nothing_behind(qapp, monkeypatch):
     p._remove_indicator(inst, animate=True)
     _settle(p)
     assert not _in_plot(p, curve)
+    assert not list(p._indicator_anims_for_tests())
+
+
+# -- volume ----------------------------------------------------------------------
+
+def _add_volume(p):
+    p._add_indicator("volume", {}, color="#3399ff")
+    inst = p._indicators[-1]
+    p._draw_in(inst)
+    return inst
+
+
+def _heights(inst):
+    return list(inst.pane_items[0].opts["height"])
+
+
+def _y_autoranges(inst):
+    return inst.pane.getViewBox().autoRangeEnabled()[1]
+
+
+def test_volume_bars_rise_from_the_baseline(qapp, monkeypatch):
+    p = _chart(monkeypatch, animate=True)
+    inst = _add_volume(p)
+    inst.anim.setCurrentTime(inst.anim.duration() // 3)
+    mid = _heights(inst)
+    assert 0 < max(mid) < 1000
+    # the pane holds its final scale while the bars grow into it
+    assert not _y_autoranges(inst)
+    _settle(p)
+    assert _heights(inst) == pytest.approx([1000] * 200)
+    assert _y_autoranges(inst)
+    assert inst.pane_items[0].opacity() == pytest.approx(1.0)
+
+
+def test_volume_with_reduced_motion_is_full_at_once(qapp, monkeypatch):
+    p = _chart(monkeypatch, animate=False)
+    inst = _add_volume(p)
+    assert inst.anim is None or inst.anim.state() == inst.anim.State.Stopped
+    assert _heights(inst) == pytest.approx([1000] * 200)
+    assert _y_autoranges(inst)
+
+
+def test_removing_volume_mid_rise_leaves_nothing_behind(qapp, monkeypatch):
+    p = _chart(monkeypatch, animate=True)
+    inst = _add_volume(p)
+    inst.anim.setCurrentTime(inst.anim.duration() // 3)
+    p._remove_indicator(inst, animate=True)
+    _settle(p)
+    assert inst.pane is None
     assert not list(p._indicator_anims_for_tests())
