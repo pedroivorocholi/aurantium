@@ -65,6 +65,9 @@ FLASH_MS = 240      # link-group tint decay on a propagated symbol
 NOTICE_IN_MS = 110  # notice card appearing
 NOTICE_OUT_MS = 220 # notice card retiring on its own timer
 NOTICE_DISMISS_MS = 100  # ...but a click gets an immediate answer
+#: A notice replacing one already up: the card stays, its new text fades up
+#: from here over CROSSFADE_MS — still readable at once, but visibly new.
+NOTICE_SWAP_FROM = 0.4
 
 #: The house curve. Qt's built-in OutCubic is the weak equivalent of CSS's
 #: default ease-out; OutQuint matches the strong cubic-bezier(0.23, 1, 0.32, 1)

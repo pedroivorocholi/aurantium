@@ -135,15 +135,38 @@ class Notifier(QWidget):
         text = (text or "").strip()
         if not text:
             return
+        # A card already up (and not on its way out) is replaced in place:
+        # restarting the slide made it drop and rise again, which read as a
+        # second card arriving rather than the same one being updated.
+        replacing = not self.isHidden() and not self._hide_when_faded
         self._apply_style(level)
         self._label.setText(text)
         self.adjustSize()
-        self.reposition()
-        self.show()
-        self.raise_()
-        self._slide_to(self._resting_pos(), rise=True, ms=motion.NOTICE_IN_MS)
+        if replacing:
+            self._swap_in_place()
+        else:
+            self.reposition()
+            self.show()
+            self.raise_()
+            self._slide_to(self._resting_pos(), rise=True, ms=motion.NOTICE_IN_MS)
         self._fade_to(1.0, motion.NOTICE_IN_MS)
         self._timer.start(max(600, int(msecs)))
+
+    def _swap_in_place(self) -> None:
+        """Keep the card where it is (re-anchored, since the new text may be
+        a different width) and let only the new text arrive."""
+        resting = self._resting_pos()
+        if self._slide.state() == QPropertyAnimation.State.Running:
+            self._slide.setEndValue(resting)  # still rising: land on the new spot
+        else:
+            self.move(resting)
+        self.raise_()
+        if motion.animations_enabled():
+            motion.fade_animation(self._label)  # make sure the effect exists to seed
+            self._label._aurantium_fade_effect.setOpacity(
+                min(motion.fade_opacity(self._label), motion.NOTICE_SWAP_FROM)
+            )
+            motion.fade(self._label, 1.0, ms=motion.CROSSFADE_MS)
 
     def dismiss(self, quick: bool = False) -> None:
         """Fade out and hide. Safe to call when nothing is showing.
