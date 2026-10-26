@@ -129,8 +129,71 @@ def test_the_toolbar_and_the_menu_both_reach_it(chart):
 
     assert chart._export_btn.toolTip()
     assert "export-image" in icons.KINDS
-    texts = [a.text() for a in chart._build_export_menu(chart).actions()]
-    assert texts == ["Save as PNG…", "Copy chart image"]
+    actions = chart._build_export_menu(chart).actions()
+    assert [a.text() for a in actions] == ["Save as PNG", "Copy chart image"]
+    assert [a.text() for a in actions[0].menu().actions()] == ["Dark…", "Light…"]
+    assert [a.text() for a in actions[1].menu().actions()] == ["Dark", "Light"]
+
+
+def _other_theme():
+    from aurantium import theme
+
+    return "light" if theme.active_theme() == "dark" else "dark"
+
+
+def test_the_export_can_be_in_the_other_theme(chart, qapp):
+    from aurantium import theme
+
+    _loaded(chart, qapp)
+    other = _other_theme()
+    image = chart.chart_image(other)
+    assert image.pixelColor(1, 1) == QColor(theme.palette_colors(other)["BG"])
+    # same frame either way: only the colours change
+    assert image.size() == chart.chart_image().size()
+
+
+def test_the_other_theme_leaves_the_screen_alone(chart, qapp):
+    _loaded(chart, qapp)
+    pens = [inst.items[0].opts["pen"].color().name()
+            for inst in chart._indicators if inst.items]
+    axis = chart.plot_widget.getAxis("left").textPen().color().name()
+    before = chart.plot_widget.grab().toImage()
+    chart.chart_image(_other_theme())
+    qapp.processEvents()
+    assert [inst.items[0].opts["pen"].color().name()
+            for inst in chart._indicators if inst.items] == pens
+    assert chart.plot_widget.getAxis("left").textPen().color().name() == axis
+    assert chart.candle_item._up == chart._colors["up"]
+    assert chart.plot_widget.grab().toImage() == before
+
+
+def test_the_other_theme_maps_roles_and_slots(chart, qapp):
+    from aurantium import theme
+    from aurantium.panels import _chart_export
+
+    _loaded(chart, qapp)
+    here, other = theme.active_theme(), _other_theme()
+    src, dst = theme.palette_colors(here), theme.palette_colors(other)
+    cmap = _chart_export.color_map(chart, other)
+    for role in ("BG", "ACCENT", "UP", "DOWN", "FG_DIM"):
+        assert cmap[src[role].lower()] == dst[role]
+    assert cmap[theme.series_color(0, here).lower()] == theme.series_color(0, other)
+    assert _chart_export.color_map(chart, here) == {}
+
+
+def test_a_picked_color_is_kept_only_where_it_reads(chart, qapp):
+    from aurantium import theme
+    from aurantium.panels import _chart_export
+
+    _loaded(chart, qapp)
+    other = _other_theme()
+    unreadable = "#fafafa" if other == "light" else "#050505"
+    readable = "#1565c0"  # mid blue: 3:1 on black and on white
+    chart._indicators[0].color = unreadable
+    chart._indicators[1].color = readable
+    cmap = _chart_export.color_map(chart, other)
+    assert cmap[unreadable] == theme.series_color(0, other)
+    assert readable not in cmap
 
 
 def test_an_indicator_with_nothing_drawn_is_left_out_of_the_legend(chart, qapp):
@@ -142,3 +205,18 @@ def test_an_indicator_with_nothing_drawn_is_left_out_of_the_legend(chart, qapp):
     labels = [e.label for e in _chart_export.legend(chart)]
     assert "SMA 50" in labels
     assert "SMA 200" not in labels  # no line on the chart, so no entry
+
+
+def test_the_header_carries_the_logo_mark_top_right_in_either_theme(chart, qapp):
+    from aurantium.panels import _chart_export as ex
+
+    _loaded(chart, qapp)
+    for name in ("dark", "light"):
+        mark = ex.logo_mark(name, ex.MARK_H * 2)
+        assert mark is not None and mark.height() == ex.MARK_H * 2
+        assert mark.width() < 2 * mark.height()  # the mark alone, not the wordmark
+        image = chart.chart_image(name)
+        x = image.width() - ex.PAD * 2 - mark.width() // 2
+        band = range(ex.PAD * 2, (ex.PAD + ex.MARK_H) * 2)
+        bg = image.pixelColor(1, 1)
+        assert any(image.pixelColor(x, y) != bg for y in band)

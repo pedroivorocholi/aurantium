@@ -1215,8 +1215,9 @@ class ChartPanel(Panel):
             "Right-click the chart for chart type, colors, grid, log scale, the events "
             "lane, drawing tools, export and reset options.",
             "The image button at the end of the indicator row exports the chart as it "
-            "stands: **Save as PNG…** or **Copy chart image** to paste elsewhere. Also on "
-            "the right-click menu.",
+            "stands: **Save as PNG** or **Copy chart image** to paste elsewhere, each "
+            "in **Dark** or **Light**, whatever theme the app is in. Also on the "
+            "right-click menu.",
         ),
         fields=(
             ("SMA / EMA", "Simple and exponential moving averages of the close over N bars"),
@@ -1228,11 +1229,14 @@ class ChartPanel(Panel):
         shortcuts=(("D", "Explain the day under the crosshair in the Day Brief"),),
         sections=(
             GuideSection("Export", "The export reproduces the chart on screen, whatever "
-                "range, interval, indicators, comparisons, log scale and theme are on: the "
+                "range, interval, indicators, comparisons and log scale are on: the "
                 "price pane, the events lane and every indicator pane with their axes, at "
                 "twice the on-screen pixels. A header names the symbol, interval and range, "
                 "with a legend entry in its plotted color for each series. The controls "
-                "above the chart are left out."),
+                "above the chart are left out. Pick **Dark** or **Light** for the image: "
+                "the other theme recolors the chart by role (price line, up/down, axes, "
+                "indicator slots); a color you picked is kept if it still reads on that "
+                "background."),
             GuideSection("Drawing", "Right-click ▸ **Drawing** offers a trendline, a "
                 "horizontal line, and parallel, flat-bottom or disjoint channels. Click "
                 "to place each point; points snap to the nearest candle. Drawings are "
@@ -1414,7 +1418,9 @@ class ChartPanel(Panel):
         icons.set_icon(self._export_btn, "export-image", CHROME_TEXT_DIM, disabled_color=FG_MUTED, size=14)
         self._export_btn.setAccessibleName("Export chart image")
         self._export_btn.setFixedWidth(26)
-        self._export_btn.setToolTip("Export chart image: save as PNG or copy, at 2× resolution")
+        self._export_btn.setToolTip(
+            "Export chart image: save as PNG or copy, dark or light, at 2× resolution"
+        )
         self._export_btn.clicked.connect(
             lambda: self._build_export_menu(self).exec(
                 self._export_btn.mapToGlobal(self._export_btn.rect().bottomLeft())
@@ -2285,24 +2291,30 @@ class ChartPanel(Panel):
     # -- extras ----------------------------------------------------------------
 
     def _build_export_menu(self, parent) -> QMenu:
+        """Save or copy, each in either theme — the image need not match the
+        app (a light chart for a document, a dark one for a deck)."""
         menu = QMenu("Export", parent)
-        png_act = QAction("Save as PNG…", menu)
-        png_act.triggered.connect(self._export_png)
-        menu.addAction(png_act)
-        copy_act = QAction("Copy chart image", menu)
-        copy_act.triggered.connect(self._copy_chart_image)
-        menu.addAction(copy_act)
+        for title, handler, ellipsis in (
+            ("Save as PNG", self._export_png, "…"),
+            ("Copy chart image", self._copy_chart_image, ""),
+        ):
+            sub = menu.addMenu(title)
+            for name in THEMES:
+                act = QAction(f"{name.capitalize()}{ellipsis}", sub)
+                act.triggered.connect(lambda _=False, h=handler, n=name: h(n))
+                sub.addAction(act)
         return menu
 
-    def chart_image(self):
+    def chart_image(self, theme_name: str | None = None):
         """The chart as it stands, at twice its on-screen pixels, with a
-        header and legend; None when nothing is plotted. See _chart_export."""
+        header and legend, in ``theme_name`` (default: the app's); None when
+        nothing is plotted. See _chart_export."""
         from . import _chart_export
 
-        return _chart_export.render(self)
+        return _chart_export.render(self, theme_name=theme_name)
 
-    def _export_png(self) -> None:
-        image = self.chart_image()
+    def _export_png(self, theme_name: str | None = None) -> None:
+        image = self.chart_image(theme_name)
         if image is None:
             self.set_status("nothing to export — no bars plotted")
             return
@@ -2317,8 +2329,8 @@ class ChartPanel(Panel):
         else:
             self.set_status("⚠ PNG export failed")
 
-    def _copy_chart_image(self) -> None:
-        image = self.chart_image()
+    def _copy_chart_image(self, theme_name: str | None = None) -> None:
+        image = self.chart_image(theme_name)
         if image is None:
             self.set_status("nothing to copy — no bars plotted")
             return

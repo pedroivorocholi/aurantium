@@ -269,6 +269,12 @@ def current_theme() -> str:
     return _read_theme_name()
 
 
+def active_theme() -> str:
+    """The theme this session is actually drawn in. Differs from
+    :func:`current_theme` after a switch that is waiting for the restart."""
+    return _active_name
+
+
 def palette_colors(name: str | None = None) -> dict:
     """A copy of a theme's color map (defaults to the active theme), with the
     color-blind up/down override folded in when that mode is on. Lets other
