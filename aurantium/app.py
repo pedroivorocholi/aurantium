@@ -1718,14 +1718,21 @@ class MainWindow(QMainWindow):
         from .panels.company import migrate_layout
 
         doc = migrate_layout(doc)
-        for spec in doc.get("panels", []):
-            self.add_panel(
-                spec.get("panel_id", ""),
-                instance_id=spec.get("instance"),
-                link_group=spec.get("link_group"),
-                settings=spec.get("settings"),
-                restore_floating=bool(spec.get("floating")),
-            )
+        # Still a restore, not a user adding panels: add_panel must not fade
+        # each one in (the guard used to drop before this loop, so every
+        # restored panel faded). The skeletons below carry the arrival instead.
+        self._loading_layout = True
+        try:
+            for spec in doc.get("panels", []):
+                self.add_panel(
+                    spec.get("panel_id", ""),
+                    instance_id=spec.get("instance"),
+                    link_group=spec.get("link_group"),
+                    settings=spec.get("settings"),
+                    restore_floating=bool(spec.get("floating")),
+                )
+        finally:
+            self._loading_layout = False
         state = doc.get("ads_state", "")
         if state:
             from PySide6.QtCore import QByteArray
@@ -1743,6 +1750,13 @@ class MainWindow(QMainWindow):
                 # maximized on the same monitor
                 if fw.isFullScreen():
                     fw.showMaximized()
+        # Every panel is at its saved place now. Those still waiting on their
+        # first data stand in as their own outline until it arrives (each
+        # skeleton tracks its panel's size, so a later relayout is fine).
+        for dock in self._docks.values():
+            panel = dock.widget()
+            if isinstance(panel, Panel):
+                panel.show_skeleton()
         return True
 
     # -- layout file sharing (export a saved layout / import one) -------------

@@ -18,6 +18,7 @@ Panels ▸ Add Panel menu. See docs/guides/PANELS.md.
 from __future__ import annotations
 
 import importlib.util
+import math
 import pkgutil
 import sys
 import traceback
@@ -27,13 +28,17 @@ from typing import Any, Callable, Optional, Type
 
 from PySide6.QtCore import (
     Property,
+    QEvent,
     QPropertyAnimation,
     QRectF,
     QSize,
     Qt,
+    QTimer,
+    QVariantAnimation,
 )
 from PySide6.QtGui import QAction, QColor, QFont, QFontMetrics, QPainter, QPen
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QHBoxLayout,
     QLabel,
     QMenu,
@@ -55,7 +60,9 @@ from .theme import (
     FG_MUTED,
     FOCUS,
     FONT_XS,
+    HEADER_BLUE,
     RADIUS_SM,
+    SPACE_LG,
 )
 from .symbol_context import (
     DEFAULT_GROUP,
@@ -566,6 +573,172 @@ class _LinkBadge(QToolButton):
         p.end()
 
 
+# --------------------------------------------------------------------------
+# Workspace skeleton
+# --------------------------------------------------------------------------
+#
+# A restored workspace used to come up as a dozen blank panels that filled in
+# one by one. Each panel still loading now shows its own outline — a table's
+# header band and rows, a plot's gridlines — at its real place in the layout,
+# breathing gently (motion.py, "Loading pulse") until its data arrives, then
+# fading into the real thing.
+
+#: Bar lengths for a table skeleton's rows, as fractions of the width. Uneven
+#: on purpose — identical bars read as a progress meter, not as rows of text.
+_SKELETON_ROW_FRACTIONS = (0.62, 0.44, 0.71, 0.53, 0.66, 0.4, 0.58)
+#: Row pitch when the panel has no table to measure one from.
+_SKELETON_ROW_PX = 22
+#: Horizontal gridlines on a plot skeleton.
+_SKELETON_GRIDLINES = 4
+
+
+class _SkeletonPulse:
+    """The one animation every skeleton breathes on. Runs only while at least
+    one skeleton is up, so a loaded workspace costs no timer at all."""
+
+    def __init__(self) -> None:
+        self.anim = QVariantAnimation()
+        self.anim.setStartValue(0.0)
+        self.anim.setEndValue(1.0)
+        self.anim.setLoopCount(-1)
+        self.anim.valueChanged.connect(self._tick)
+        self.value = 1.0
+        self._live: dict[int, QWidget] = {}
+
+    def running(self) -> bool:
+        return self.anim.state() == QVariantAnimation.State.Running
+
+    def add(self, skeleton: QWidget) -> None:
+        key = id(skeleton)
+        self._live[key] = skeleton
+        # a skeleton destroyed with its panel never gets to say goodbye
+        skeleton.destroyed.connect(lambda *_, k=key: self._drop(k))
+        if not self.running() and motion.duration(motion.SKELETON_PULSE_MS):
+            self.anim.setDuration(motion.SKELETON_PULSE_MS)
+            self.anim.start()
+
+    def remove(self, skeleton: QWidget) -> None:
+        self._drop(id(skeleton))
+
+    def _drop(self, key: int) -> None:
+        self._live.pop(key, None)
+        if not self._live:
+            self.anim.stop()
+            self.value = 1.0
+
+    def _tick(self, t) -> None:
+        # one full breath per loop: 1.0 → LOW → 1.0 on a cosine, which eases
+        # at both turns (a linear ramp reads as a blink at the bottom)
+        low = motion.SKELETON_PULSE_LOW
+        self.value = low + (1.0 - low) * (0.5 + 0.5 * math.cos(2 * math.pi * float(t)))
+        for key, skeleton in list(self._live.items()):
+            try:
+                skeleton.update()
+            except RuntimeError:
+                self._drop(key)
+
+
+_pulse: Optional[_SkeletonPulse] = None
+#: Skeletons fading out; the tests drive their fades to the end.
+_retiring: dict[int, QWidget] = {}
+
+
+def _skeleton_pulse() -> _SkeletonPulse:
+    global _pulse
+    if _pulse is None:
+        _pulse = _SkeletonPulse()
+    return _pulse
+
+
+def _skeleton_anims_for_tests() -> list:
+    anims = []
+    for skeleton in list(_retiring.values()):
+        try:
+            anim = getattr(skeleton, "_aurantium_fade", None)
+        except RuntimeError:
+            continue
+        if anim is not None:
+            anims.append(anim)
+    return anims
+
+
+class _Skeleton(QWidget):
+    """A panel body's outline, laid over it until its data arrives."""
+
+    def __init__(self, body: QWidget, on_cap: Callable[[], None]) -> None:
+        super().__init__(body)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        view = next(iter(body.findChildren(QAbstractItemView)), None)
+        self._table = view is not None
+        self._row_px = _SKELETON_ROW_PX
+        header = getattr(view, "verticalHeader", None)
+        if callable(header) and header() is not None:
+            self._row_px = max(header().defaultSectionSize(), 1)
+        self.setGeometry(body.rect())
+        body.installEventFilter(self)
+        # the hard stop: a panel whose data never comes is not left pulsing
+        self._cap = QTimer(self)
+        self._cap.setSingleShot(True)
+        self._cap.setInterval(motion.SKELETON_MAX_MS)
+        self._cap.timeout.connect(on_cap)
+        self._cap.start()
+        self.show()
+        self.raise_()
+        _skeleton_pulse().add(self)
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt override)
+        if event.type() == QEvent.Type.Resize:
+            try:
+                self.setGeometry(obj.rect())
+            except RuntimeError:
+                pass
+        return False
+
+    def retire(self) -> None:
+        """Fade into the real panel underneath, then go."""
+        _skeleton_pulse().remove(self)
+        self._cap.stop()
+        if motion.duration(motion.OVERLAY_MS) == 0:
+            self.hide()
+            self.deleteLater()
+            return
+        key = id(self)
+        _retiring[key] = self
+        self.destroyed.connect(lambda *_, k=key: _retiring.pop(k, None))
+        anim = motion.fade(self, 0.0, hide_when_done=True)
+        anim.finished.connect(self.deleteLater)
+
+    def paintEvent(self, _event) -> None:  # noqa: N802 (Qt override)
+        p = QPainter(self)
+        try:
+            # opaque ground, so the empty widgets underneath never show through
+            p.fillRect(self.rect(), QColor(BG))
+            pulse = _skeleton_pulse()
+            p.setOpacity(pulse.value if pulse.running() else 1.0)
+            w, h, row = self.width(), self.height(), self._row_px
+            if self._table:
+                p.fillRect(0, 0, w, row, QColor(HEADER_BLUE))
+                bar_h = max(row // 3, 2)
+                y, i = row, 0
+                while y + row <= h:
+                    frac = _SKELETON_ROW_FRACTIONS[i % len(_SKELETON_ROW_FRACTIONS)]
+                    p.fillRect(
+                        SPACE_LG, y + (row - bar_h) // 2,
+                        int((w - 2 * SPACE_LG) * frac), bar_h, QColor(CHROME_LOW),
+                    )
+                    y += row
+                    i += 1
+            else:
+                pen = QPen(QColor(BORDER_STRONG))
+                pen.setWidth(1)
+                p.setPen(pen)
+                for k in range(1, _SKELETON_GRIDLINES + 1):
+                    y = int(h * k / (_SKELETON_GRIDLINES + 1))
+                    p.drawLine(SPACE_LG, y, w - SPACE_LG, y)
+        finally:
+            p.end()
+
+
 class _PanelLayout(QVBoxLayout):
     """The panel's outermost layout: fills whatever height the dock gives.
 
@@ -717,9 +890,11 @@ class Panel(QWidget):
 
         # -- content area for subclasses
         content = QWidget(self)
+        self._body = content
         self.content_layout = QVBoxLayout(content)
         self.content_layout.setContentsMargins(4, 4, 4, 4)
         outer.addWidget(content, 1)
+        self._skeleton: Optional[_Skeleton] = None
 
         self._ctx.symbol_changed.connect(self._on_ctx_changed)
         self._update_badge()
@@ -900,6 +1075,8 @@ class Panel(QWidget):
             self._state_targets.append(widget)
 
     def _set_state(self, text: str, severity: str = "") -> None:
+        if severity != "loading":
+            self._skeleton_done()  # data, an error, stale, or nothing to say
         self._state_lbl.setText(text)
         self._state_lbl.setVisible(bool(text))
         self._state_lbl.setProperty("severity", severity or None)
@@ -927,8 +1104,30 @@ class Panel(QWidget):
             if callable(setter):
                 setter(on)
 
+    def show_skeleton(self) -> None:
+        """Stand this panel's outline in for it while its first data loads.
+
+        Called by the window after restoring a workspace, once every panel is
+        at its real place and size. A panel not loading — no fetch, or served
+        from the cache already — gets nothing: its content is the outline.
+        """
+        if self._skeleton is not None or self._host is not None:
+            return
+        if self._state_lbl.text() != LOADING:
+            return
+        self._skeleton = _Skeleton(self._body, self._skeleton_done)
+
+    def _skeleton_done(self) -> None:
+        skeleton, self._skeleton = getattr(self, "_skeleton", None), None
+        if skeleton is not None:
+            try:
+                skeleton.retire()
+            except RuntimeError:
+                pass  # destroyed with the panel
+
     def set_empty(self, title: str, hint: str = "") -> None:
         """Say what is missing, and what to do about it."""
+        self._skeleton_done()
         for target in self._state_targets:
             setter = getattr(target, "set_empty_text", None)
             if callable(setter):
