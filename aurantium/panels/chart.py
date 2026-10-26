@@ -28,6 +28,7 @@ from PySide6.QtGui import (
     QPen,
     QPicture,
     QPixmap,
+    QPolygonF,
     QShortcut,
 )
 from PySide6.QtWidgets import (
@@ -1101,11 +1102,11 @@ class _BarTimeAxis(pg.AxisItem):
 #: Points both series are resampled to for the morph. Enough that a line
 #: travelling between two shapes reads as a line, not a polygon; the real
 #: candles crossfade in over it, so finer detail would never be seen.
-MORPH_POINTS = 128
 
 
 class _MorphOverlay(QWidget):
-    """The line the morph paints, laid over the plot's viewport. Out of the
+    """The series the morph paints, laid over the plot's viewport, drawn as
+    the chart's own type — candles stay candles, bars stay bars. Out of the
     scene on purpose: it travels in pixel space, so the two series need not
     share a bar count, an axis or a scale."""
 
@@ -1120,12 +1121,7 @@ class _MorphOverlay(QWidget):
     def paintEvent(self, _event) -> None:  # noqa: N802 (Qt override)
         p = QPainter(self)
         try:
-            pts = self._morph.points_now()
-            if len(pts) >= 2:
-                p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-                p.setOpacity(self._morph.overlay_opacity)
-                p.setPen(QPen(QColor(self._morph.color), 1.5))
-                p.drawPolyline(pts)
+            self._morph.paint(p)
         except (AttributeError, RuntimeError):
             pass  # panel torn down underneath us
         finally:
@@ -1150,14 +1146,14 @@ class _SeriesMorph:
         self._panel = panel
         #: The old series in viewport pixels, plus the Y range it was drawn
         #: in, waiting for the new symbol's history. None when no morph is due.
-        self._snapshot: Optional[tuple[list, tuple]] = None
-        self._from: list[QPointF] = []
-        self._to: list[QPointF] = []
+        self._snapshot: Optional[tuple[_PixelBars, tuple]] = None
+        #: The old bars, resampled to the new series' visible bar count.
+        self._from: Optional[_PixelBars] = None
+        self.kind = panel._chart_type
         self._y_from = (0.0, 1.0)
         self._y_to = (0.0, 1.0)
         self._t = 1.0
         self._last_change = float("-inf")
-        self.color = panel._colors["line"]
         self.overlay_opacity = 1.0
         self.overlay = _MorphOverlay(panel.plot_widget.viewport(), self)
         # One persistent animation per chart (see motion.fade_animation for
@@ -1190,10 +1186,10 @@ class _SeriesMorph:
         self._last_change = now
         if too_soon or not motion.animations_enabled():
             return
-        pts = self._series_points()
-        if pts:
+        bars = self._series_bars()
+        if bars is not None:
             y_range = tuple(self._panel.plot_widget.getViewBox().viewRange()[1])
-            self._snapshot = (pts, y_range)
+            self._snapshot = (bars, y_range)
 
     def history_arriving(self) -> None:
         """A history callback is about to apply. Anything that is not the
@@ -1208,15 +1204,21 @@ class _SeriesMorph:
         if snap is None:
             return
         ms = motion.duration(motion.CHART_MORPH_MS)
-        to = self._series_points()
-        if ms == 0 or not to:
+        if ms == 0:
+            return
+        # the target is the chart as it will finally stand: fitted now, or the
+        # last frame would sit off the real candles and the landing would jump
+        self._panel._fit_y_to_visible()
+        to = self._series_bars()
+        if ms == 0 or to is None:
             return
         panel = self._panel
-        self._from = _resample(snap[0])
-        self._to = _resample(to)
+        # paired off bar for bar on the new series' own bars, so the last
+        # frame is exactly the real chart underneath
+        self._from = snap[0].resampled(len(to.x))
+        self.kind = panel._chart_type
         self._y_from = snap[1]
         self._y_to = tuple(panel.plot_widget.getViewBox().viewRange()[1])
-        self.color = panel._colors["line"]
         self.overlay.setGeometry(panel.plot_widget.viewport().rect())
         self.overlay.show()
         self.overlay.raise_()
@@ -1253,14 +1255,59 @@ class _SeriesMorph:
 
     # -- frames --------------------------------------------------------------
 
-    def points_at(self, t: float) -> list[QPointF]:
-        return [
-            QPointF(a.x() + (b.x() - a.x()) * t, a.y() + (b.y() - a.y()) * t)
-            for a, b in zip(self._from, self._to)
-        ]
+    def bars_at(self, t: float) -> Optional["_PixelBars"]:
+        if self._from is None:
+            return None
+        # The target is mapped afresh every frame: the new prices re-lay out
+        # the price axis a moment after they land, shifting the plot inside
+        # the viewport, so pixels taken at landing are stale one frame later.
+        to = self._series_bars(self._y_to)
+        if to is None or len(to.x) != len(self._from.x):
+            return None
+        return self._from.lerp(to, t)
 
-    def points_now(self) -> list[QPointF]:
-        return self.points_at(self._t)
+    def points_at(self, t: float) -> list[QPointF]:
+        """The closes at ``t`` — the line a line or area chart draws."""
+        bars = self.bars_at(t)
+        if bars is None:
+            return []
+        return [QPointF(float(x), float(y)) for x, y in zip(bars.x, bars.c)]
+
+    def paint(self, p: QPainter) -> None:
+        """One frame, in the chart's own type and colours."""
+        bars = self.bars_at(self._t)
+        if bars is None or len(bars.x) < 2:
+            return
+        panel = self._panel
+        p.setOpacity(self.overlay_opacity)
+        if self.kind in ("candles", "bars"):
+            up, down = QColor(panel._colors["up"]), QColor(panel._colors["down"])
+            hw = bars.half_width
+            for x, o, h, l, c in zip(bars.x, bars.o, bars.h, bars.l, bars.c):  # noqa: E741
+                color = up if c <= o else down  # pixel y runs downwards
+                p.setPen(QPen(color, 1))
+                p.drawLine(QPointF(x, l), QPointF(x, h))
+                if self.kind == "candles":
+                    p.setBrush(color)
+                    top, height = min(o, c), max(abs(c - o), 1.0)
+                    p.drawRect(QRectF(x - hw, top, hw * 2, height))
+                else:
+                    p.drawLine(QPointF(x - hw, o), QPointF(x, o))
+                    p.drawLine(QPointF(x, c), QPointF(x + hw, c))
+            return
+        pts = [QPointF(float(x), float(y)) for x, y in zip(bars.x, bars.c)]
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        line = QColor(panel._colors["line"])
+        if self.kind == "area":
+            fill = QColor(line)
+            fill.setAlpha(60)
+            base = float(panel.plot_widget.viewport().height())
+            poly = QPolygonF([QPointF(pts[0].x(), base), *pts, QPointF(pts[-1].x(), base)])
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(fill)
+            p.drawPolygon(poly)
+        p.setPen(QPen(line, 1.5))
+        p.drawPolyline(pts)
 
     def _step(self, value) -> None:
         try:
@@ -1296,42 +1343,66 @@ class _SeriesMorph:
         items.extend(cmp.curve for cmp in panel._compares if cmp.curve is not None)
         return items
 
-    def _series_points(self) -> list[QPointF]:
-        """The visible closes in viewport pixels. ViewBox mapping is affine,
-        so three mapped points give the whole transform."""
+    def _series_bars(self, y_range: Optional[tuple] = None) -> Optional["_PixelBars"]:
+        """The visible bars in viewport pixels, as the plot maps them now —
+        or as it will with ``y_range``, the range the morph is heading for."""
         panel = self._panel
-        closes = panel._hist_c
+        n = min(len(panel._hist_o), len(panel._hist_hi), len(panel._hist_lo), len(panel._hist_c))
         vb = panel.plot_widget.getViewBox()
-        if not closes or vb.width() <= 0 or vb.height() <= 0:
-            return []
+        if not n or vb.width() <= 0 or vb.height() <= 0:
+            return None
         (x0, x1), _ = vb.viewRange()
         i0 = max(0, math.ceil(x0))
-        i1 = min(len(closes), math.floor(x1) + 1)
+        i1 = min(n, math.floor(x1) + 1)
         if i1 - i0 < 2:
-            return []
-        ys = np.asarray(closes[i0:i1], dtype=float)
+            return None
+        ohlc = np.array(
+            [
+                panel._hist_o[i0:i1],
+                panel._hist_hi[i0:i1],
+                panel._hist_lo[i0:i1],
+                panel._hist_c[i0:i1],
+            ],
+            dtype=float,
+        )
         if panel._log_on:
-            if ys.min() <= 0:
-                return []
-            ys = np.log10(ys)
-        view = panel.plot_widget.viewportTransform()
+            if ohlc.min() <= 0:
+                return None
+            ohlc = np.log10(ohlc)
+        y0, y1 = y_range if y_range is not None else vb.viewRange()[1]
+        if x1 <= x0 or y1 <= y0:
+            return None
+        rect = panel.plot_widget.viewportTransform().mapRect(vb.sceneBoundingRect())
+        bar_px = rect.width() / (x1 - x0)
+        xs = rect.left() + (np.arange(i0, i1, dtype=float) - x0) * bar_px
+        o, h, l, c = rect.top() + (y1 - ohlc) * (rect.height() / (y1 - y0))  # noqa: E741
+        # the candle and OHLC items draw 0.35 of a bar either side
+        return _PixelBars(xs, o, h, l, c, abs(bar_px) * 0.35)
 
-        def px(x: float, y: float) -> QPointF:
-            return view.map(vb.mapViewToScene(QPointF(x, y)))
 
-        origin, unit_x, unit_y = px(0.0, 0.0), px(1.0, 0.0), px(0.0, 1.0)
-        xs = origin.x() + (unit_x.x() - origin.x()) * np.arange(i0, i1, dtype=float)
-        ys_px = origin.y() + (unit_y.y() - origin.y()) * ys
-        return [QPointF(float(x), float(y)) for x, y in zip(xs, ys_px)]
+class _PixelBars:
+    """A run of OHLC bars in viewport pixels, as arrays."""
 
+    def __init__(self, x, o, h, l, c, half_width: float) -> None:  # noqa: E741
+        self.x, self.o, self.h, self.l, self.c = x, o, h, l, c
+        self.half_width = half_width
 
-def _resample(points: list[QPointF], n: int = MORPH_POINTS) -> list[QPointF]:
-    """``n`` points evenly spaced in x along the polyline ``points``, so two
-    series of any bar count can be paired off point for point."""
-    xs = np.array([p.x() for p in points])
-    ys = np.array([p.y() for p in points])
-    grid = np.linspace(xs[0], xs[-1], n)
-    return [QPointF(float(x), float(y)) for x, y in zip(grid, np.interp(grid, xs, ys))]
+    def resampled(self, n: int) -> "_PixelBars":
+        """``n`` bars evenly spaced across the same span, each field
+        interpolated, so two series of any bar count pair off bar for bar."""
+        grid = np.linspace(self.x[0], self.x[-1], n)
+        o, h, l, c = (np.interp(grid, self.x, f) for f in (self.o, self.h, self.l, self.c))  # noqa: E741
+        return _PixelBars(grid, o, h, l, c, self.half_width * len(self.x) / n)
+
+    def lerp(self, other: "_PixelBars", t: float) -> "_PixelBars":
+        def mix(a, b):
+            return a + (b - a) * t
+
+        return _PixelBars(
+            mix(self.x, other.x), mix(self.o, other.o), mix(self.h, other.h),
+            mix(self.l, other.l), mix(self.c, other.c),
+            mix(self.half_width, other.half_width),
+        )
 
 
 class _RangeDialog(QDialog):
@@ -1441,6 +1512,7 @@ class _RangeDialog(QDialog):
 
 @register_panel(id="chart", title="Chart", category="Markets")
 class ChartPanel(Panel):
+    SKELETON = "plot"
     GUIDE = PanelGuide(
         purpose="Price chart for the linked symbol, with indicators, drawings and an events lane.",
         links="Follows the link group's symbol: the old line morphs into the new "

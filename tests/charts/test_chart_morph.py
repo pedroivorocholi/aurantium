@@ -11,6 +11,7 @@ checks the *end* state, with animations on and off.
 import time
 
 import pytest
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QApplication
 
 from aurantium import motion
@@ -268,3 +269,82 @@ def test_volume_does_not_animate_with_reduced_motion(qapp, monkeypatch, feeds):
     p.on_symbol("BBB")
     assert vol.anim is None or vol.anim.state() == vol.anim.State.Stopped
     assert list(vol.pane_items[0].opts["height"]) == pytest.approx([1000] * 80)
+
+
+def _overlay_colors(p, t):
+    from PySide6.QtGui import QColor, QImage, QPainter
+
+    morph = p._morph
+    morph._t = t
+    morph.overlay_opacity = 1.0
+    size = p.plot_widget.viewport().size()
+    img = QImage(size, QImage.Format.Format_ARGB32)
+    img.fill(0)
+    painter = QPainter(img)
+    morph.paint(painter)
+    painter.end()
+    seen = set()
+    for y in range(0, img.height(), 2):
+        for x in range(0, img.width(), 2):
+            px = QColor.fromRgba(img.pixel(x, y))
+            if px.alpha() == 255:
+                seen.add(px.name())
+    return seen
+
+
+@pytest.mark.parametrize("kind", ["candles", "bars"])
+def test_the_morph_keeps_the_chart_type(qapp, monkeypatch, feeds, kind):
+    """Candles morph as candles and bars as bars — never a line in between."""
+    p = _make_chart(monkeypatch, animate=True, feeds=feeds)
+    p._chart_type = kind
+    p._apply_chart_type()
+    _load_first(p, monkeypatch)
+    p.on_symbol("BBB")
+    morph = p._morph
+    assert morph.kind == kind
+    colors = _overlay_colors(p, 0.5)
+    up = QColor(p._colors["up"]).name()
+    down = QColor(p._colors["down"]).name()
+    assert colors & {up, down}
+    assert QColor(p._colors["line"]).name() not in colors
+    _settle(p)
+    _assert_final(p)
+
+
+def test_the_last_frame_is_the_new_chart_bar_for_bar(qapp, monkeypatch, feeds):
+    p = _make_chart(monkeypatch, animate=True, feeds=feeds)
+    _load_first(p, monkeypatch)
+    p.on_symbol("BBB")
+    # the new prices re-lay out the price axis, shifting the plot inside the
+    # viewport: the last frame must follow it
+    QApplication.processEvents()
+    end = p._morph.bars_at(1.0)
+    _settle(p)
+    real = p._morph._series_bars()  # the chart as it stands once landed
+    assert len(end.x) == len(real.x)
+    assert list(end.c) == pytest.approx(list(real.c), abs=0.5)
+    assert list(end.h) == pytest.approx(list(real.h), abs=0.5)
+
+
+def test_an_area_chart_morphs_as_an_area(qapp, monkeypatch, feeds):
+    p = _make_chart(monkeypatch, animate=True, feeds=feeds)
+    p._chart_type = "area"
+    p._apply_chart_type()
+    _load_first(p, monkeypatch)
+    p.on_symbol("BBB")
+    assert p._morph.kind == "area"
+    assert _overlay_colors(p, 0.5)
+    _settle(p)
+    _assert_final(p)
+
+
+def test_a_line_chart_still_morphs_as_a_line(qapp, monkeypatch, feeds):
+    p = _make_chart(monkeypatch, animate=True, feeds=feeds)
+    p._chart_type = "line"
+    p._apply_chart_type()
+    _load_first(p, monkeypatch)
+    p.on_symbol("BBB")
+    assert p._morph.kind == "line"
+    assert _overlay_colors(p, 0.5)  # it paints
+    _settle(p)
+    _assert_final(p)
