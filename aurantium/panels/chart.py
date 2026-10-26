@@ -10,12 +10,13 @@ import bisect
 import itertools
 import math
 import re
+import time
 from datetime import date, datetime, timedelta
 from typing import Any, Callable, Optional
 
 import numpy as np
 import pyqtgraph as pg
-from PySide6.QtCore import QDate, QEvent, QPointF, QRectF, QSize, Qt
+from PySide6.QtCore import QDate, QEvent, QPointF, QRectF, QSize, Qt, QVariantAnimation
 from PySide6.QtGui import (
     QAction,
     QActionGroup,
@@ -46,8 +47,10 @@ from PySide6.QtWidgets import (
     QRadioButton,
     QSpinBox,
     QVBoxLayout,
+    QWidget,
 )
 
+from .. import motion
 from ..guide import GuideSection, PanelGuide
 from ..components.empty_state import EmptyState
 from ..date_context import DateContext, bar_datetime
@@ -1091,6 +1094,236 @@ class _BarTimeAxis(pg.AxisItem):
 
 # -- custom range dialog ----------------------------------------------------
 
+#: Points both series are resampled to for the morph. Enough that a line
+#: travelling between two shapes reads as a line, not a polygon; the real
+#: candles crossfade in over it, so finer detail would never be seen.
+MORPH_POINTS = 128
+
+
+class _MorphOverlay(QWidget):
+    """The line the morph paints, laid over the plot's viewport. Out of the
+    scene on purpose: it travels in pixel space, so the two series need not
+    share a bar count, an axis or a scale."""
+
+    def __init__(self, viewport: QWidget, morph: "_SeriesMorph") -> None:
+        super().__init__(viewport)
+        self._morph = morph
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.hide()
+
+    def paintEvent(self, _event) -> None:  # noqa: N802 (Qt override)
+        p = QPainter(self)
+        try:
+            pts = self._morph.points_now()
+            if len(pts) >= 2:
+                p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+                p.setOpacity(self._morph.overlay_opacity)
+                p.setPen(QPen(QColor(self._morph.color), 1.5))
+                p.drawPolyline(pts)
+        except (AttributeError, RuntimeError):
+            pass  # panel torn down underneath us
+        finally:
+            p.end()
+
+
+class _SeriesMorph:
+    """The old symbol's line morphing into the new one's (motion.py, "Chart
+    data transitions" — a deliberate, narrow exception to the budget).
+
+    The chart's final state is always applied first, exactly as without
+    motion. The morph then only borrows three things for ``CHART_MORPH_MS``:
+    an overlay line travelling from the old shape to the new, the plot's Y
+    range travelling from the old fit to the new one (so the axis rescales),
+    and the opacity of the real series, which crossfades in over the second
+    half. ``finish`` hands all three back, so any interruption — a pan, the
+    next symbol, a range change, an empty result — can only land on the
+    final chart.
+    """
+
+    def __init__(self, panel: "ChartPanel") -> None:
+        self._panel = panel
+        #: The old series in viewport pixels, plus the Y range it was drawn
+        #: in, waiting for the new symbol's history. None when no morph is due.
+        self._snapshot: Optional[tuple[list, tuple]] = None
+        self._from: list[QPointF] = []
+        self._to: list[QPointF] = []
+        self._y_from = (0.0, 1.0)
+        self._y_to = (0.0, 1.0)
+        self._t = 1.0
+        self._last_change = float("-inf")
+        self.color = panel._colors["line"]
+        self.overlay_opacity = 1.0
+        self.overlay = _MorphOverlay(panel.plot_widget.viewport(), self)
+        # One persistent animation per chart (see motion.fade_animation for
+        # why throwaway DeleteWhenStopped animations are not used here).
+        self.anim = QVariantAnimation(panel)
+        self.anim.setStartValue(0.0)
+        self.anim.setEndValue(1.0)
+        self.anim.setEasingCurve(motion.EASE_OUT)
+        self.anim.valueChanged.connect(self._step)
+        self.anim.finished.connect(self.finish)
+        # a drag or wheel on the plot is the user taking over: stop at once
+        panel.plot_widget.getViewBox().sigRangeChangedManually.connect(
+            lambda *_: self.finish()
+        )
+
+    def running(self) -> bool:
+        return self.anim.state() == QVariantAnimation.State.Running
+
+    # -- the three moments ---------------------------------------------------
+
+    def symbol_changing(self) -> None:
+        """Before the old series is cleared: snapshot it, unless this change
+        follows the last one too quickly to be watched."""
+        now = time.monotonic()
+        was_running = self.running()
+        self.finish()
+        self._snapshot = None
+        too_soon = was_running or (now - self._last_change) * 1000.0 < motion.CHART_MORPH_MS
+        self._last_change = now
+        if too_soon or not motion.animations_enabled():
+            return
+        pts = self._series_points()
+        if pts:
+            y_range = tuple(self._panel.plot_widget.getViewBox().viewRange()[1])
+            self._snapshot = (pts, y_range)
+
+    def history_arriving(self) -> None:
+        """A history callback is about to apply. Anything that is not the
+        answer to a pending symbol change (a live refresh, a widened fetch)
+        lands any running morph first."""
+        if self._snapshot is None:
+            self.finish()
+
+    def history_landed(self) -> None:
+        """The new symbol's final chart is in place: morph into it."""
+        snap, self._snapshot = self._snapshot, None
+        if snap is None:
+            return
+        ms = motion.duration(motion.CHART_MORPH_MS)
+        to = self._series_points()
+        if ms == 0 or not to:
+            return
+        panel = self._panel
+        self._from = _resample(snap[0])
+        self._to = _resample(to)
+        self._y_from = snap[1]
+        self._y_to = tuple(panel.plot_widget.getViewBox().viewRange()[1])
+        self.color = panel._colors["line"]
+        self.overlay.setGeometry(panel.plot_widget.viewport().rect())
+        self.overlay.show()
+        self.overlay.raise_()
+        self.anim.stop()
+        self.anim.setDuration(ms)
+        self._step(0.0)
+        self.anim.start()
+
+    def cancel(self) -> None:
+        """Not a symbol change after all (a range or interval change, an empty
+        result): drop the snapshot and land any running morph."""
+        self._snapshot = None
+        self.finish()
+
+    def finish(self) -> None:
+        """Land on the final chart now."""
+        try:
+            if self.running():
+                self.anim.stop()
+            active = self.overlay.isVisible()
+            self.overlay.hide()
+            self._t = 1.0
+            for item in self._faded_items():
+                item.setOpacity(1.0)
+            if active:
+                self._panel._fit_y_to_visible()
+        except RuntimeError:
+            pass  # panel destroyed mid-morph
+
+    # -- frames --------------------------------------------------------------
+
+    def points_at(self, t: float) -> list[QPointF]:
+        return [
+            QPointF(a.x() + (b.x() - a.x()) * t, a.y() + (b.y() - a.y()) * t)
+            for a, b in zip(self._from, self._to)
+        ]
+
+    def points_now(self) -> list[QPointF]:
+        return self.points_at(self._t)
+
+    def _step(self, value) -> None:
+        try:
+            self._t = float(value)
+            panel = self._panel
+            (a0, a1), (b0, b1) = self._y_from, self._y_to
+            t = self._t
+            panel._fitting_y = True  # keep _fit_y_to_visible out of the way
+            try:
+                panel.plot_widget.getViewBox().setYRange(
+                    a0 + (b0 - a0) * t, a1 + (b1 - a1) * t, padding=0
+                )
+            finally:
+                panel._fitting_y = False
+            # The crossfade runs on linear time, not the eased value: the line
+            # does its travelling early (EASE_OUT), and the real series takes
+            # over across the second half, once the shape has nearly landed.
+            duration = self.anim.duration()
+            linear = self.anim.currentTime() / duration if duration else 1.0
+            fade = min(1.0, max(0.0, (linear - 0.5) / 0.5))
+            for item in self._faded_items():
+                item.setOpacity(fade)
+            self.overlay_opacity = 1.0 - fade
+            self.overlay.update()
+        except RuntimeError:
+            pass  # panel destroyed mid-morph
+
+    def _faded_items(self) -> list:
+        panel = self._panel
+        items = [panel.candle_item, panel.bar_item, panel.line_curve]
+        for inst in panel._indicators:
+            items.extend(inst.items)
+        items.extend(cmp.curve for cmp in panel._compares if cmp.curve is not None)
+        return items
+
+    def _series_points(self) -> list[QPointF]:
+        """The visible closes in viewport pixels. ViewBox mapping is affine,
+        so three mapped points give the whole transform."""
+        panel = self._panel
+        closes = panel._hist_c
+        vb = panel.plot_widget.getViewBox()
+        if not closes or vb.width() <= 0 or vb.height() <= 0:
+            return []
+        (x0, x1), _ = vb.viewRange()
+        i0 = max(0, math.ceil(x0))
+        i1 = min(len(closes), math.floor(x1) + 1)
+        if i1 - i0 < 2:
+            return []
+        ys = np.asarray(closes[i0:i1], dtype=float)
+        if panel._log_on:
+            if ys.min() <= 0:
+                return []
+            ys = np.log10(ys)
+        view = panel.plot_widget.viewportTransform()
+
+        def px(x: float, y: float) -> QPointF:
+            return view.map(vb.mapViewToScene(QPointF(x, y)))
+
+        origin, unit_x, unit_y = px(0.0, 0.0), px(1.0, 0.0), px(0.0, 1.0)
+        xs = origin.x() + (unit_x.x() - origin.x()) * np.arange(i0, i1, dtype=float)
+        ys_px = origin.y() + (unit_y.y() - origin.y()) * ys
+        return [QPointF(float(x), float(y)) for x, y in zip(xs, ys_px)]
+
+
+def _resample(points: list[QPointF], n: int = MORPH_POINTS) -> list[QPointF]:
+    """``n`` points evenly spaced in x along the polyline ``points``, so two
+    series of any bar count can be paired off point for point."""
+    xs = np.array([p.x() for p in points])
+    ys = np.array([p.y() for p in points])
+    grid = np.linspace(xs[0], xs[-1], n)
+    return [QPointF(float(x), float(y)) for x, y in zip(grid, np.interp(grid, xs, ys))]
+
+
 class _RangeDialog(QDialog):
     """A trailing lookback (last N minutes / hours / days, with 1h and 4h as
     quick picks) or two date pickers, themed by the app-global stylesheet."""
@@ -1200,8 +1433,10 @@ class _RangeDialog(QDialog):
 class ChartPanel(Panel):
     GUIDE = PanelGuide(
         purpose="Price chart for the linked symbol, with indicators, drawings and an events lane.",
-        links="Follows the link group's symbol. A click on a mark in the EVENTS "
-        "lane opens the Day Brief on that date.",
+        links="Follows the link group's symbol: the old line morphs into the new "
+        "symbol's and the price axis rescales to it (instant when Windows "
+        "animations are off, or when you step through symbols quickly). A click "
+        "on a mark in the EVENTS lane opens the Day Brief on that date.",
         interactions=(
             "**RANGE** sets the window, 1d to max. **custom…** picks a trailing "
             "lookback (the last N minutes, hours or days, with 1h and 4h one click away) "
@@ -1451,6 +1686,7 @@ class ChartPanel(Panel):
         self.line_curve.setVisible(False)
         self.content_layout.addWidget(self.plot_widget, 3)
         self._setup_navigation()
+        self._morph = _SeriesMorph(self)
 
         # -- events lane -------------------------------------------------------
         # Deliberately its own x-linked strip rather than marks inside the price
@@ -1731,6 +1967,7 @@ class ChartPanel(Panel):
         self._range_or_interval_changed()
 
     def _range_or_interval_changed(self) -> None:
+        self._morph.cancel()  # a new window on the same symbol never morphs
         self._update_range_interval_buttons()
         if self.current_symbol:
             self._resubscribe(self.current_symbol)
@@ -2274,6 +2511,7 @@ class ChartPanel(Panel):
                 inst.pane.showGrid(x=checked, y=checked, alpha=0.15)
 
     def _toggle_log(self, checked: bool) -> None:
+        self._morph.finish()  # its pixels were mapped on the old scale
         self._log_on = checked
         vb = self.plot_widget.getViewBox()
         window = vb.viewRange()[0]
@@ -2696,6 +2934,8 @@ class ChartPanel(Panel):
         # trendlines are drawn against a specific symbol's bars — drop them when
         # the linked symbol actually changes (restore() re-seeds the tag so
         # persisted drawings survive a layout reload of the same symbol).
+        # first, while the old series is still loaded: the morph's snapshot
+        self._morph.symbol_changing()
         if symbol != self._annotations_symbol:
             self._clear_drawings()
             self._annotations_symbol = symbol
@@ -3265,6 +3505,7 @@ class ChartPanel(Panel):
             self._fitting_y = False
 
     def _reset_view(self) -> None:
+        self._morph.finish()
         self._frame_window(self._hist_t, self._hist_hi, self._hist_lo)
 
     def _on_pane_clicked(self, ev) -> None:
@@ -3301,6 +3542,7 @@ class ChartPanel(Panel):
         self.set_loading(False)
         if not isinstance(data, dict):
             return
+        self._morph.history_arriving()
         t = data.get("t") or []
         o = data.get("o") or []
         h = data.get("h") or []
@@ -3308,6 +3550,7 @@ class ChartPanel(Panel):
         c = data.get("c") or []
         v = data.get("v") or []
         if not t:
+            self._morph.cancel()
             self.set_status("no data")
             self._hist_t, self._hist_o, self._hist_c = [], [], []
             self._hist_hi, self._hist_lo, self._hist_v = [], [], []
@@ -3355,6 +3598,8 @@ class ChartPanel(Panel):
         )
         self.set_status(f"{rng} · {self._interval}")
         self._sync_empty()
+        # last: the morph starts from the finished chart, never builds it
+        self._morph.history_landed()
 
     def _on_quote(self, data: Any) -> None:
         if not isinstance(data, dict):

@@ -14,8 +14,25 @@ from aurantium import motion
 
 def test_durations_stay_inside_the_interface_budget():
     """Past ~300ms an interface control starts to feel like it lags the user."""
-    for name in ("FLASH_MS", "NOTICE_IN_MS", "NOTICE_OUT_MS"):
+    for name in (
+        "FLASH_MS", "NOTICE_IN_MS", "NOTICE_OUT_MS", "INDICATOR_IN_MS",
+        "INDICATOR_OUT_MS", "CHART_MORPH_MS",
+    ):
         assert getattr(motion, name) <= 300, name
+
+
+def test_the_budget_exceptions_are_written_into_the_policy():
+    """Two motions break the quarter-second rule on purpose (the chart morph,
+    the loading pulse). Each must be argued for in motion.py itself, not
+    smuggled in at a call site."""
+    doc = motion.__doc__
+    assert "CHART_MORPH_MS" in doc and "SKELETON_PULSE_MS" in doc
+    assert "Deliberate exceptions" in doc
+    # the morph is the only data transition, and it stays near the ceiling
+    assert motion.CHART_MORPH_MS <= 300
+    # the pulse is bounded: it can never run forever
+    assert motion.SKELETON_MAX_MS > motion.SKELETON_PULSE_MS
+    assert 0.0 < motion.SKELETON_PULSE_LOW < 1.0
 
 
 def test_the_notice_leaves_more_slowly_than_it_arrives():
@@ -42,7 +59,9 @@ def test_animations_default_to_on_when_the_os_query_fails(monkeypatch):
     monkeypatch.setattr(
         motion, "_macos_animations_on", lambda: (_ for _ in ()).throw(OSError())
     )
-    assert motion.animations_enabled() is True
+    # the OS query itself, even when the run forces --animations=on|off
+    real = getattr(motion.animations_enabled, "__wrapped__", motion.animations_enabled)
+    assert real() is True
 
 
 # -- the maximize path must not animate ------------------------------------

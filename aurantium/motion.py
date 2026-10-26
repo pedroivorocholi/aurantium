@@ -17,6 +17,39 @@ The motion budget for the app lives here too. aurantium is an Operate-mode
 terminal that a user keeps open all day, so the numbers sit at the fast end:
 nothing animates longer than a quarter second, and anything triggered from the
 keyboard does not animate at all.
+
+Deliberate exceptions
+---------------------
+
+Two motions break that budget on purpose. Each is written down here, with the
+conditions that keep it narrow, so neither can spread by accident.
+
+**Chart data transitions** (``CHART_MORPH_MS``). When the chart panel's linked
+symbol changes, its price series morphs from the old symbol's shape into the
+new one — the line's y-values interpolate, the price axis rescales, and the
+real candles crossfade in over the second half. Up to 300ms, on ``EASE_OUT``.
+It is allowed only because it is the moment the product exists for (a click
+re-centring the workspace) and only under all of these conditions:
+
+* only a symbol change — range, interval, zoom, pan, log scale and live
+  refreshes of the same symbol never morph;
+* skipped, landing on the final state, when the symbol changes again within
+  ``CHART_MORPH_MS`` of the previous change or while a morph is running —
+  stepping through a watchlist never animates;
+* skipped under reduced motion (no snapshot is even taken);
+* the final chart is always applied first, synchronously; the morph is only
+  an overlay painted on top, the price items' opacity and the plot's own Y
+  range, so an interrupted or skipped morph can only ever land on it;
+* it may follow a keyboard-entered symbol: it starts when the data lands, not
+  when the key goes down, so it adds nothing to the keystroke's latency;
+* no widget geometry moves — content layout still never animates.
+
+**Loading pulse** (``SKELETON_PULSE_MS``). A workspace skeleton breathes while
+its panel has no data. It answers no user action, so the per-interaction
+budget does not apply; it stops the moment the panel reports data, an error
+or an empty result, and after ``SKELETON_MAX_MS`` regardless, so nothing is
+ever left pulsing. One shared animation drives every skeleton, so idle CPU is
+zero once the workspace is up. Under reduced motion the skeleton is static.
 """
 
 from __future__ import annotations
@@ -108,6 +141,23 @@ POPUP_IN_FROM = 0.35
 PAGE_IN_FROM = 0.6
 #: A panel's first appearance. Once per panel, so it can afford a beat more.
 PANEL_IN_MS = 180
+
+#: Exception (see the module docstring): the chart's old series morphing into
+#: the new symbol's. Also the minimum gap between symbol changes for a morph
+#: to run at all.
+CHART_MORPH_MS = 280
+
+#: Exception (see the module docstring): one breath of a workspace skeleton,
+#: the opacity it breathes down to, and the hard stop for a panel whose data
+#: never arrives.
+SKELETON_PULSE_MS = 1400
+SKELETON_PULSE_LOW = 0.55
+SKELETON_MAX_MS = 8000
+
+#: A newly added chart indicator drawing in left to right; a removed one
+#: fading out. The removal is quicker: the user already chose it gone.
+INDICATOR_IN_MS = 240
+INDICATOR_OUT_MS = 160
 
 
 def fade_animation(widget) -> QPropertyAnimation:
