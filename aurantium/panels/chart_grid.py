@@ -164,6 +164,7 @@ class _ChartCell(QWidget):
 
 @register_panel(id="chart_grid", title="Chart Grid", category="Markets")
 class ChartGridPanel(Panel):
+    SKELETON = "plot"
     GUIDE = PanelGuide(
         purpose="A grid of small line charts, one per symbol, to watch many markets at a glance.",
         links="Click a cell to send its symbol to every panel in this link group.",

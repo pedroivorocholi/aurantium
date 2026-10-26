@@ -474,6 +474,9 @@ def main() -> int:
         _splash_message(splash, "LOADING · LAYOUT", start + (1.0 - start) * done / total)
 
     win.layout_progress = _layout_step
+    # once the workspace stands in its saved arrangement (every panel still an
+    # outline) the window takes over: the panels filling in are the progress
+    win.layout_ready = lambda: _close_splash(splash, win)
     startup_err = ""
     try:
         # On the no-saved-session branch, default_startup shows a modal
@@ -489,6 +492,7 @@ def main() -> int:
         startup_err = _tb.format_exc()
     finally:
         win.layout_progress = None  # later workspace loads have no splash
+        win.layout_ready = None
 
     # Panels are built and the layout restored — hand off from splash to window.
     # Harmless no-op if the no-session branch already closed it above:

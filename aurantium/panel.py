@@ -623,7 +623,10 @@ class _SkeletonPulse:
     def _drop(self, key: int) -> None:
         self._live.pop(key, None)
         if not self._live:
-            self.anim.stop()
+            try:
+                self.anim.stop()
+            except RuntimeError:
+                pass  # shutdown: the animation went before its last skeleton
             self.value = 1.0
 
     def _tick(self, t) -> None:
@@ -665,11 +668,15 @@ def _skeleton_anims_for_tests() -> list:
 class _Skeleton(QWidget):
     """A panel body's outline, laid over it until its data arrives."""
 
-    def __init__(self, body: QWidget, on_cap: Callable[[], None]) -> None:
+    def __init__(
+        self, body: QWidget, on_cap: Callable[[], None], table: Optional[bool] = None
+    ) -> None:
         super().__init__(body)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         view = next(iter(body.findChildren(QAbstractItemView)), None)
-        self._table = view is not None
+        # a table's outline when the body holds one, unless told outright
+        # (a placeholder has no body yet to look into)
+        self._table = view is not None if table is None else table
         self._row_px = _SKELETON_ROW_PX
         header = getattr(view, "verticalHeader", None)
         if callable(header) and header() is not None:
@@ -739,6 +746,31 @@ class _Skeleton(QWidget):
             p.end()
 
 
+class LoadingPlaceholder(QWidget):
+    """What a dock holds while a workspace is restored, until its panel is
+    built: the panel's outline, breathing.
+
+    A workspace used to be restored by building every panel, docking each one
+    as a tab of the same area, and only then applying the saved arrangement —
+    so the window showed the panels piling up one over the other. Now each
+    dock is created holding one of these, the arrangement is applied at once,
+    and the real panels replace them one by one (MainWindow.apply_layout).
+    """
+
+    def __init__(self, panel_cls: type) -> None:
+        super().__init__()
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        table = getattr(panel_cls, "SKELETON", "table") != "plot"
+        self._skeleton: Optional[_Skeleton] = _Skeleton(self, self._stop, table=table)
+
+    def _stop(self) -> None:
+        """The hard stop: a panel that takes this long still stops pulsing."""
+        skeleton, self._skeleton = self._skeleton, None
+        if skeleton is not None:
+            _skeleton_pulse().remove(skeleton)
+            skeleton.update()
+
+
 class _PanelLayout(QVBoxLayout):
     """The panel's outermost layout: fills whatever height the dock gives.
 
@@ -781,6 +813,12 @@ class Panel(QWidget):
     #: case that earned it: it opens in response to a click on the chart, and
     #: landing on top of the chart would hide what the user is asking about.
     FLOATABLE: bool = False
+
+    #: The outline the panel loads behind: ``"table"`` (header and rows) or
+    #: ``"plot"`` (gridlines). A panel with a table in its body is drawn as one
+    #: whatever this says; it decides the placeholder a dock holds before the
+    #: panel is built (see ``LoadingPlaceholder``).
+    SKELETON: str = "table"
 
     #: This panel's quick guide — purpose, linking, key interactions, fields
     #: and shortcuts (see ``guide.PanelGuide``). Required for every registered

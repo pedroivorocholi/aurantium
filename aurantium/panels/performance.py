@@ -77,6 +77,7 @@ def _dedupe(symbols: list[str]) -> list[str]:
 
 @register_panel(id="performance", title="Performance", category="Analytics")
 class PerformancePanel(Panel):
+    SKELETON = "plot"
     GUIDE = PanelGuide(
         purpose="The linked symbol's return against a comparison set, from the start of the window.",
         links="Follows the link group's symbol, which is always the first line.",

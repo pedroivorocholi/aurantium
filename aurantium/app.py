@@ -10,7 +10,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import PySide6QtAds as QtAds
-from PySide6.QtCore import QEvent, QObject, QSettings, Qt, QTimer
+from PySide6.QtCore import QEvent, QEventLoop, QObject, QSettings, Qt, QTimer
 from PySide6.QtGui import (
     QAction,
     QActionGroup,
@@ -46,7 +46,7 @@ from .layout_store import LayoutStore
 from .notifier import Notifier
 from .title_bar import NativeFrame, TitleBar, frame_panel_window
 from .components.fit_width import relax_min_widths
-from .panel import Panel, PanelRegistry
+from .panel import LoadingPlaceholder, Panel, PanelRegistry
 from .paths import ASSETS_DIR, BUNDLE_DIR
 from .presets import Preset, available_presets
 from .symbol_context import DEFAULT_GROUP, GROUPS, SymbolContext
@@ -114,6 +114,18 @@ class _DockParentWatch(QObject):
         return False
 
 
+def _no_sideways_scroll(dock, content: QWidget) -> None:
+    """QtAds wraps a dock's widget in a scroll area. Panels reflow to any
+    width (wrapping control rows, shrinking columns), so that wrapper only
+    ever scrolls vertically — a docked panel never scrolls sideways."""
+    wrapper = content.parentWidget()
+    while wrapper is not None and wrapper is not dock:
+        if isinstance(wrapper, QScrollArea):
+            wrapper.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            break
+        wrapper = wrapper.parentWidget()
+
+
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -130,9 +142,16 @@ class MainWindow(QMainWindow):
         self._pre_maximize_state = None  # QByteArray snapshot to restore on exit
         self._last_closed: dict | None = None  # for reopen-last-closed (Ctrl+Shift+T)
         self._loading_layout = False  # guard: mass-close during layout swap isn't a user close
-        #: Called with (panels built, total) as apply_layout restores a
+        #: Called with (panels placed, total) as apply_layout restores a
         #: workspace; startup points it at the splash card's progress bar.
         self.layout_progress: Callable[[int, int], None] | None = None
+        #: Called once a restored workspace stands in its saved arrangement,
+        #: every panel still an outline; startup closes the splash there, so
+        #: the workspace itself shows the rest of the load.
+        self.layout_ready: Callable[[], None] | None = None
+        #: instance id -> (meta, link group, settings) for a dock still holding
+        #: a LoadingPlaceholder (see apply_layout)
+        self._unbuilt: dict[str, tuple] = {}
         self._dock_watch = _DockParentWatch(self)
         # Multi-screen: a panel (or a whole tab stack) dragged out past every
         # aurantium window becomes a window of its own, a full docking area
@@ -1530,6 +1549,7 @@ class MainWindow(QMainWindow):
         target_instance: str | None = None,
         floating: bool = False,
         restore_floating: bool = False,
+        placeholder: bool = False,
     ) -> QtAds.CDockWidget | None:
         """Create a panel dock. ``area`` is global unless ``target_instance``
         names an existing panel instance — then the new dock is placed
@@ -1544,7 +1564,10 @@ class MainWindow(QMainWindow):
         parked at the screen edge instead of centred.
 
         ``restore_floating`` is accepted for saved layouts and callers that
-        pass it; every panel can float now, so it changes nothing."""
+        pass it; every panel can float now, so it changes nothing.
+
+        ``placeholder`` creates the dock holding the panel's loading outline
+        instead of the panel; ``_build_placeholder`` swaps the real one in."""
         # a retired id (e.g. "key_metrics") opens its replacement on the
         # matching tab; explicit settings win over the alias defaults
         panel_id, alias_settings = PanelRegistry.resolve(panel_id)
@@ -1566,41 +1589,19 @@ class MainWindow(QMainWindow):
             except (IndexError, ValueError):
                 pass
 
-        try:
-            panel: Panel = meta.cls()
-            panel.build()
-            # one long label or combo must not hold the dock wide
-            relax_min_widths(panel)
-        except Exception as exc:
-            import traceback
-
-            traceback.print_exc()
-            # one broken panel must not blank the whole window — report it to
-            # the user and skip; the invalid panel never reaches the dock manager
-            self.notify(
-                f"Couldn't open {meta.title}: {exc}", 6000, level="warn"
-            )
-            return None
-        if link_group:
-            panel.set_link_group(link_group)
-        if settings:
-            try:
-                panel.restore(settings)
-            except Exception:
-                pass
+        if placeholder:
+            panel = None
+            content: QWidget = LoadingPlaceholder(meta.cls)
+        else:
+            panel = self._build_panel(meta, link_group, settings)
+            if panel is None:
+                return None
+            content = panel
 
         dock = QtAds.CDockWidget(self.dock_manager, meta.title)
         dock.setObjectName(instance_id)
-        dock.setWidget(panel)
-        # QtAds wraps the panel in a scroll area. Panels reflow to any width
-        # (wrapping control rows, shrinking columns), so that wrapper only
-        # ever scrolls vertically — a docked panel never scrolls sideways.
-        wrapper = panel.parentWidget()
-        while wrapper is not None and wrapper is not dock:
-            if isinstance(wrapper, QScrollArea):
-                wrapper.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-                break
-            wrapper = wrapper.parentWidget()
+        dock.setWidget(content)
+        _no_sideways_scroll(dock, content)
         dock.setFeature(QtAds.CDockWidget.DockWidgetDeleteOnClose, True)
         # FLOATABLE (read from the class, so a restored layout behaves the
         # same) now only decides where a new window of that panel opens.
@@ -1642,6 +1643,9 @@ class MainWindow(QMainWindow):
         else:
             self.dock_manager.addDockWidget(area, dock)
         self._docks[instance_id] = dock
+        if panel is None:
+            self._unbuilt[instance_id] = (meta, link_group, settings)
+            return dock
 
         # late join: sync to the group's current symbol
         sym = SymbolContext.instance().symbol(panel.link_group)
@@ -1653,6 +1657,62 @@ class MainWindow(QMainWindow):
             # delay the data they opened the app to read.
             motion.fade_in_panel(panel)
         return dock
+
+    def _build_panel(self, meta, link_group: str | None, settings: dict | None) -> Panel | None:
+        """Construct, build and configure one panel; None (reported to the
+        user) when it fails."""
+        try:
+            panel: Panel = meta.cls()
+            panel.build()
+            # one long label or combo must not hold the dock wide
+            relax_min_widths(panel)
+        except Exception as exc:
+            import traceback
+
+            traceback.print_exc()
+            # one broken panel must not blank the whole window — report it to
+            # the user and skip; the invalid panel never reaches the dock manager
+            self.notify(
+                f"Couldn't open {meta.title}: {exc}", 6000, level="warn"
+            )
+            return None
+        if link_group:
+            panel.set_link_group(link_group)
+        if settings:
+            try:
+                panel.restore(settings)
+            except Exception:
+                pass
+        return panel
+
+    def _build_placeholder(self, instance_id: str) -> None:
+        """Build the real panel for a dock holding a LoadingPlaceholder and
+        put it in the placeholder's place."""
+        pending = self._unbuilt.pop(instance_id, None)
+        dock = self._docks.get(instance_id)
+        if pending is None or dock is None:
+            return
+        panel = self._build_panel(*pending)
+        if panel is None:
+            dock.closeDockWidget()  # its place in the arrangement closes up
+            return
+        placeholder = dock.widget()
+        dock.setWidget(panel)
+        _no_sideways_scroll(dock, panel)
+        if placeholder is not None and placeholder is not panel:
+            placeholder.deleteLater()
+        sym = SymbolContext.instance().symbol(panel.link_group)
+        if sym:
+            panel._apply_symbol(sym)
+        # still fetching: from outline straight to its own outline, never
+        # through a bare "no symbol" state in between
+        panel.show_skeleton()
+
+    def _show_progress(self) -> None:
+        """Let a visible window paint mid-restore. Input is held back: nothing
+        the user clicks may reach a half-built workspace."""
+        if self.isVisible():
+            QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
 
     # -- layout serialization (dict in / dict out) ---------------------------
 
@@ -1721,20 +1781,28 @@ class MainWindow(QMainWindow):
         from .panels.company import migrate_layout
 
         doc = migrate_layout(doc)
-        # Still a restore, not a user adding panels: add_panel must not fade
-        # each one in (the guard used to drop before this loop, so every
-        # restored panel faded). The skeletons below carry the arrival instead.
+        # Two passes. First every dock is created holding its panel's loading
+        # outline and the saved arrangement is applied, so the window shows
+        # the workspace exactly as saved at once; then the panels are built
+        # into their places one by one. (Built first and arranged last, they
+        # piled up as tabs of one area in front of the user.) Still a restore,
+        # not a user adding panels: nothing fades in.
         self._loading_layout = True
+        self._unbuilt.clear()
         specs = doc.get("panels", [])
+        placed: list[str] = []
         try:
             for done, spec in enumerate(specs, 1):
-                self.add_panel(
+                dock = self.add_panel(
                     spec.get("panel_id", ""),
                     instance_id=spec.get("instance"),
                     link_group=spec.get("link_group"),
                     settings=spec.get("settings"),
                     restore_floating=bool(spec.get("floating")),
+                    placeholder=True,
                 )
+                if dock is not None:
+                    placed.append(dock.objectName())
                 if self.layout_progress is not None:
                     self.layout_progress(done, len(specs))
         finally:
@@ -1756,6 +1824,17 @@ class MainWindow(QMainWindow):
                 # maximized on the same monitor
                 if fw.isFullScreen():
                     fw.showMaximized()
+        if self.layout_ready is not None:
+            self.layout_ready()
+        self._show_progress()
+        self._loading_layout = True
+        try:
+            for instance_id in placed:
+                self._build_placeholder(instance_id)
+                self._show_progress()
+        finally:
+            self._loading_layout = False
+            self._unbuilt.clear()
         # Every panel is at its saved place now. Those still waiting on their
         # first data stand in as their own outline until it arrives (each
         # skeleton tracks its panel's size, so a later relayout is fine).

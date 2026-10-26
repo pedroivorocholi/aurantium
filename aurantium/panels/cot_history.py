@@ -56,6 +56,7 @@ def _segments_cross(xs: list, ys: list, box) -> bool:
     id="cot_history", title="Speculator Positioning (CFTC)", category="Analytics"
 )
 class CotHistoryPanel(Panel):
+    SKELETON = "plot"
     GUIDE = PanelGuide(
         purpose="How large speculators are positioned in one futures market, week by week (CFTC Commitments of Traders).",
         links="Pick a market in the dropdown and linked panels follow; click a "

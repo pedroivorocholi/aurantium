@@ -61,6 +61,7 @@ def make_commodity_combo(parent, commodities) -> QComboBox:
 
 @register_panel(id="futures_curve", title="Futures Curve", category="Markets")
 class FuturesCurvePanel(Panel):
+    SKELETON = "plot"
     GUIDE = PanelGuide(
         purpose="A commodity's futures curve: the price of each upcoming delivery month.",
         links="Pick a commodity in the dropdown and linked panels follow; click a "
