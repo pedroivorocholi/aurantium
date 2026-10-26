@@ -620,6 +620,9 @@ class _IndicatorInstance:
         self.pane: Optional[pg.PlotWidget] = None  # osc indicators only
         self.items: list = []       # pg items on the price plot
         self.pane_items: list = []  # pg items inside self.pane
+        #: the draw-in reveal, created on first use (ChartPanel._draw_in)
+        self.anim: Optional[QVariantAnimation] = None
+        self._reveal: tuple[list, list] = ([], [])  # (items, (curve, xs, ys))
 
     @property
     def spec(self) -> _IndicatorSpec:
@@ -1445,7 +1448,8 @@ class ChartPanel(Panel):
             "Hover for a crosshair with the bar's date and open/high/low/close. Drag to "
             "scroll through time, wheel to zoom, double-click to reset.",
             "**INDICATORS**: **+** adds SMA, EMA, Bollinger Bands, VWAP, Volume, RSI or "
-            "MACD. Click a chip to switch it off and on; right-click it to recolor, "
+            "MACD; a new one draws in from the left, and a removed one fades out. "
+            "Click a chip to switch it off and on; right-click it to recolor, "
             "change its period or remove it.",
             "Right-click the chart for chart type, colors, grid, log scale, the events "
             "lane, drawing tools, export and reset options.",
@@ -1521,6 +1525,7 @@ class ChartPanel(Panel):
         self._log_on = False
         self._colors = dict(DEFAULT_COLORS)
         self._indicators: list[_IndicatorInstance] = []
+        self._fading_out: list[QVariantAnimation] = []  # removed overlays, mid-fade
         self._palette_iter = 0
         self._compares: list[_Compare] = []
         self._sector_wanted = False  # "compare with sector ETF" awaits the profile
@@ -2021,6 +2026,8 @@ class ChartPanel(Panel):
         if color is None:
             return
         self._add_indicator(kind, params, color=color)
+        # the user's own add — a restored layout's indicators are not events
+        self._draw_in(self._indicators[-1])
 
     def _add_indicator(
         self, kind: str, params: dict,
@@ -2078,7 +2085,7 @@ class ChartPanel(Panel):
             menu.addAction(edit_act)
         menu.addSeparator()
         rm_act = QAction("Remove", menu)
-        rm_act.triggered.connect(lambda: self._remove_indicator(inst))
+        rm_act.triggered.connect(lambda: self._remove_indicator(inst, animate=True))
         menu.addAction(rm_act)
         menu.exec(inst.chip.mapToGlobal(pos))
 
@@ -2114,7 +2121,15 @@ class ChartPanel(Panel):
         self._refresh_indicator(inst)
         self._maybe_widen_fetch()
 
-    def _remove_indicator(self, inst: _IndicatorInstance) -> None:
+    def _remove_indicator(self, inst: _IndicatorInstance, animate: bool = False) -> None:
+        """``animate`` only for the user removing one from its chip menu: a
+        restore or a reset to defaults swaps indicators in bulk, which is not
+        an event to watch."""
+        self._land_reveal(inst)
+        # overlays on the price fade out on their own; the chip and any pane
+        # go now (they hold layout space, and layout never animates)
+        if animate and self._fade_out_items(inst.items):
+            inst.items = []
         self._teardown_indicator_items(inst)
         if inst.chip is not None:
             self._chips_row.removeWidget(inst.chip)
@@ -2124,6 +2139,106 @@ class ChartPanel(Panel):
             inst.chip.hide()
             inst.chip.deleteLater()
         self._indicators.remove(inst)
+
+    # -- indicator motion ------------------------------------------------------
+
+    def _draw_in(self, inst: _IndicatorInstance) -> None:
+        """Reveal a just-added indicator left to right as it fades up.
+
+        Curves are re-sliced frame by frame from their own full data; bars and
+        fills only fade. Any refresh of the indicator mid-reveal lands it
+        (``_refresh_indicator``), and so does the end of the reveal, so the
+        last word on its data is always the real computation.
+        """
+        ms = motion.duration(motion.INDICATOR_IN_MS)
+        items = inst.items + inst.pane_items
+        if ms == 0 or not inst.on or not items:
+            return
+        curves = []
+        for item in items:
+            if isinstance(item, pg.PlotDataItem):
+                xs, ys = item.xData, item.yData
+                if xs is not None and len(xs) > 1:
+                    curves.append((item, xs, ys))
+        inst._reveal = (items, curves)
+        if inst.anim is None:
+            inst.anim = QVariantAnimation(self)
+            inst.anim.setStartValue(0.0)
+            inst.anim.setEndValue(1.0)
+            inst.anim.setEasingCurve(motion.EASE_OUT)
+            inst.anim.valueChanged.connect(lambda v, i=inst: self._reveal_step(i, v))
+            inst.anim.finished.connect(lambda i=inst: self._refresh_indicator(i))
+        inst.anim.stop()
+        inst.anim.setDuration(ms)
+        self._reveal_step(inst, 0.0)
+        inst.anim.start()
+
+    def _reveal_step(self, inst: _IndicatorInstance, value) -> None:
+        t = float(value)
+        items, curves = inst._reveal
+        try:
+            for item in items:
+                item.setOpacity(t)
+            for item, xs, ys in curves:
+                k = max(2, int(round(len(xs) * t)))
+                item.setData(xs[:k], ys[:k])
+        except RuntimeError:
+            pass  # torn down mid-reveal
+
+    def _land_reveal(self, inst: _IndicatorInstance) -> None:
+        """Stop a running reveal and put the indicator at full opacity. Its
+        data is restored by whoever called (``_refresh_indicator``)."""
+        if inst.anim is not None and inst.anim.state() == QVariantAnimation.State.Running:
+            inst.anim.stop()
+        inst._reveal = ([], [])
+        for item in inst.items + inst.pane_items:
+            try:
+                item.setOpacity(1.0)
+            except RuntimeError:
+                pass
+
+    def _fade_out_items(self, items: list) -> bool:
+        """Fade price-plot items out, then remove them. True when they were
+        taken over (the caller must not tear them down itself)."""
+        ms = motion.duration(motion.INDICATOR_OUT_MS)
+        if ms == 0 or not items or not any(item.isVisible() for item in items):
+            return False
+        starts = [item.opacity() for item in items]
+        anim = QVariantAnimation(self)
+        anim.setStartValue(1.0)
+        anim.setEndValue(0.0)
+        anim.setEasingCurve(motion.EASE_OUT)
+        anim.setDuration(ms)
+
+        def step(value) -> None:
+            try:
+                for item, start in zip(items, starts):
+                    item.setOpacity(start * float(value))
+            except RuntimeError:
+                pass
+
+        def done() -> None:
+            for item in items:
+                try:
+                    self.plot_widget.removeItem(item)
+                    if hasattr(item, "deleteLater"):
+                        item.deleteLater()
+                except RuntimeError:
+                    pass
+            if anim in self._fading_out:
+                self._fading_out.remove(anim)
+            anim.deleteLater()
+
+        anim.valueChanged.connect(step)
+        anim.finished.connect(done)
+        self._fading_out.append(anim)  # held until done, then released
+        anim.start()
+        return True
+
+    def _indicator_anims_for_tests(self) -> list:
+        running = QVariantAnimation.State.Running
+        anims = [i.anim for i in self._indicators if i.anim is not None and i.anim.state() == running]
+        return anims + [a for a in self._fading_out if a.state() == running]
 
     def _maybe_widen_fetch(self) -> None:
         """A new/longer indicator may need more lookback than what's fetched."""
@@ -2236,6 +2351,7 @@ class ChartPanel(Panel):
 
     def _refresh_indicator(self, inst: _IndicatorInstance) -> None:
         """Recompute and apply one indicator's data from stored history."""
+        self._land_reveal(inst)  # a draw-in never outlives real data
         self._apply_indicator_visibility(inst)
         t, c = self._hist_x, self._hist_c
         if not inst.on:
