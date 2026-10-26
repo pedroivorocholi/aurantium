@@ -23,7 +23,7 @@ def _alpha_rows(kind, dpr, size=icons.SIZE):
 
 
 @pytest.mark.parametrize("dpr", [1.0, 1.5, 2.0])
-def test_the_minimize_bar_is_one_solid_row(qapp, dpr):
+def test_the_minimize_bar_has_no_half_tone_rows(qapp, dpr):
     img, rows = _alpha_rows("minimize", dpr)
     mid = img.width() // 2
     column = [rows[y][mid] for y in range(img.height())]
@@ -69,3 +69,23 @@ def test_chip_row_buttons_use_the_family_size(qapp):
 
     src = inspect.getsource(chart)
     assert 'set_icon(self._add_btn, "plus", CHROME_TEXT_DIM, disabled_color=FG_MUTED)' in src
+
+
+@pytest.mark.parametrize("dpr", [1.5, 2.0])
+@pytest.mark.parametrize("kind", ["close", "plus"])
+def test_symmetric_glyphs_render_symmetric(qapp, kind, dpr):
+    """The X once drew with one diagonal heavier than the other: a 1px stroke
+    nudged half a pixel off the glyph's centre. (At 100% the stroke is 1px on
+    a 16px canvas, which has no centre pixel: crisp there means half a pixel
+    off centre, so symmetry is only asserted for the even widths.)"""
+    img, rows = _alpha_rows(kind, dpr)
+    n = img.width()
+    assert all(rows[y][x] == rows[y][n - 1 - x] for y in range(n) for x in range(n))
+
+
+def test_strokes_are_never_thinner_than_designed_at_150(qapp):
+    """1.5-unit strokes at 24 device px: 2px, not a faint 1px."""
+    img, rows = _alpha_rows("minimize", 1.5)
+    mid = img.width() // 2
+    solid = [y for y in range(img.height()) if rows[y][mid] >= 250]
+    assert len(solid) == 2

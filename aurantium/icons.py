@@ -67,8 +67,10 @@ def _hint(kind: str, device_px: int) -> tuple[str, float]:
     if 'stroke="currentColor"' not in body:
         return body, 0.0
     scale = device_px / VIEWBOX
-    # just under the true weight, rounded: 1px at 16px/150%, 2px at 200%
-    width_px = max(1, round(_STROKE * scale - 0.25))
+    # the true weight, rounded half up — never thinner than designed where it
+    # matters: 2px at 16px/150% (1px there read as faint and blurred), 1px
+    # at 100%, 2px at 200%
+    width_px = max(1, int(_STROKE * scale + 0.5))
     body = _STROKE_WIDTH.sub(f'stroke-width="{width_px / scale:.4f}"', body)
     target = 0.5 if width_px % 2 else 0.0
     shift_px = (target - (VIEWBOX / 2 * scale) % 1.0) % 1.0
