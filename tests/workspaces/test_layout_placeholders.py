@@ -129,3 +129,29 @@ def test_startup_closes_the_splash_once_the_arrangement_stands():
     src = inspect.getsource(entry.main)
     assert "win.layout_ready = lambda: _close_splash(splash, win)" in src
     assert "win.layout_ready = None" in src
+
+
+def test_nothing_of_the_first_pass_reaches_the_screen(win):
+    """Before the arrangement is applied the placeholder docks are stacked in
+    one column; the splash's progress step used to paint them like that."""
+    doc = _two_columns(win)
+    during, ready = [], []
+    win.layout_progress = lambda done, total: during.append(win.updatesEnabled())
+    win.layout_ready = lambda: ready.append(win.updatesEnabled())
+    assert win.apply_layout(doc)
+    assert during and not any(during)
+    assert ready == [True]
+    assert win.updatesEnabled()
+
+
+def test_a_failed_restore_never_leaves_the_window_frozen(win, monkeypatch):
+    doc = _two_columns(win)
+
+    def boom(*a, **k):
+        raise RuntimeError("restore failed")
+
+    monkeypatch.setattr(win.dock_manager, "restoreState", boom, raising=False)
+    monkeypatch.setattr(win, "add_panel", boom)
+    with pytest.raises(RuntimeError):
+        win.apply_layout(doc)
+    assert win.updatesEnabled()

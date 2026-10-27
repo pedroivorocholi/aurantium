@@ -1763,67 +1763,75 @@ class MainWindow(QMainWindow):
                 level="warn",
             )
             return False
-        # drop any maximize state — we're rebuilding the whole arrangement
-        self._maximized_instance = None
-        self._pre_maximize_state = None
-        self._esc_shortcut.setEnabled(False)
-        UndoStack.instance().clear()  # undo history doesn't cross a layout swap
-        self._loading_layout = True  # mass-close below isn't a user close
+        # Nothing of the first pass reaches the screen: until the saved
+        # arrangement is applied, the docks sit wherever they were added —
+        # stacked in one column — and the splash's progress step would
+        # otherwise paint them like that.
+        self.setUpdatesEnabled(False)
         try:
-            for dock in list(self._docks.values()):
-                dock.closeDockWidget()
-        finally:
-            self._loading_layout = False
-        self._docks.clear()
-        self._maximize_actions.clear()
-        SymbolContext.instance().from_json(doc.get("symbols", {}))
-        DateContext.instance().from_json(doc.get("dates", {}))
-        from .panels.company import migrate_layout
-
-        doc = migrate_layout(doc)
-        # Two passes. First every dock is created holding its panel's loading
-        # outline and the saved arrangement is applied, so the window shows
-        # the workspace exactly as saved at once; then the panels are built
-        # into their places one by one. (Built first and arranged last, they
-        # piled up as tabs of one area in front of the user.) Still a restore,
-        # not a user adding panels: nothing fades in.
-        self._loading_layout = True
-        self._unbuilt.clear()
-        specs = doc.get("panels", [])
-        placed: list[str] = []
-        try:
-            for done, spec in enumerate(specs, 1):
-                dock = self.add_panel(
-                    spec.get("panel_id", ""),
-                    instance_id=spec.get("instance"),
-                    link_group=spec.get("link_group"),
-                    settings=spec.get("settings"),
-                    restore_floating=bool(spec.get("floating")),
-                    placeholder=True,
-                )
-                if dock is not None:
-                    placed.append(dock.objectName())
-                if self.layout_progress is not None:
-                    self.layout_progress(done, len(specs))
-        finally:
-            self._loading_layout = False
-        state = doc.get("ads_state", "")
-        if state:
-            from PySide6.QtCore import QByteArray
-
-            self._opening_windows += 1
+            # drop any maximize state — we're rebuilding the whole arrangement
+            self._maximized_instance = None
+            self._pre_maximize_state = None
+            self._esc_shortcut.setEnabled(False)
+            UndoStack.instance().clear()  # undo history doesn't cross a layout swap
+            self._loading_layout = True  # mass-close below isn't a user close
             try:
-                self.dock_manager.restoreState(QByteArray.fromHex(state.encode()))
-            except Exception:
-                pass
+                for dock in list(self._docks.values()):
+                    dock.closeDockWidget()
             finally:
-                self._opening_windows -= 1
-            for fw in self.dock_manager.floatingWidgets():
-                self._keep_on_screen(fw)
-                # full screen is gone; a panel window saved in it comes back
-                # maximized on the same monitor
-                if fw.isFullScreen():
-                    fw.showMaximized()
+                self._loading_layout = False
+            self._docks.clear()
+            self._maximize_actions.clear()
+            SymbolContext.instance().from_json(doc.get("symbols", {}))
+            DateContext.instance().from_json(doc.get("dates", {}))
+            from .panels.company import migrate_layout
+
+            doc = migrate_layout(doc)
+            # Two passes. First every dock is created holding its panel's loading
+            # outline and the saved arrangement is applied, so the window shows
+            # the workspace exactly as saved at once; then the panels are built
+            # into their places one by one. (Built first and arranged last, they
+            # piled up as tabs of one area in front of the user.) Still a restore,
+            # not a user adding panels: nothing fades in.
+            self._loading_layout = True
+            self._unbuilt.clear()
+            specs = doc.get("panels", [])
+            placed: list[str] = []
+            try:
+                for done, spec in enumerate(specs, 1):
+                    dock = self.add_panel(
+                        spec.get("panel_id", ""),
+                        instance_id=spec.get("instance"),
+                        link_group=spec.get("link_group"),
+                        settings=spec.get("settings"),
+                        restore_floating=bool(spec.get("floating")),
+                        placeholder=True,
+                    )
+                    if dock is not None:
+                        placed.append(dock.objectName())
+                    if self.layout_progress is not None:
+                        self.layout_progress(done, len(specs))
+            finally:
+                self._loading_layout = False
+            state = doc.get("ads_state", "")
+            if state:
+                from PySide6.QtCore import QByteArray
+
+                self._opening_windows += 1
+                try:
+                    self.dock_manager.restoreState(QByteArray.fromHex(state.encode()))
+                except Exception:
+                    pass
+                finally:
+                    self._opening_windows -= 1
+                for fw in self.dock_manager.floatingWidgets():
+                    self._keep_on_screen(fw)
+                    # full screen is gone; a panel window saved in it comes back
+                    # maximized on the same monitor
+                    if fw.isFullScreen():
+                        fw.showMaximized()
+        finally:
+            self.setUpdatesEnabled(True)
         if self.layout_ready is not None:
             self.layout_ready()
         self._show_progress()
