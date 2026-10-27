@@ -751,7 +751,10 @@ class CandlestickItem(pg.GraphicsObject):
         for t, o, h, l, c in rows:
             is_up = c >= o
             painter.setPen(pg.mkPen(self._up if is_up else self._down))
-            painter.drawLine(QPointF(t, l), QPointF(t, h))
+            if h != l:
+                # a zero-length line in a QPicture under the plot's scale
+                # paints as a full-height column (flat bars on a holiday)
+                painter.drawLine(QPointF(t, l), QPointF(t, h))
             painter.setBrush(up_brush if is_up else down_brush)
             body_h = (c - o) or (max(abs(o), 1.0) * 1e-4)
             painter.drawRect(QRectF(t - half_width, o, half_width * 2, body_h))
@@ -830,7 +833,8 @@ class OHLCBarItem(pg.GraphicsObject):
         self._bounds = self._data_bounds(rows, tick)
         for t, o, h, l, c in rows:
             painter.setPen(pg.mkPen(self._up if c >= o else self._down, width=1))
-            painter.drawLine(QPointF(t, l), QPointF(t, h))
+            if h != l:  # see CandlestickItem: no zero-length lines
+                painter.drawLine(QPointF(t, l), QPointF(t, h))
             painter.drawLine(QPointF(t - tick, o), QPointF(t, o))
             painter.drawLine(QPointF(t, c), QPointF(t + tick, c))
         painter.end()
