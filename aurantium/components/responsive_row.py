@@ -24,6 +24,9 @@ from __future__ import annotations
 from PySide6.QtCore import QRect, QSize, Qt
 from PySide6.QtWidgets import QLayout, QSizePolicy, QSpacerItem, QWidget, QWidgetItem
 
+#: Marks the plain widget ``insertLayout`` puts a nested layout in.
+_HOSTS_LAYOUT = "responsiveRowHost"
+
 
 class ResponsiveRow(QLayout):
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -68,8 +71,16 @@ class ResponsiveRow(QLayout):
         self.insertLayout(-1, layout, stretch)
 
     def insertLayout(self, index: int, layout: QLayout, stretch: int = 0) -> None:  # noqa: N802
-        self.addChildLayout(layout)
-        self._insert(index, layout, stretch)
+        # Hosted in a plain widget, never a child layout of this row: on
+        # PySide 6.12, destroying the row deleted a child layout after the
+        # row's Python side was gone, and Qt's ChildRemoved handling called
+        # ``itemAt`` on it — a pure virtual with nothing behind it, whose
+        # error leaked into the next Python callback.
+        host = QWidget()
+        host.setProperty(_HOSTS_LAYOUT, True)
+        layout.setContentsMargins(0, 0, 0, 0)
+        host.setLayout(layout)
+        self.insertWidget(index, host, stretch)
 
     def addStretch(self, stretch: int = 0) -> None:  # noqa: N802
         self.insertStretch(-1, stretch)
@@ -95,7 +106,8 @@ class ResponsiveRow(QLayout):
 
     def setStretchFactor(self, target, stretch: int) -> bool:  # noqa: N802
         for i, item in enumerate(self._items):
-            if item.widget() is target or item.layout() is target:
+            w = item.widget()
+            if w is target or (w is not None and w.property(_HOSTS_LAYOUT) and w.layout() is target):
                 self._stretch[i] = int(stretch)
                 self.invalidate()
                 return True
@@ -133,6 +145,12 @@ class ResponsiveRow(QLayout):
                 continue
             out.append(i)
         return out
+
+    @staticmethod
+    def _hosts_layout(item) -> bool:
+        # a nested layout fills its line's height, as it did as a child layout
+        w = item.widget()
+        return w is not None and bool(w.property(_HOSTS_LAYOUT))
 
     @staticmethod
     def _min_w(item) -> int:
@@ -268,7 +286,7 @@ class ResponsiveRow(QLayout):
                 x = area.x()
                 for i in line:
                     item = self._items[i]
-                    if item.layout() is not None or self._expands_v(i):
+                    if self._hosts_layout(item) or self._expands_v(i):
                         ih = lh
                     else:
                         ih = max(min(item.sizeHint().height(), lh), min(item.minimumSize().height(), lh))
