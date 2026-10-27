@@ -29,8 +29,8 @@ from __future__ import annotations
 import re
 from functools import lru_cache
 
-from PySide6.QtCore import QByteArray, QRectF, Qt
-from PySide6.QtGui import QIcon, QPainter, QPixmap
+from PySide6.QtCore import QByteArray, QRect, QRectF, QSize, Qt
+from PySide6.QtGui import QIcon, QIconEngine, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
 from .reicon_icons import SVG, VIEWBOX
@@ -89,9 +89,77 @@ def _renderer(kind: str, color: str, device_px: int = 0) -> QSvgRenderer:
     return QSvgRenderer(QByteArray(svg.encode("utf-8")))
 
 
+class _GlyphEngine(QIconEngine):
+    """Paints a glyph for the screen it is being drawn on, when it is drawn.
+
+    Icons used to be rendered once, at construction, for the ratio of the
+    screen the widget reported then. A window is built before it is shown, so
+    that was the *primary* screen's — and on a desk with a 100% main monitor
+    and a 150% laptop panel, every icon in a window on the laptop was a 100%
+    glyph (1px strokes, half a pixel off centre) stretched by Qt to 150%: a
+    lopsided, soft X. Rendered on demand at the scale Qt asks for, an icon is
+    right on whichever screen it is on, and stays right when the window is
+    dragged to the other one.
+    """
+
+    def __init__(self, kind: str, colors: dict, size: int = 0) -> None:
+        super().__init__()
+        self._kind = kind
+        #: QIcon.Mode -> colour; Normal is always present
+        self._colors = colors
+        self._size = size
+
+    def _color(self, mode) -> str:
+        return self._colors.get(mode) or self._colors[QIcon.Mode.Normal]
+
+    def scaledPixmap(self, size, mode, state, scale):  # noqa: N802 (Qt override)
+        logical = max(1, min(size.width(), size.height()))
+        return _cached_pixmap(self._kind, self._color(mode), float(scale or 1.0), logical)
+
+    def pixmap(self, size, mode, state):  # noqa: D102 (Qt override)
+        return self.scaledPixmap(size, mode, state, 1.0)
+
+    def paint(self, painter, rect, mode, state) -> None:  # noqa: D102 (Qt override)
+        side = min(rect.width(), rect.height())
+        scale = painter.device().devicePixelRatioF() if painter.device() else 1.0
+        px = self.scaledPixmap(QSize(side, side), mode, state, scale)
+        target = QRect(0, 0, side, side)
+        target.moveCenter(rect.center())
+        painter.drawPixmap(target.topLeft(), px)
+
+    def actualSize(self, size, mode, state):  # noqa: N802 (Qt override)
+        side = min(size.width(), size.height())
+        if self._size:
+            side = min(side, self._size)
+        return QSize(side, side)
+
+    def availableSizes(self, mode=QIcon.Mode.Normal, state=QIcon.State.Off):  # noqa: N802
+        return [QSize(self._size or SIZE, self._size or SIZE)]
+
+    def clone(self) -> "_GlyphEngine":
+        return _GlyphEngine(self._kind, dict(self._colors), self._size)
+
+    def key(self) -> str:
+        return "aurantium-glyph"
+
+
+@lru_cache(maxsize=1024)
+def _cached_pixmap(kind: str, color: str, dpr: float, size: int) -> QPixmap:
+    # icons repaint with their buttons; the glyph is rendered once per
+    # (kind, colour, scale, size) rather than on every paint
+    return pixmap(kind, color, dpr, size)
+
+
+def _glyph_icon(kind: str, colors: dict, size: int = 0) -> QIcon:
+    return QIcon(_GlyphEngine(kind, {m: str(c) for m, c in colors.items() if c}, size))
+
+
 def icon(kind: str, color: str, dpr: float = 1.0) -> QIcon:
-    """One glyph, in one colour, at one device-pixel-ratio."""
-    return QIcon(pixmap(kind, color, dpr))
+    """One glyph, in one colour, painted for whatever screen shows it.
+
+    ``dpr`` is accepted for existing callers and no longer needed: the icon
+    renders at paint time for the screen it is on (see ``_GlyphEngine``)."""
+    return _glyph_icon(kind, {QIcon.Mode.Normal: color})
 
 
 def pixmap(kind: str, color: str, dpr: float = 1.0, size: int = SIZE) -> QPixmap:
@@ -124,11 +192,14 @@ def two_tone_icon(
     Used by the list editor's row-delete button (grey to the loss red) and the
     title bar's close button (white on the red hover fill).
     """
-    result = QIcon()
-    result.addPixmap(pixmap(kind, color, dpr), QIcon.Mode.Normal)
-    result.addPixmap(pixmap(kind, hover_color, dpr), QIcon.Mode.Active)
-    result.addPixmap(pixmap(kind, hover_color, dpr), QIcon.Mode.Selected)
-    return result
+    return _glyph_icon(
+        kind,
+        {
+            QIcon.Mode.Normal: color,
+            QIcon.Mode.Active: hover_color,
+            QIcon.Mode.Selected: hover_color,
+        },
+    )
 
 
 def set_icon(
@@ -143,19 +214,13 @@ def set_icon(
     painted for the button's screen, with optional hover (``Active``) and
     disabled tints — Qt's own disabled tint of an icon is a grey wash that
     matches nothing in the palette."""
-    from PySide6.QtCore import QSize
-
-    dpr = device_pixel_ratio(button)
-    result = QIcon()
-    result.addPixmap(pixmap(kind, color, dpr, size), QIcon.Mode.Normal)
+    colors = {QIcon.Mode.Normal: color}
     if hover_color:
-        hover = pixmap(kind, hover_color, dpr, size)
-        result.addPixmap(hover, QIcon.Mode.Active)
-        result.addPixmap(hover, QIcon.Mode.Selected)
+        colors[QIcon.Mode.Active] = colors[QIcon.Mode.Selected] = hover_color
     if disabled_color:
-        result.addPixmap(pixmap(kind, disabled_color, dpr, size), QIcon.Mode.Disabled)
+        colors[QIcon.Mode.Disabled] = disabled_color
     button.setText("")
-    button.setIcon(result)
+    button.setIcon(_glyph_icon(kind, colors, size))
     button.setIconSize(QSize(size, size))
 
 

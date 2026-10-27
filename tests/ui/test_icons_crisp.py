@@ -89,3 +89,42 @@ def test_strokes_are_never_thinner_than_designed_at_150(qapp):
     mid = img.width() // 2
     solid = [y for y in range(img.height()) if rows[y][mid] >= 250]
     assert len(solid) == 2
+
+
+@pytest.mark.parametrize("make", ["icon", "two_tone", "set_icon"])
+def test_an_icon_built_before_its_window_is_shown_paints_for_its_screen(qapp, make):
+    """A window is built before it is shown, while it still reports the
+    primary screen's ratio. On a 100% main monitor with the window on a 150%
+    laptop panel, every icon used to be a 100% glyph stretched by Qt: the
+    lopsided, soft X. Icons now render for the scale they are painted at."""
+    from PySide6.QtCore import QSize
+    from PySide6.QtWidgets import QToolButton
+
+    if make == "icon":
+        ic = icons.icon("close", WHITE, 1.0)
+    elif make == "two_tone":
+        ic = icons.two_tone_icon("close", WHITE, "#ff0000", 1.0)
+    else:
+        b = QToolButton()
+        icons.set_icon(b, "close", WHITE)
+        ic = b.icon()
+    for scale in (1.0, 1.5, 2.0):
+        got = ic.pixmap(QSize(icons.SIZE, icons.SIZE), scale)
+        assert got.toImage() == icons.pixmap("close", WHITE, scale).toImage()
+
+
+def test_hover_and_disabled_tints_survive(qapp):
+    from PySide6.QtCore import QSize
+    from PySide6.QtGui import QIcon
+    from PySide6.QtWidgets import QToolButton
+
+    b = QToolButton()
+    icons.set_icon(b, "plus", WHITE, hover_color="#ff0000", disabled_color="#00ff00")
+    size = QSize(icons.SIZE, icons.SIZE)
+    for mode, color in (
+        (QIcon.Mode.Normal, WHITE),
+        (QIcon.Mode.Active, "#ff0000"),
+        (QIcon.Mode.Disabled, "#00ff00"),
+    ):
+        got = b.icon().pixmap(size, 1.5, mode)
+        assert got.toImage() == icons.pixmap("plus", color, 1.5).toImage()
