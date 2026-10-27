@@ -20,6 +20,63 @@
     <language>en</language>
 
     <item>
+      <title>Aurantium 1.13.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.13.2</h3>
+        <ul>
+          <li>Chart symbol changes animate smoothly instead of stuttering or cutting to the end</li>
+          <li>The first chart of the day no longer jumps when today&#x27;s prices replace yesterday&#x27;s</li>
+          <li>Line and area charts keep a steady frame rate through the whole transition</li>
+          <li>Faster chart repaints when panning, zooming and changing symbols</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 27 Oct 2026 15:28:37 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.13.2/aurantium-setup.exe"
+        sparkle:version="1.13.2"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76542432"
+        sparkle:edSignature="N+2GG1RUkMNcnAkOfBw/B14XfHGM3GZlX14MCrZ3TBvlX7ypbpn4GSM1wq8485VaLVH5zHl2n+pFfjuWUMRkAA=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.13.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.13.2</h3>
+        <ul>
+          <li>Chart symbol changes animate smoothly instead of stuttering or cutting to the end</li>
+          <li>The first chart of the day no longer jumps when today&#x27;s prices replace yesterday&#x27;s</li>
+          <li>Line and area charts keep a steady frame rate through the whole transition</li>
+          <li>Faster chart repaints when panning, zooming and changing symbols</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 27 Oct 2026 15:28:37 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.13.2/aurantium-mac.zip"
+        sparkle:version="1.13.2"
+        sparkle:os="macos"
+        length="298182717"
+        sparkle:edSignature="55bwN0hBT1w6xdscgdE/DwqMjQ8QYGFAKGQvvcVrF9Q3wvhVxquZh4zQKWUWlOj5fOZJQpb5DIkBUv9YLDwnCg=="
+        type="application/zip" />
+    </item>
+    <item>
       <title>Aurantium 1.13.1</title>
       <description><![CDATA[
         <style>
