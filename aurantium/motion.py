@@ -27,7 +27,9 @@ conditions that keep it narrow, so neither can spread by accident.
 **Chart data transitions** (``CHART_MORPH_MS``). When the chart panel's linked
 symbol changes, its price series morphs from the old symbol's shape into the
 new one — the line's y-values interpolate, the price axis rescales, and the
-real candles crossfade in over the second half. Up to 300ms, on ``EASE_TRAVEL``.
+real candles crossfade in over the second half (a line or area is handed over
+on the last frame instead, where the two are identical). Up to 300ms, on
+``EASE_TRAVEL``.
 It is allowed only because it is the moment the product exists for (a click
 re-centring the workspace) and only under all of these conditions:
 
@@ -187,13 +189,23 @@ class PacedAnimation(QVariantAnimation):
 
     FRAME_MS = 16
     MAX_STEP_MS = 50  # three frames at 60Hz
-    #: Past this many durations of wall time, the pacing lets go and the
-    #: motion lands: a stalled thread may slow it, never drag it out.
+    #: Past this many durations of wall time after its first frame, the pacing
+    #: lets go and the motion lands: a stalled thread may slow it, never drag
+    #: it out. Counted from the first frame, not from start(): a morph starts
+    #: inside the symbol change that caused it, and the rest of that change
+    #: can hold the thread for half a second before anything of it is seen.
     DEADLINE = 2.0
+    #: The first frame waits for the thread to be free: a tick arriving within
+    #: this long of the one before. Played while the thread is still away
+    #: between ticks, the motion would only show as a few disjoint steps.
+    SETTLE_GAP_MS = 34  # two frames at 60Hz
+    #: ...but waits no longer than this after start(), busy or not.
+    SETTLE_MAX_MS = 600
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self._last = self._started = 0.0
+        self._last = self._queued = 0.0
+        self._started: float | None = None
         self._ticker = QTimer(self)
         self._ticker.setTimerType(Qt.TimerType.PreciseTimer)
         self._ticker.setInterval(self.FRAME_MS)
@@ -205,7 +217,8 @@ class PacedAnimation(QVariantAnimation):
         if self.state() == self.State.Stopped:
             return  # zero duration: already landed
         super().pause()
-        self._last = self._started = time.monotonic()
+        self._last = self._queued = time.monotonic()
+        self._started = None  # set by the first frame
         self._ticker.start()
 
     def stop(self) -> None:  # noqa: D102 (QAbstractAnimation API)
@@ -219,6 +232,11 @@ class PacedAnimation(QVariantAnimation):
         now = time.monotonic()
         step = (now - self._last) * 1000.0
         self._last = now
+        if self._started is None:
+            if (step > self.SETTLE_GAP_MS
+                    and (now - self._queued) * 1000.0 < self.SETTLE_MAX_MS):
+                return  # still busy with whatever started it: hold frame 0
+            self._started = now
         if (now - self._started) * 1000.0 < self.duration() * self.DEADLINE:
             step = min(step, self.MAX_STEP_MS)
         self.setCurrentTime(min(self.duration(), self.currentTime() + max(1, round(step))))

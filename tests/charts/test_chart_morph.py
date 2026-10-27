@@ -11,7 +11,8 @@ checks the *end* state, with animations on and off.
 import time
 
 import pytest
-from PySide6.QtGui import QColor
+import pyqtgraph as pg
+from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import QApplication
 
 from aurantium import motion
@@ -222,16 +223,17 @@ def test_a_stalled_ui_thread_delays_the_morph_instead_of_skipping_it(
     qapp, monkeypatch, feeds
 ):
     """A linked symbol change re-renders every panel in the group on the UI
-    thread. While that holds the thread, the morph's clock advances at most
-    a few frames per tick, so its frames still reach the screen — up to its
-    deadline, past which it lands rather than drag on."""
+    thread. While that holds the thread the morph waits on its first frame,
+    then plays once frames come on time again — never skipped to its end."""
     p = _make_chart(monkeypatch, animate=True, feeds=feeds)
     _load_first(p, monkeypatch)
     p.on_symbol("BBB")
     anim = p._morph.anim
-    # away for longer than the whole morph, inside the pacing deadline
+    # away for longer than the whole morph
     time.sleep(motion.CHART_MORPH_MS * 1.5 / 1000)
     anim._tick()
+    assert anim.currentTime() == 0  # the thread just came back: hold
+    anim._tick()  # the next frame on time
     assert 0 < anim.currentTime() <= motion.PacedAnimation.MAX_STEP_MS
     assert p._morph.running()
     _settle(p)
@@ -349,4 +351,167 @@ def test_a_line_chart_still_morphs_as_a_line(qapp, monkeypatch, feeds):
     assert p._morph.kind == "line"
     assert _overlay_colors(p, 0.5)  # it paints
     _settle(p)
+    _assert_final(p)
+
+
+# -- frame cost -------------------------------------------------------------------
+#
+# The morph rescales the price axis every frame, so whatever a repaint costs,
+# the morph pays it ~12 times in 200ms. Two costs made it stutter: the price
+# grid drew dozens of lines no eye could see, and every frame painted twice.
+
+def _grid_specs(p):
+    axis = p.plot_widget.getAxis("left")
+    _axis_spec, tick_specs, _text_specs = axis.generateDrawSpecs(QPainter())
+    return tick_specs
+
+
+def test_the_price_grid_skips_lines_too_faint_to_see(qapp, monkeypatch, feeds):
+    p = _make_chart(monkeypatch, animate=False, feeds={"AAA": _bars(100.0, n=1260)})
+    p.on_symbol("AAA")
+    specs = _grid_specs(p)
+    alphas = [pen.color().alpha() for pen, _p1, _p2 in specs]
+    assert alphas  # the grid is still there...
+    assert min(alphas) >= 10  # ...minus pyqtgraph's ~2% finest level
+    # the grid's two visible levels both survive
+    assert len(set(alphas)) >= 2
+
+
+def test_ticks_without_a_grid_are_untouched(qapp, monkeypatch, feeds):
+    p = _make_chart(monkeypatch, animate=False, feeds={"AAA": _bars(100.0, n=1260)})
+    p._toggle_grid(False)
+    p.on_symbol("AAA")
+    stock = pg.AxisItem.generateDrawSpecs(p.plot_widget.getAxis("left"), QPainter())
+    assert len(_grid_specs(p)) == len(stock[1])
+
+
+def test_a_morph_frame_repaints_through_the_scene_only(qapp, monkeypatch, feeds):
+    """The overlay is a child of the viewport, so the scene's repaint already
+    repaints it. Asking the overlay separately cost a second full paint per
+    frame once the real candles faded in — half the frame rate."""
+    p = _make_chart(monkeypatch, animate=True, feeds=feeds)
+    _load_first(p, monkeypatch)
+    p.on_symbol("BBB")
+    morph = p._morph
+    direct = []
+    monkeypatch.setattr(morph.overlay, "update", lambda *a: direct.append(a))
+    morph._step(0.75)
+    assert direct == []
+    _settle(p)
+    _assert_final(p)
+
+
+def _windowed_feeds():
+    # more history fetched than the 6M window shows, as in the app: the real
+    # line runs on past the plot's left edge
+    return {"AAA": _bars(100.0, n=400), "BBB": _bars(400.0, n=400, slope=-0.5)}
+
+
+@pytest.mark.parametrize("kind", ["line", "area"])
+def test_the_price_line_is_handed_over_not_crossfaded(qapp, monkeypatch, kind):
+    p = _make_chart(monkeypatch, animate=True, feeds=_windowed_feeds())
+    p._chart_type = kind
+    p._apply_chart_type()
+    _load_first(p, monkeypatch)
+    p.on_symbol("BBB")
+    morph = p._morph
+    anim = morph.anim
+    anim.setCurrentTime(int(anim.duration() * 0.75))  # deep in the crossfade
+    assert p.line_curve.opacity() == 0.0
+    assert morph.overlay_opacity == 1.0
+    _settle(p)
+    _assert_final(p)
+
+
+def _plot_pixels(p):
+    vb = p.plot_widget.getViewBox()
+    rect = p.plot_widget.viewportTransform().mapRect(vb.sceneBoundingRect()).toRect()
+    return p.plot_widget.viewport().grab(rect).toImage()
+
+
+@pytest.mark.parametrize("kind", ["line", "area"])
+def test_the_handover_frame_matches_the_real_chart(qapp, monkeypatch, kind):
+    """What makes the handover invisible: the overlay's last frame, edges and
+    area floor included, is the real price line."""
+    p = _make_chart(monkeypatch, animate=True, feeds=_windowed_feeds())
+    p._chart_type = kind
+    p._apply_chart_type()
+    p._toggle_grid(False)
+    _load_first(p, monkeypatch)
+    p.on_symbol("BBB")
+    _settle(p)
+    QApplication.processEvents()
+    for item in _faded_items_but_price(p):
+        item.setVisible(False)  # compare the price line alone
+    real = _plot_pixels(p)
+    morph = p._morph
+    morph._from = morph._series_bars()
+    morph._t, morph.overlay_opacity = 1.0, 1.0
+    p.line_curve.setOpacity(0.0)
+    morph.overlay.setGeometry(p.plot_widget.viewport().rect())
+    morph.overlay.show()
+    morph.overlay.raise_()
+    QApplication.processEvents()
+    drawn = _plot_pixels(p)
+    assert real.size() == drawn.size()
+    # antialiasing may round the two a fraction of a pixel apart; the shape,
+    # the edges and the area's floor must not differ (the line's very end,
+    # where a sub-pixel shift moves the cap across a column, is skipped)
+    for x in range(0, real.width(), 10):
+        if not _ink(real, min(x + 3, real.width() - 1))[0]:
+            continue
+        a, b = _ink(real, x), _ink(drawn, x)
+        assert b[0] == pytest.approx(a[0], rel=0.05, abs=20), f"column {x}: ink"
+        if a[0]:
+            assert b[1] == pytest.approx(a[1], abs=0.6), f"column {x}: centre"
+
+
+def _ink(img, x):
+    """(total brightness, its weighted mean y) down one column."""
+    total = weighted = 0.0
+    for y in range(img.height()):
+        v = QColor.fromRgb(img.pixel(x, y)).red()
+        if v > 12:
+            total += v
+            weighted += v * y
+    return total, (weighted / total if total else 0.0)
+
+
+def _faded_items_but_price(p):
+    items = []
+    for inst in p._indicators:
+        items.extend(inst.items)
+    return items
+
+
+# -- today's data replacing yesterday's ------------------------------------------
+#
+# The first chart of the day warms from the disk cache (yesterday's bars) and
+# morphs into them; the network's fresh bars land a few hundred ms later. That
+# used to land the morph on the spot — a cut, then a jump to the new last bar.
+
+def test_a_refresh_mid_morph_retargets_instead_of_cutting(qapp, monkeypatch, feeds):
+    p = _make_chart(monkeypatch, animate=True, feeds=feeds)
+    _load_first(p, monkeypatch)
+    p.on_symbol("BBB")  # yesterday's 80 bars, from the cache
+    morph = p._morph
+    anim = morph.anim
+    anim.setCurrentTime(int(anim.duration() * 0.3))
+    fresh = _bars(400.0, n=81, slope=-2.0)  # today adds a bar
+    p._on_history(fresh)
+    assert morph.running()  # still travelling...
+    assert anim.currentTime() == int(anim.duration() * 0.3)  # ...from where it was
+    assert len(morph.bars_at(0.5).x) == len(morph._series_bars().x)  # toward today's bars
+    _settle(p)
+    _assert_final(p)
+    assert len(p._hist_c) == 81
+
+
+def test_a_refresh_after_the_morph_is_not_a_morph(qapp, monkeypatch, feeds):
+    p = _make_chart(monkeypatch, animate=True, feeds=feeds)
+    _load_first(p, monkeypatch)
+    p.on_symbol("BBB")
+    _settle(p)
+    p._on_history(_bars(400.0, n=81, slope=-2.0))
+    assert not p._morph.running()
     _assert_final(p)

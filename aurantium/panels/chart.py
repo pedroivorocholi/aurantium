@@ -860,6 +860,10 @@ def _next_nice(step: float) -> float:
     return 20.0 * exp
 
 
+#: Below this alpha (of 255) a grid line on the chart background is not seen.
+_MIN_GRID_ALPHA = 10
+
+
 class _PriceAxis(pg.AxisItem):
     """The price axis. Linear, it is pyqtgraph's own. Log, it labels prices.
 
@@ -889,6 +893,18 @@ class _PriceAxis(pg.AxisItem):
     def logTickStrings(self, values, scale, spacing):  # noqa: N802 (pyqtgraph API)
         places = max(0, math.ceil(-math.log10(spacing))) if spacing and spacing > 0 else 2
         return [f"{10.0 ** v:.{places}f}" for v in values]
+
+    def generateDrawSpecs(self, p):  # noqa: N802 (pyqtgraph API)
+        """Grid lines too faint to see are not drawn. pyqtgraph's finest grid
+        level comes out at ~2% alpha — invisible, yet it was most of the lines
+        (51 of 64 on a 5Y chart) and most of each repaint, which the morph
+        pays every frame as it rescales this axis."""
+        specs = super().generateDrawSpecs(p)
+        if specs is None or self.grid is False:
+            return specs
+        axis_spec, tick_specs, text_specs = specs
+        visible = [s for s in tick_specs if s[0].color().alpha() >= _MIN_GRID_ALPHA]
+        return axis_spec, visible, text_specs
 
 
 class _SpacedAxis(pg.AxisItem):
@@ -1141,7 +1157,8 @@ class _SeriesMorph:
     an overlay line travelling from the old shape to the new, the plot's Y
     range travelling from the old fit to the new one (so the axis rescales),
     and the opacity of the real series, which crossfades in over the second
-    half. ``finish`` hands all three back, so any interruption — a pan, the
+    half (a price line is handed over on the last frame instead; see
+    ``_step``). ``finish`` hands all three back, so any interruption — a pan, the
     next symbol, a range change, an empty result — can only land on the
     final chart.
     """
@@ -1158,6 +1175,9 @@ class _SeriesMorph:
         self._y_to = (0.0, 1.0)
         self._t = 1.0
         self._last_change = float("-inf")
+        #: Set by history_arriving: the history landing next refreshes the
+        #: series a running morph is heading for.
+        self._retarget = False
         self.overlay_opacity = 1.0
         self.overlay = _MorphOverlay(panel.plot_widget.viewport(), self)
         # One persistent animation per chart (see motion.fade_animation for
@@ -1196,14 +1216,21 @@ class _SeriesMorph:
             self._snapshot = (bars, y_range)
 
     def history_arriving(self) -> None:
-        """A history callback is about to apply. Anything that is not the
-        answer to a pending symbol change (a live refresh, a widened fetch)
-        lands any running morph first."""
-        if self._snapshot is None:
+        """A history callback is about to apply. A refresh of the symbol a
+        morph is travelling to — the network's fresh bars landing over the
+        disk cache's, which is how every first chart of the day loads — keeps
+        it travelling, now toward the fresh bars. Anything else that is not
+        the answer to a pending symbol change lands any running morph first."""
+        self._retarget = self._snapshot is None and self.running()
+        if self._snapshot is None and not self._retarget:
             self.finish()
 
     def history_landed(self) -> None:
         """The new symbol's final chart is in place: morph into it."""
+        if self._retarget:
+            self._retarget = False
+            self._aim_at_landed_chart()
+            return
         snap, self._snapshot = self._snapshot, None
         if snap is None:
             return
@@ -1236,10 +1263,24 @@ class _SeriesMorph:
             if inst.kind == "volume":
                 panel._draw_in(inst)
 
+    def _aim_at_landed_chart(self) -> None:
+        """Mid-morph, the chart under the overlay was rebuilt: travel on from
+        here toward it, on the same clock. The rebuild re-fitted the Y range
+        and reset the real series' opacity; the next frame puts both back."""
+        to = self._series_bars()
+        if to is None or self._from is None:
+            self.finish()
+            return
+        self._y_to = tuple(self._panel.plot_widget.getViewBox().viewRange()[1])
+        if len(self._from.x) != len(to.x):
+            self._from = self._from.resampled(len(to.x))
+        self._step(self.anim.currentValue())
+
     def cancel(self) -> None:
         """Not a symbol change after all (a range or interval change, an empty
         result): drop the snapshot and land any running morph."""
         self._snapshot = None
+        self._retarget = False
         self.finish()
 
     def finish(self) -> None:
@@ -1283,6 +1324,8 @@ class _SeriesMorph:
         if bars is None or len(bars.x) < 2:
             return
         panel = self._panel
+        vb = panel.plot_widget.getViewBox()
+        p.setClipRect(panel.plot_widget.viewportTransform().mapRect(vb.sceneBoundingRect()))
         p.setOpacity(self.overlay_opacity)
         if self.kind in ("candles", "bars"):
             up, down = QColor(panel._colors["up"]), QColor(panel._colors["down"])
@@ -1305,7 +1348,10 @@ class _SeriesMorph:
         if self.kind == "area":
             fill = QColor(line)
             fill.setAlpha(60)
-            base = float(panel.plot_widget.viewport().height())
+            # the fill's floor travels from the viewport's bottom to the real
+            # area's fill level, so the handover to it is seamless
+            bottom = float(panel.plot_widget.viewport().height())
+            base = bottom + (self._fill_floor(bottom) - bottom) * self._t
             poly = QPolygonF([QPointF(pts[0].x(), base), *pts, QPointF(pts[-1].x(), base)])
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(fill)
@@ -1335,9 +1381,30 @@ class _SeriesMorph:
             for item in self._faded_items():
                 item.setOpacity(fade)
             self.overlay_opacity = 1.0 - fade
-            self.overlay.update()
+            if self.kind in ("line", "area"):
+                # No crossfade for the price line: the overlay's last frame
+                # *is* it, pixel for pixel, so it is handed over on that frame.
+                # A 1.5px antialiased line drawn translucent under another was
+                # the costliest thing on screen, at half the frame rate.
+                panel.line_curve.setOpacity(1.0 if linear >= 1.0 else 0.0)
+                self.overlay_opacity = 1.0
+            # Through the scene, not overlay.update(): the overlay is a child
+            # of the viewport, so the scene's repaint repaints it too. Asked
+            # for separately, every frame painted twice once the real candles
+            # were visible, halving the frame rate of the crossfade.
+            panel.plot_widget.scene().update()
         except RuntimeError:
             pass  # panel destroyed mid-morph
+
+    def _fill_floor(self, default: float) -> float:
+        """Where the real area chart's fill stops, in viewport pixels."""
+        panel = self._panel
+        curve = panel.line_curve.curve
+        level = curve.opts.get("fillLevel")
+        if level is None:
+            return default
+        scene = curve.mapToScene(QPointF(0.0, float(level)))
+        return float(panel.plot_widget.viewportTransform().map(scene).y())
 
     def _faded_items(self) -> list:
         panel = self._panel
@@ -1356,8 +1423,10 @@ class _SeriesMorph:
         if not n or vb.width() <= 0 or vb.height() <= 0:
             return None
         (x0, x1), _ = vb.viewRange()
-        i0 = max(0, math.ceil(x0))
-        i1 = min(n, math.floor(x1) + 1)
+        # one bar past each edge, as the real chart has: its line runs on to
+        # the next point off screen, and paint() clips both to the plot
+        i0 = max(0, math.ceil(x0) - 1)
+        i1 = min(n, math.floor(x1) + 2)
         if i1 - i0 < 2:
             return None
         ohlc = np.array(

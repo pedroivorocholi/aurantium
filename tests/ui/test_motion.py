@@ -466,7 +466,58 @@ def test_a_paced_animation_lets_go_at_its_deadline(qapp):
     anim = motion.PacedAnimation()
     anim.setDuration(100)
     anim.start()
+    anim._tick()  # the first frame reaches the screen
     _time.sleep(0.25)  # past 2 x 100ms
     anim._tick()
     assert anim.state() == anim.State.Stopped
     assert not anim._ticker.isActive()
+
+
+def test_a_stall_before_the_first_frame_does_not_count(qapp):
+    """A morph starts inside the linked symbol change that caused it, and the
+    rest of that change (every linked panel refilling and repainting) can hold
+    the thread for half a second. That is not the motion being dragged out —
+    none of it has been seen yet — so the deadline runs from the first frame."""
+    import time as _time
+
+    anim = motion.PacedAnimation()
+    anim.setDuration(100)
+    anim.start()
+    _time.sleep(0.25)  # the symbol change still running
+    anim._tick()
+    assert anim.state() != anim.State.Stopped
+    assert anim.currentTime() <= motion.PacedAnimation.MAX_STEP_MS
+    anim.stop()
+
+
+def test_a_paced_animation_waits_for_a_free_thread_to_begin(qapp):
+    """Its first frame waits until frames arrive on time — while the thread is
+    still away between ticks, playing would only show disjoint steps."""
+    import time as _time
+
+    anim = motion.PacedAnimation()
+    anim.setDuration(200)
+    anim.start()
+    for _ in range(3):  # a busy thread: ticks far apart
+        _time.sleep(0.1)
+        anim._tick()
+    assert anim.currentTime() == 0
+    anim._tick()  # back to back: the thread is free
+    assert anim.currentTime() > 0
+    anim.stop()
+
+
+def test_a_paced_animation_waits_for_a_free_thread_only_so_long(qapp):
+    import time as _time
+
+    anim = motion.PacedAnimation()
+    anim.setDuration(200)
+    anim.start()
+    waited = 0.0
+    while anim.currentTime() == 0 and waited < 2.0:
+        _time.sleep(0.1)
+        waited += 0.1
+        anim._tick()
+    assert anim.currentTime() > 0
+    assert waited * 1000 <= motion.PacedAnimation.SETTLE_MAX_MS + 150
+    anim.stop()
