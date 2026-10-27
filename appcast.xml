@@ -20,6 +20,71 @@
     <language>en</language>
 
     <item>
+      <title>Aurantium 1.13.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.13.1</h3>
+        <ul>
+          <li>Charts morph smoothly between symbols and keep their chart type (candles stay candles)</li>
+          <li>Indicators draw in when added and fade out when removed; volume bars rise in</li>
+          <li>Workspaces open in their exact saved layout, with each panel showing a loading outline until it&#x27;s ready</li>
+          <li>Startup splash shows a progress bar</li>
+          <li>Sharper, even-weight icons on every screen scaling, with a symmetric close X</li>
+          <li>Fixed flat bars on market holidays drawing as a solid block on yield charts</li>
+          <li>Fixed an internal error when closing a Company panel</li>
+          <li>Smoother animation while linked panels load</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 27 Oct 2026 02:18:38 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.13.1/aurantium-setup.exe"
+        sparkle:version="1.13.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76545526"
+        sparkle:edSignature="bhwBhw+TLIE7gCcGEoKos7dh/scFaSYqllEkipt5iLeYenDsYBXsdOQbWJF+4JXSI9w06q/RQb1aqiuvGApsCw=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.13.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.13.1</h3>
+        <ul>
+          <li>Charts morph smoothly between symbols and keep their chart type (candles stay candles)</li>
+          <li>Indicators draw in when added and fade out when removed; volume bars rise in</li>
+          <li>Workspaces open in their exact saved layout, with each panel showing a loading outline until it&#x27;s ready</li>
+          <li>Startup splash shows a progress bar</li>
+          <li>Sharper, even-weight icons on every screen scaling, with a symmetric close X</li>
+          <li>Fixed flat bars on market holidays drawing as a solid block on yield charts</li>
+          <li>Fixed an internal error when closing a Company panel</li>
+          <li>Smoother animation while linked panels load</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 27 Oct 2026 02:18:38 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.13.1/aurantium-mac.zip"
+        sparkle:version="1.13.1"
+        sparkle:os="macos"
+        length="298182658"
+        sparkle:edSignature="D4AZjPAW49zzetXnv9JxWkWJfT+/T5Cvs2qCgV+WNWxAHL+R+zOvRh2F9QPZWjY0EEi/1ERHd0VpdxRDUmguAQ=="
+        type="application/zip" />
+    </item>
+    <item>
       <title>Aurantium 1.12.3</title>
       <description><![CDATA[
         <style>
