@@ -222,13 +222,15 @@ def test_a_stalled_ui_thread_delays_the_morph_instead_of_skipping_it(
     qapp, monkeypatch, feeds
 ):
     """A linked symbol change re-renders every panel in the group on the UI
-    thread. However long that holds the thread, the morph's clock advances at
-    most two frames per tick, so its frames still reach the screen."""
+    thread. While that holds the thread, the morph's clock advances at most
+    a few frames per tick, so its frames still reach the screen — up to its
+    deadline, past which it lands rather than drag on."""
     p = _make_chart(monkeypatch, animate=True, feeds=feeds)
     _load_first(p, monkeypatch)
     p.on_symbol("BBB")
     anim = p._morph.anim
-    time.sleep(0.5)  # the thread is away for longer than the whole morph
+    # away for longer than the whole morph, inside the pacing deadline
+    time.sleep(motion.CHART_MORPH_MS * 1.5 / 1000)
     anim._tick()
     assert 0 < anim.currentTime() <= motion.PacedAnimation.MAX_STEP_MS
     assert p._morph.running()

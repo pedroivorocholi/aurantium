@@ -155,7 +155,7 @@ PANEL_IN_MS = 180
 #: Exception (see the module docstring): the chart's old series morphing into
 #: the new symbol's. Also the minimum gap between symbol changes for a morph
 #: to run at all.
-CHART_MORPH_MS = 280
+CHART_MORPH_MS = 200
 
 #: Exception (see the module docstring): one breath of a workspace skeleton,
 #: the opacity it breathes down to, and the hard stop for a panel whose data
@@ -186,11 +186,14 @@ class PacedAnimation(QVariantAnimation):
     """
 
     FRAME_MS = 16
-    MAX_STEP_MS = 34  # two frames at 60Hz
+    MAX_STEP_MS = 50  # three frames at 60Hz
+    #: Past this many durations of wall time, the pacing lets go and the
+    #: motion lands: a stalled thread may slow it, never drag it out.
+    DEADLINE = 2.0
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self._last = 0.0
+        self._last = self._started = 0.0
         self._ticker = QTimer(self)
         self._ticker.setTimerType(Qt.TimerType.PreciseTimer)
         self._ticker.setInterval(self.FRAME_MS)
@@ -202,7 +205,7 @@ class PacedAnimation(QVariantAnimation):
         if self.state() == self.State.Stopped:
             return  # zero duration: already landed
         super().pause()
-        self._last = time.monotonic()
+        self._last = self._started = time.monotonic()
         self._ticker.start()
 
     def stop(self) -> None:  # noqa: D102 (QAbstractAnimation API)
@@ -214,8 +217,10 @@ class PacedAnimation(QVariantAnimation):
             self._ticker.stop()
             return
         now = time.monotonic()
-        step = min((now - self._last) * 1000.0, self.MAX_STEP_MS)
+        step = (now - self._last) * 1000.0
         self._last = now
+        if (now - self._started) * 1000.0 < self.duration() * self.DEADLINE:
+            step = min(step, self.MAX_STEP_MS)
         self.setCurrentTime(min(self.duration(), self.currentTime() + max(1, round(step))))
         if self.state() == self.State.Stopped:
             self._ticker.stop()

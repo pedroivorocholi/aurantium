@@ -456,3 +456,17 @@ def test_stopping_a_paced_animation_stops_its_timer(qapp):
     anim.start()
     anim.stop()
     assert not anim._ticker.isActive()
+
+
+def test_a_paced_animation_lets_go_at_its_deadline(qapp):
+    """Paced, a stalled thread slows the motion; it never drags it out past
+    DEADLINE durations of wall time."""
+    import time as _time
+
+    anim = motion.PacedAnimation()
+    anim.setDuration(100)
+    anim.start()
+    _time.sleep(0.25)  # past 2 x 100ms
+    anim._tick()
+    assert anim.state() == anim.State.Stopped
+    assert not anim._ticker.isActive()
