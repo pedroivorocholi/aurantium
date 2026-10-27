@@ -363,7 +363,18 @@ def _migrate_legacy_identity(app) -> None:
         pass
 
 
+#: How often a thread holding the GIL is asked to hand it over (Python's
+#: default is 5ms). Data providers parse feeds and frames in worker threads,
+#: in pure Python, while the UI thread needs the GIL many times per frame —
+#: on a linked symbol change the chart's morph got 2-3 frames, 400-600ms
+#: apart, while news and prices loaded behind it. At 0.5ms it gets 6-8,
+#: mostly well under 150ms apart; startup time measured the same. It costs
+#: nothing at idle: it only applies while two threads want the lock.
+GIL_SWITCH_INTERVAL_S = 0.0005
+
+
 def main() -> int:
+    sys.setswitchinterval(GIL_SWITCH_INTERVAL_S)
     _maybe_capture_output()
     _install_crash_logging()
     load_dotenv(EXT_DIR / ".env")
