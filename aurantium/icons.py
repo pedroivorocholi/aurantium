@@ -50,6 +50,13 @@ KINDS = tuple(SVG)
 _STROKE = 1.5
 _STROKE_WIDTH = re.compile(r'stroke-width="[\d.]+"')
 
+#: Glyphs Reicon only draws as filled outlines (no stroked version exists),
+#: whose 1.5-unit outline would sit visibly thinner than the stroked family.
+#: They are traced with an extra stroke to the family's line weight. ``more``
+#: (dots) and ``grip`` (four tight bars, which merge at 100% when thickened)
+#: stay as drawn.
+_EMBOLDEN = frozenset({"help"})
+
 
 def _hint(kind: str, device_px: int) -> tuple[str, float]:
     """The glyph's markup and grid offset for a ``device_px``-wide render.
@@ -60,23 +67,40 @@ def _hint(kind: str, device_px: int) -> tuple[str, float]:
     number of device pixels, and is shifted so the lines its strokes are
     centred on (the grid's centre line, and the rest of the grid with it at
     the family's sizes) land on pixel centres for an odd width, or pixel edges
-    for an even one. Filled glyphs are drawn as authored: their outlines are
-    curves, which antialias whatever the grid.
+    for an even one. Filled glyphs are drawn as authored — except the
+    ``_EMBOLDEN`` outlines, thickened to the same weight.
     """
     body = SVG[kind]
+    scale = device_px / VIEWBOX
+    if kind in _EMBOLDEN:
+        # a stroke along a filled outline adds half its width on each side:
+        # this one brings the 1.5-unit outline to the stroked line weight
+        extra = max(0.0, _line_px(scale) / scale - _STROKE)
+        body = body.replace(
+            'fill="currentColor"',
+            f'fill="currentColor" stroke="currentColor" stroke-width="{extra:.4f}" '
+            'stroke-linejoin="round"',
+        )
+        return body, 0.0
     if 'stroke="currentColor"' not in body:
         return body, 0.0
-    scale = device_px / VIEWBOX
-    # Always an even number of device pixels, and at least 2. Even, because
-    # an even-width line centres exactly on the glyph's midpoint at every
-    # size: a 1px line has no centre pixel to sit on in a 16px icon, so at
-    # 100% the X landed half a pixel off and read as lopsided. At least 2,
-    # because 1px read as faint: 2px at 100%, 150% and 200%.
-    width_px = max(2, 2 * round(_STROKE * scale / 2))
+    width_px = _line_px(scale)
     body = _STROKE_WIDTH.sub(f'stroke-width="{width_px / scale:.4f}"', body)
     # even width: the lines' edges, not their centres, go on pixel edges
     shift_px = (-(VIEWBOX / 2 * scale)) % 1.0
     return body, shift_px / scale
+
+
+def _line_px(scale: float) -> int:
+    """The family's line weight, in device pixels, at ``scale``.
+
+    Always an even number, and at least 2. Even, because an even-width line
+    centres exactly on the glyph's midpoint at every size: a 1px line has no
+    centre pixel to sit on in a 16px icon, so at 100% the X landed half a
+    pixel off and read as lopsided. At least 2, because 1px read as faint:
+    2px at 100%, 150% and 200%.
+    """
+    return max(2, 2 * round(_STROKE * scale / 2))
 
 
 @lru_cache(maxsize=512)

@@ -129,3 +129,31 @@ def test_hover_and_disabled_tints_survive(qapp):
     ):
         got = b.icon().pixmap(size, 1.5, mode)
         assert got.toImage() == icons.pixmap("plus", color, 1.5).toImage()
+
+
+def _stroke_px(kind, dpr):
+    """The thickest run of solid pixels down the glyph's columns."""
+    img, rows = _alpha_rows(kind, dpr)
+    best = 0
+    for x in range(img.width()):
+        run = 0
+        for y in range(img.height()):
+            run = run + 1 if rows[y][x] >= 200 else 0
+            best = max(best, run) if run < img.height() // 3 else best
+    return best
+
+
+@pytest.mark.parametrize("dpr", [1.0, 1.5])
+@pytest.mark.parametrize("kind", ["expand", "link", "search", "export-image", "help"])
+def test_the_panel_chrome_glyphs_share_one_line_weight(qapp, kind, dpr):
+    """The panel-maximize arrows were a filled outline drawn at 1.5 units,
+    visibly thinner beside the stroked icons once those went to 2px. Every
+    chrome glyph is stroked (or, for help, thickened) to the same weight."""
+    assert _stroke_px(kind, dpr) >= _stroke_px("minimize", dpr)
+
+
+def test_chrome_glyphs_are_stroked_where_reicon_has_a_stroked_version():
+    from aurantium.reicon_icons import SVG
+
+    for kind in ("expand", "link", "search", "export-image"):
+        assert 'stroke="currentColor"' in SVG[kind], kind
