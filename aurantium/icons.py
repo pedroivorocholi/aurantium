@@ -67,13 +67,15 @@ def _hint(kind: str, device_px: int) -> tuple[str, float]:
     if 'stroke="currentColor"' not in body:
         return body, 0.0
     scale = device_px / VIEWBOX
-    # the true weight, rounded half up — never thinner than designed where it
-    # matters: 2px at 16px/150% (1px there read as faint and blurred), 1px
-    # at 100%, 2px at 200%
-    width_px = max(1, int(_STROKE * scale + 0.5))
+    # Always an even number of device pixels, and at least 2. Even, because
+    # an even-width line centres exactly on the glyph's midpoint at every
+    # size: a 1px line has no centre pixel to sit on in a 16px icon, so at
+    # 100% the X landed half a pixel off and read as lopsided. At least 2,
+    # because 1px read as faint: 2px at 100%, 150% and 200%.
+    width_px = max(2, 2 * round(_STROKE * scale / 2))
     body = _STROKE_WIDTH.sub(f'stroke-width="{width_px / scale:.4f}"', body)
-    target = 0.5 if width_px % 2 else 0.0
-    shift_px = (target - (VIEWBOX / 2 * scale) % 1.0) % 1.0
+    # even width: the lines' edges, not their centres, go on pixel edges
+    shift_px = (-(VIEWBOX / 2 * scale)) % 1.0
     return body, shift_px / scale
 
 

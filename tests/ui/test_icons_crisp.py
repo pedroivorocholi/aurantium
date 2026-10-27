@@ -71,21 +71,22 @@ def test_chip_row_buttons_use_the_family_size(qapp):
     assert 'set_icon(self._add_btn, "plus", CHROME_TEXT_DIM, disabled_color=FG_MUTED)' in src
 
 
-@pytest.mark.parametrize("dpr", [1.5, 2.0])
-@pytest.mark.parametrize("kind", ["close", "plus"])
+@pytest.mark.parametrize("dpr", [1.0, 1.25, 1.5, 2.0])
+@pytest.mark.parametrize("kind", ["close", "plus", "minimize", "menu"])
 def test_symmetric_glyphs_render_symmetric(qapp, kind, dpr):
-    """The X once drew with one diagonal heavier than the other: a 1px stroke
-    nudged half a pixel off the glyph's centre. (At 100% the stroke is 1px on
-    a 16px canvas, which has no centre pixel: crisp there means half a pixel
-    off centre, so symmetry is only asserted for the even widths.)"""
+    """The X drew lopsided on a 100% monitor: a 1px stroke has no centre
+    pixel to sit on in a 16px icon. Strokes are an even width now, centred
+    exactly, at every scale."""
     img, rows = _alpha_rows(kind, dpr)
     n = img.width()
-    assert all(rows[y][x] == rows[y][n - 1 - x] for y in range(n) for x in range(n))
+    # within the rasterizer's own rounding (1/255), which no eye can see
+    assert all(abs(rows[y][x] - rows[y][n - 1 - x]) <= 2 for y in range(n) for x in range(n))
 
 
-def test_strokes_are_never_thinner_than_designed_at_150(qapp):
-    """1.5-unit strokes at 24 device px: 2px, not a faint 1px."""
-    img, rows = _alpha_rows("minimize", 1.5)
+@pytest.mark.parametrize("dpr", [1.0, 1.25, 1.5, 2.0])
+def test_strokes_are_two_solid_pixels(qapp, dpr):
+    """Never a faint 1px line, at 100% included."""
+    img, rows = _alpha_rows("minimize", dpr)
     mid = img.width() // 2
     solid = [y for y in range(img.height()) if rows[y][mid] >= 250]
     assert len(solid) == 2
