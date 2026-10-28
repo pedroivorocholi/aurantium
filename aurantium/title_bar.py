@@ -243,6 +243,7 @@ if IS_WINDOWS:
 
     WM_NCCALCSIZE = 0x0083
     WM_NCHITTEST = 0x0084
+    WM_NCPAINT = 0x0085
     WM_NCMOUSEMOVE = 0x00A0
     WM_NCLBUTTONDOWN = 0x00A1
     WM_NCLBUTTONUP = 0x00A2
@@ -320,6 +321,47 @@ if IS_WINDOWS:
         wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
         ctypes.c_int, ctypes.c_int, wintypes.UINT,
     ]
+    _gdi32 = ctypes.windll.gdi32
+    _user32.GetWindowDC.restype = wintypes.HDC
+    _user32.GetWindowDC.argtypes = [wintypes.HWND]
+    _user32.ReleaseDC.argtypes = [wintypes.HWND, wintypes.HDC]
+    _user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+    _user32.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+    _user32.ClientToScreen.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
+    _user32.FillRect.argtypes = [wintypes.HDC, ctypes.POINTER(wintypes.RECT), wintypes.HBRUSH]
+    _gdi32.CreateSolidBrush.restype = wintypes.HBRUSH
+    _gdi32.CreateSolidBrush.argtypes = [wintypes.COLORREF]
+    _gdi32.DeleteObject.argtypes = [wintypes.HGDIOBJ]
+    _gdi32.ExcludeClipRect.argtypes = [wintypes.HDC] + [ctypes.c_int] * 4
+
+
+def _fill_outside_client(hwnd) -> None:
+    """Paint the window's non-client strip in the theme background. The only
+    such strip is the auto-hide taskbar gap of a maximized window; left alone
+    it is see-through, a thin bar of whatever sits behind the app."""
+    from PySide6.QtGui import QColor
+
+    from .theme import BG
+
+    win = wintypes.RECT()
+    client = wintypes.RECT()
+    origin = wintypes.POINT(0, 0)
+    _user32.GetWindowRect(hwnd, ctypes.byref(win))
+    _user32.GetClientRect(hwnd, ctypes.byref(client))
+    _user32.ClientToScreen(hwnd, ctypes.byref(origin))
+    dx, dy = origin.x - win.left, origin.y - win.top
+    whole = wintypes.RECT(0, 0, win.right - win.left, win.bottom - win.top)
+    color = QColor(BG)
+    dc = _user32.GetWindowDC(hwnd)
+    if not dc:
+        return
+    brush = _gdi32.CreateSolidBrush(color.red() | color.green() << 8 | color.blue() << 16)
+    try:
+        _gdi32.ExcludeClipRect(dc, dx, dy, dx + client.right, dy + client.bottom)
+        _user32.FillRect(dc, ctypes.byref(whole), brush)
+    finally:
+        _gdi32.DeleteObject(brush)
+        _user32.ReleaseDC(hwnd, dc)
 
 
 def _leave_room_for_autohide_taskbar(rect, monitor) -> None:
@@ -410,6 +452,9 @@ class NativeFrame:
                     params.rgrc[0] = info.rcWork
                     _leave_room_for_autohide_taskbar(params.rgrc[0], info.rcMonitor)
             return True, 0  # no native frame: the client is the whole window
+        if m == WM_NCPAINT and _user32.IsZoomed(msg.hWnd):
+            _fill_outside_client(msg.hWnd)
+            return True, 0
         if m == WM_NCHITTEST:
             hit = self._hit_test(msg.lParam)
             self._bar.set_max_button_state(hit == HTMAXBUTTON, self._max_pressed)
