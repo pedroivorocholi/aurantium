@@ -121,6 +121,9 @@ hiddenimports += [
     "aurantium.transitions",
     "aurantium.reicon_icons",
     "aurantium.undo",
+    # Per-panel divider drags: tiling geometry and its QtAds splitter bridge.
+    "aurantium.tiling",
+    "aurantium.free_resize",
 ]
 
 # macOS-only updater backend (see updater.py's docstring); imported lazily
