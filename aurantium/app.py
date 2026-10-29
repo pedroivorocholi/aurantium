@@ -41,6 +41,7 @@ from .alerts import AlertEngine
 from .command_bar import CommandBar
 from .datahub import DataHub
 from .date_context import WINDOW_SPAN_DAYS, WINDOWS, DateContext, parse_iso
+from .free_resize import FreeResizeController
 from . import motion
 from .layout_store import LayoutStore
 from .notifier import Notifier
@@ -205,8 +206,10 @@ class MainWindow(QMainWindow):
         # how panels reach a second monitor), while a drag released inside a
         # window but off any drop target goes back where it was, so moving
         # panels around never leaves a stray window behind
-        # (_settle_new_window). Live splitter resize + even splits for free
-        # arranging.
+        # (_settle_new_window). Dragging a divider resizes only the panels
+        # pressed against that edge (FreeResizeController); Shift-drag moves
+        # the whole straight line, and Alt skips snapping level with nearby
+        # edges. Even splits when a panel is dropped in.
         _cfg = QtAds.CDockManager
         for _flag in (
             _cfg.OpaqueSplitterResize,
@@ -233,6 +236,13 @@ class MainWindow(QMainWindow):
         # whichever panel happens to be first
         QtAds.CDockManager.setFloatingContainersTitle("Aurantium")
         self.dock_manager.floatingWidgetCreated.connect(self._on_window_created)
+        # per-panel divider drags in every dock container (main + floating);
+        # native drags while a panel is maximized (the others are hidden then).
+        # A child of the window, so Qt drops the filter when the window dies.
+        self._free_resize = FreeResizeController(
+            lambda: not self._maximized_instance, self
+        )
+        QApplication.instance().installEventFilter(self._free_resize)
         self._register_dock_icons()
 
         self._build_menus()

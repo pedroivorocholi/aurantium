@@ -4,15 +4,20 @@ as :mod:`aurantium.tiling` rectangles/nodes and apply a tree back to it.
 Keys are ``CDockAreaWidget`` objects. ``restoreState`` recreates dock areas, so
 nothing here caches them: every call reads the live widgets afresh. Only
 visible areas count; hidden ones (closed panels) stay parked where they are.
+Re-nesting in :func:`apply_tree` assumes the container has no hidden areas
+(it would misplace them), so :class:`FreeResizeController` never drags then.
 """
 
 from __future__ import annotations
 
-import PySide6QtAds as QtAds
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget
+from collections.abc import Callable
 
-from .tiling import Leaf, Node, Rect, Rects, Split, shape
+import PySide6QtAds as QtAds
+from PySide6.QtCore import QEvent, QObject, QPoint, Qt
+from PySide6.QtWidgets import QSplitterHandle, QWidget
+
+from .tiling import (Leaf, Node, Rect, Rects, Segment, Split, build_tree,
+                     move_segment, movable_segment, shape, snap_delta)
 
 _ORIENT = {"h": Qt.Horizontal, "v": Qt.Vertical}
 
@@ -80,7 +85,8 @@ def read_tree(container: QtAds.CDockContainerWidget) -> Node | None:
 
 def _set_sizes(splitter: QtAds.CDockSplitter, kids: list[QWidget],
                sizes: tuple[int, ...]) -> None:
-    """Size the visible ``kids``; hidden siblings keep their stored size."""
+    """Size the visible ``kids``. Hidden siblings report 0 from ``sizes()`` and
+    get it back, so ``setSizes`` resets them to their minimum."""
     want = dict(zip((id(k) for k in kids), sizes))
     current = splitter.sizes()
     splitter.setSizes([want.get(id(splitter.widget(i)), current[i])
@@ -162,3 +168,102 @@ def apply_tree(container: QtAds.CDockContainerWidget, node: Node) -> None:
         _resize(root, node)
     finally:
         root.setUpdatesEnabled(True)
+
+
+class _Drag:
+    """One divider drag in progress: everything fixed at press time."""
+
+    def __init__(self, container, seg: Segment, press: QPoint, rects: Rects,
+                 mins, gap: int, tree: Node):
+        self.container = container
+        self.seg = seg
+        self.press = press  # global position, so the moving handle can't skew it
+        self.rects = rects
+        self.mins = mins
+        self.gap = gap
+        self.tree = tree    # the last applied tree, preferred when both cuts fit
+        self.delta: int | None = None
+
+
+class FreeResizeController(QObject):
+    """App-wide event filter that turns a press on a dock splitter handle into
+    a per-panel drag: only the panels pressed against the grabbed edge move.
+
+    Shift at press moves the whole straight line (the old behaviour); Alt
+    during the drag skips snap-to-align. Falls through to the native QtAds
+    drag when ``is_active()`` is false, when the container has a hidden area,
+    or when no movable segment is found.
+    """
+
+    def __init__(self, is_active: Callable[[], bool], parent=None):
+        super().__init__(parent)
+        self._is_active = is_active
+        self._drag: _Drag | None = None
+
+    def eventFilter(self, obj, event):  # noqa: N802 (Qt override)
+        if not isinstance(obj, QSplitterHandle):
+            return False
+        t = event.type()
+        if t == QEvent.MouseButtonPress:
+            return self._press(obj, event)
+        if self._drag is None:
+            return False
+        if t == QEvent.MouseMove:
+            self._move(event)
+            return True
+        if t == QEvent.MouseButtonRelease:
+            self._drag = None
+            return True
+        return False
+
+    def _press(self, handle: QSplitterHandle, event) -> bool:
+        self._drag = None
+        if event.button() != Qt.LeftButton:
+            return False
+        splitter = handle.splitter()
+        if not isinstance(splitter, QtAds.CDockSplitter) or not self._is_active():
+            return False
+        area = splitter.findChild(QtAds.CDockAreaWidget)
+        container = area.dockContainer() if area is not None else None
+        if container is None:
+            return False
+        root = container.rootSplitter()
+        all_areas = root.findChildren(QtAds.CDockAreaWidget)
+        if any(not a.isVisible() for a in all_areas):
+            return False  # re-nesting would misplace hidden areas
+        tree = read_tree(container)
+        if tree is None:
+            return False
+        rects, gap = read_rects(container), handle_gap(container)
+        top_left = handle.mapTo(root, QPoint(0, 0))
+        at = handle.mapTo(root, event.position().toPoint())
+        if splitter.orientation() == Qt.Horizontal:  # a vertical divider line
+            axis, coord, along = "v", top_left.x(), at.y()
+        else:
+            axis, coord, along = "h", top_left.y(), at.x()
+        whole = bool(event.modifiers() & Qt.ShiftModifier)
+        seg = movable_segment(rects, axis, coord, along, gap, whole_line=whole)
+        if seg is None:
+            return False
+        mins = {}
+        for a in rects:
+            m = a.minimumSizeHint().expandedTo(a.minimumSize())
+            mins[a] = (m.width(), m.height())
+        self._drag = _Drag(container, seg, event.globalPosition().toPoint(),
+                           rects, mins, gap, tree)
+        return True
+
+    def _move(self, event) -> None:
+        d = self._drag
+        moved = event.globalPosition().toPoint() - d.press
+        delta = moved.x() if d.seg.axis == "v" else moved.y()
+        if not event.modifiers() & Qt.AltModifier:
+            delta = snap_delta(d.rects, d.seg, delta, d.gap)
+        rects, delta = move_segment(d.rects, d.seg, delta, d.gap, d.mins)
+        if delta == d.delta:
+            return
+        tree = build_tree(rects, d.gap, prefer=d.tree)
+        if tree is None:
+            return  # a pinwheel: hold the last valid position
+        apply_tree(d.container, tree)
+        d.tree, d.delta = tree, delta

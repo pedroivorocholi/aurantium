@@ -4,11 +4,13 @@ import zlib
 
 import pytest
 import PySide6QtAds as QtAds
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QLabel, QMainWindow
+from PySide6.QtCore import QPoint, Qt
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication, QLabel, QMainWindow, QSplitterHandle
 
-from aurantium.free_resize import apply_tree, handle_gap, read_rects, read_tree
-from aurantium.tiling import Leaf, Rect, Split, build_tree, shape
+from aurantium.free_resize import (FreeResizeController, apply_tree, handle_gap,
+                                   read_rects, read_tree)
+from aurantium.tiling import SNAP_PX, Leaf, Rect, Split, build_tree, shape
 
 NAMES = ("a", "b", "c", "d")
 
@@ -39,14 +41,14 @@ def grid_window(qapp):
     qapp.processEvents()
 
 
-def areas(mgr):
+def areas(mgr, names=NAMES):
     """name -> its dock area, read fresh (restoreState recreates areas)."""
-    return {n: mgr.findDockWidget(n).dockAreaWidget() for n in NAMES}
+    return {n: mgr.findDockWidget(n).dockAreaWidget() for n in names}
 
 
-def named_rects(mgr):
-    rects = read_rects(mgr)
-    return {n: rects[a] for n, a in areas(mgr).items()}
+def named_rects(mgr, names=NAMES, container=None):
+    rects = read_rects(container or mgr)
+    return {n: rects[a] for n, a in areas(mgr, names).items()}
 
 
 def close(r1: Rect, r2: Rect, tol=1):
@@ -167,6 +169,213 @@ def test_apply_leaf_tree_is_noop_shape(qapp):
         apply_tree(mgr, Leaf(area))
         assert read_tree(mgr) == Leaf(area)
     finally:
+        win.close()
+        win.deleteLater()
+        qapp.processEvents()
+
+
+# --- the drag controller --------------------------------------------------------
+
+PEDRO = ("topic", "news", "chart", "analyst", "company", "watch", "comm")
+
+
+@pytest.fixture
+def controller(qapp):
+    """An always-active controller filtering the whole app, removed afterwards."""
+    ctrl = FreeResizeController(lambda: True)
+    qapp.installEventFilter(ctrl)
+    yield ctrl
+    qapp.removeEventFilter(ctrl)
+
+
+def _dock(mgr, name):
+    d = QtAds.CDockWidget(mgr, name)
+    d.setObjectName(name)
+    d.setWidget(QLabel(name))
+    return d
+
+
+@pytest.fixture
+def pedro_window(qapp, controller):
+    """[topic/news] | [chart/[analyst|company]] | [watch/comm], 1200x800, with
+    news's top (y~300) above chart's bottom (y~450) so news borders chart."""
+    win = QMainWindow()
+    win.resize(1200, 800)
+    mgr = QtAds.CDockManager(win)
+    A = QtAds.DockWidgetArea
+    topic = mgr.addDockWidget(A.LeftDockWidgetArea, _dock(mgr, "topic"))
+    chart = mgr.addDockWidget(A.RightDockWidgetArea, _dock(mgr, "chart"))
+    watch = mgr.addDockWidget(A.RightDockWidgetArea, _dock(mgr, "watch"))
+    mgr.addDockWidget(A.BottomDockWidgetArea, _dock(mgr, "news"), topic)
+    analyst = mgr.addDockWidget(A.BottomDockWidgetArea, _dock(mgr, "analyst"), chart)
+    mgr.addDockWidget(A.RightDockWidgetArea, _dock(mgr, "company"), analyst)
+    mgr.addDockWidget(A.BottomDockWidgetArea, _dock(mgr, "comm"), watch)
+    win.show()
+    qapp.processEvents()
+    mgr.rootSplitter().setSizes([360, 480, 360])
+    for area, top in ((topic, 300), (chart, 450), (watch, 400)):
+        col = area.parentWidget()
+        col.setSizes([top, col.height() - top - col.handleWidth()])
+    qapp.processEvents()
+    yield mgr, controller
+    win.close()
+    win.deleteLater()
+    qapp.processEvents()
+
+
+def handle_at(container, x, y):
+    """The visible splitter handle under root-splitter point (x, y)."""
+    root = container.rootSplitter()
+    for h in root.findChildren(QSplitterHandle):
+        if not h.isVisible():
+            continue
+        tl = h.mapTo(root, QPoint(0, 0))
+        if tl.x() <= x < tl.x() + h.width() and tl.y() <= y < tl.y() + h.height():
+            return h
+    raise AssertionError(f"no handle at {(x, y)}")
+
+
+def drag(container, x, y, dx, dy, press_mods=Qt.NoModifier,
+         move_mods=Qt.NoModifier):
+    """Press the handle at root point (x, y), move by (dx, dy) in two steps,
+    release. Local points are recomputed from global ones as the handle moves."""
+    h = handle_at(container, x, y)
+    start = container.rootSplitter().mapToGlobal(QPoint(x, y))
+    QTest.mousePress(h, Qt.LeftButton, press_mods, h.mapFromGlobal(start))
+    for f in (0.5, 1.0):
+        to = start + QPoint(int(dx * f), int(dy * f))
+        QTest.mouseEvent(QTest.MouseAction.MouseMove, h, Qt.NoButton, move_mods,
+                         h.mapFromGlobal(to))
+    end = start + QPoint(dx, dy)
+    QTest.mouseRelease(h, Qt.LeftButton, Qt.NoModifier, h.mapFromGlobal(end))
+    QApplication.processEvents()
+
+
+def test_drag_news_edge_leaves_company_untouched(pedro_window):
+    mgr, _ = pedro_window
+    old = named_rects(mgr, PEDRO)
+    drag(mgr, old["news"].right + 1, old["news"].y + 100, 50, 0)
+    new = named_rects(mgr, PEDRO)
+    for n in ("topic", "news"):
+        assert new[n].w == old[n].w + 50
+    for n in ("chart", "analyst"):
+        assert new[n].w == old[n].w - 50 and new[n].x == old[n].x + 50
+    for n in ("company", "watch", "comm"):
+        assert new[n] == old[n]
+
+
+def test_plain_drag_moves_only_its_column(grid_window, controller):
+    mgr = grid_window
+    old = named_rects(mgr)
+    drag(mgr, old["a"].x + 50, old["a"].bottom + 1, 0, 60)
+    new = named_rects(mgr)
+    assert new["a"].h == old["a"].h + 60 and new["c"].h == old["c"].h - 60
+    assert new["b"] == old["b"] and new["d"] == old["d"]
+
+
+def test_shift_drag_moves_whole_line(grid_window, controller):
+    mgr = grid_window
+    old = named_rects(mgr)
+    drag(mgr, old["a"].x + 50, old["a"].bottom + 1, 0, 60,
+         press_mods=Qt.ShiftModifier)
+    new = named_rects(mgr)
+    for n in ("a", "b"):
+        assert new[n].h == old[n].h + 60
+    for n in ("c", "d"):
+        assert new[n].h == old[n].h - 60 and new[n].y == old[n].y + 60
+
+
+def _chart_bottom_drag(mgr, move_mods):
+    """Drag chart's bottom to SNAP_PX // 2 below topic's bottom edge."""
+    old = named_rects(mgr, PEDRO)
+    target = old["topic"].bottom + SNAP_PX // 2
+    drag(mgr, old["chart"].x + 50, old["chart"].bottom + 1, 0,
+         target - old["chart"].bottom, move_mods=move_mods)
+    return old, named_rects(mgr, PEDRO), target
+
+
+def test_drag_snaps_level_with_parallel_edge(pedro_window):
+    mgr, _ = pedro_window
+    old, new, _ = _chart_bottom_drag(mgr, Qt.NoModifier)
+    assert new["chart"].bottom == old["topic"].bottom
+    assert new["analyst"].y == new["company"].y == new["news"].y
+
+
+def test_alt_drag_skips_snap(pedro_window):
+    mgr, _ = pedro_window
+    old, new, target = _chart_bottom_drag(mgr, Qt.AltModifier)
+    assert new["chart"].bottom == target
+    assert new["topic"] == old["topic"] and new["news"] == old["news"]
+
+
+def test_drag_stops_at_last_valid(pedro_window):
+    mgr, _ = pedro_window
+    old = named_rects(mgr, PEDRO)
+    drag(mgr, old["news"].right + 1, old["news"].y + 100, 2000, 0)
+    new = named_rects(mgr, PEDRO)
+    ar = areas(mgr, PEDRO)
+    for n, r in new.items():
+        hint = ar[n].minimumSizeHint()
+        assert r.w >= hint.width() and r.h >= hint.height()
+    assert new["news"].w > old["news"].w
+    for n in ("company", "watch", "comm"):
+        assert new[n] == old[n]
+
+
+def test_inactive_with_hidden_areas(pedro_window):
+    mgr, ctrl = pedro_window
+    mgr.findDockWidget("company").toggleView(False)
+    QApplication.processEvents()
+    names = tuple(n for n in PEDRO if n != "company")
+    tree = shape(read_tree(mgr))
+    old = named_rects(mgr, names)
+    drag(mgr, old["news"].right + 1, old["news"].y + 100, 50, 0)
+    new = named_rects(mgr, names)
+    assert shape(read_tree(mgr)) == tree
+    assert new["news"].w == old["news"].w + 50  # the native drag still ran
+    assert ctrl._drag is None
+
+
+def test_inactive_when_is_active_false(pedro_window):
+    mgr, ctrl = pedro_window
+    ctrl._is_active = lambda: False
+    old = named_rects(mgr, PEDRO)
+    drag(mgr, old["news"].right + 1, old["news"].y + 100, 50, 0)
+    new = named_rects(mgr, PEDRO)
+    assert new["news"].w == old["news"].w + 50  # native drag
+    # natively the whole centre column shrinks, so company changes with it
+    assert new["company"] != old["company"]
+    assert ctrl._drag is None
+
+
+def test_drag_in_floating_container(qapp, controller):
+    win = QMainWindow()
+    win.resize(800, 600)
+    mgr = QtAds.CDockManager(win)
+    A = QtAds.DockWidgetArea
+    mgr.addDockWidget(A.LeftDockWidgetArea, _dock(mgr, "main1"))
+    mgr.addDockWidget(A.RightDockWidgetArea, _dock(mgr, "main2"))
+    fw = mgr.addDockWidgetFloating(_dock(mgr, "a"))
+    fa = mgr.findDockWidget("a").dockAreaWidget()
+    fb = mgr.addDockWidget(A.RightDockWidgetArea, _dock(mgr, "b"), fa)
+    mgr.addDockWidget(A.BottomDockWidgetArea, _dock(mgr, "c"), fa)
+    mgr.addDockWidget(A.BottomDockWidgetArea, _dock(mgr, "d"), fb)
+    win.show()
+    fw.resize(800, 600)
+    fw.show()
+    qapp.processEvents()
+    try:
+        container = fw.dockContainer()
+        assert container.rootSplitter() is not mgr.rootSplitter()
+        main_before = read_rects(mgr)
+        old = named_rects(mgr, container=container)
+        drag(container, old["a"].x + 50, old["a"].bottom + 1, 0, 40)
+        new = named_rects(mgr, container=container)
+        assert new["a"].h == old["a"].h + 40 and new["c"].h == old["c"].h - 40
+        assert new["b"] == old["b"] and new["d"] == old["d"]
+        assert read_rects(mgr) == main_before
+    finally:
+        fw.close()
         win.close()
         win.deleteLater()
         qapp.processEvents()
