@@ -4,9 +4,11 @@ import zlib
 
 import pytest
 import PySide6QtAds as QtAds
-from PySide6.QtCore import QPoint, Qt
+from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
+from PySide6.QtGui import QMouseEvent
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QLabel, QMainWindow, QSplitterHandle
+from PySide6.QtWidgets import (QApplication, QLabel, QMainWindow, QSplitterHandle,
+                               QWidget)
 
 from aurantium.free_resize import (FreeResizeController, apply_tree, handle_gap,
                                    read_rects, read_tree)
@@ -379,3 +381,48 @@ def test_drag_in_floating_container(qapp, controller):
         win.close()
         win.deleteLater()
         qapp.processEvents()
+
+
+def test_reshaping_drag_through_window_keeps_following(grid_window, controller):
+    """A move that re-nests deletes the grabbed handle; the drag must keep
+    following the pointer and end cleanly. Events go through the window, as
+    real OS events do, so Qt's grab decides who receives them."""
+    mgr = grid_window
+    win = mgr.parentWidget()
+    root = mgr.rootSplitter()
+    old = named_rects(mgr)
+    assert abs(old["a"].bottom - old["b"].bottom) <= 2  # a "+" crossing
+    x, y = old["a"].right + 1, old["a"].y + 100
+    handle = handle_at(mgr, x, y)
+    wh = win.windowHandle()
+
+    def at(dx):
+        return root.mapTo(win, QPoint(x + dx, y))
+
+    QTest.mousePress(wh, Qt.LeftButton, Qt.NoModifier, at(0))
+    for dx in (20, 60, 100, 140):
+        QTest.mouseMove(wh, at(dx))
+        QApplication.processEvents()
+    QTest.mouseRelease(wh, Qt.LeftButton, Qt.NoModifier, at(140))
+    QApplication.processEvents()
+    new = named_rects(mgr)
+    assert root.orientation() == Qt.Vertical  # it did re-nest (rows-first)
+    assert new["a"].right == old["a"].right + 140
+    assert new["c"] == old["c"] and new["d"] == old["d"]
+    assert controller._drag is None
+    assert QWidget.mouseGrabber() is None
+    del handle
+
+
+def test_drag_ends_when_button_no_longer_held(grid_window, controller):
+    """A lost release (grab lost, modal popped) must not leave a drag stuck."""
+    mgr = grid_window
+    old = named_rects(mgr)
+    h = handle_at(mgr, old["a"].x + 50, old["a"].bottom + 1)
+    QTest.mousePress(h, Qt.LeftButton, Qt.NoModifier, QPoint(5, 1))
+    assert controller._drag is not None
+    mv = QMouseEvent(QEvent.MouseMove, QPointF(5, 20), h.mapToGlobal(QPointF(5, 20)),
+                     Qt.NoButton, Qt.NoButton, Qt.NoModifier)
+    QApplication.sendEvent(h, mv)
+    assert controller._drag is None
+    assert QWidget.mouseGrabber() is None
