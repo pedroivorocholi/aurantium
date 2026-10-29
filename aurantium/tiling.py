@@ -144,3 +144,100 @@ def snap_delta(rects: Rects, seg: Segment, delta: int, gap: int,
     if best is not None and abs(best - here) <= threshold:
         return best - seg.coord
     return delta
+
+
+# --- rectangles -> splitter tree ------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Leaf:
+    key: Hashable
+
+
+@dataclass(frozen=True)
+class Split:
+    """``orient="h"`` lays children side by side (Qt.Horizontal), ``"v"`` stacks
+    them. ``sizes`` are each child's pixel extent along ``orient`` (gaps excluded)."""
+
+    orient: Literal["h", "v"]
+    children: tuple[Node, ...]
+    sizes: tuple[int, ...]
+
+
+Node = Leaf | Split
+
+
+def _bands(rects: Rects, orient: str, gap: int) -> list[Rects]:
+    """Group ``rects`` into bands separated by full-length cuts. ``"h"`` cuts are
+    vertical gaps (bands side by side); ``"v"`` cuts are horizontal gaps."""
+    axis: Axis = "v" if orient == "h" else "h"
+    items = sorted(rects.items(), key=lambda kv: _near_far(kv[1], axis)[0])
+    bands: list[Rects] = []
+    reach = None
+    for key, r in items:
+        near, far = _near_far(r, axis)
+        if reach is None or near >= reach + gap - ALIGN_TOL_PX:
+            bands.append({})
+            reach = far
+        bands[-1][key] = r
+        reach = max(reach, far)
+    return bands
+
+
+def _extent(rects: Rects, orient: str) -> int:
+    axis: Axis = "v" if orient == "h" else "h"
+    return (max(_near_far(r, axis)[1] for r in rects.values())
+            - min(_near_far(r, axis)[0] for r in rects.values()))
+
+
+def _leaves(node: Node) -> frozenset:
+    if isinstance(node, Leaf):
+        return frozenset([node.key])
+    return frozenset().union(*(_leaves(c) for c in node.children))
+
+
+def _find(node: Node | None, keys: frozenset) -> Node | None:
+    """The subtree of ``node`` whose leaf-set equals ``keys``."""
+    if node is None:
+        return None
+    if _leaves(node) == keys:
+        return node
+    if isinstance(node, Split):
+        for c in node.children:
+            hit = _find(c, keys)
+            if hit is not None:
+                return hit
+    return None
+
+
+def build_tree(rects: Rects, gap: int, prefer: Node | None = None) -> Node | None:
+    """Guillotine tree for ``rects``, or ``None`` when no full-length cut exists
+    (a pinwheel). Where both orientations cut, ``prefer``'s orientation for the
+    same set of panels wins, else ``"h"``."""
+    if not rects:
+        return None
+    if len(rects) == 1:
+        return Leaf(next(iter(rects)))
+    cuts = {o: b for o in ("h", "v") if len(b := _bands(rects, o, gap)) > 1}
+    if not cuts:
+        return None
+    hint = _find(prefer, frozenset(rects))
+    if isinstance(hint, Split) and hint.orient in cuts:
+        orient = hint.orient
+    else:
+        orient = "h" if "h" in cuts else "v"
+    children, sizes = [], []
+    for band in cuts[orient]:
+        child = build_tree(band, gap, prefer)
+        if child is None:
+            return None
+        children.append(child)
+        sizes.append(_extent(band, orient))
+    return Split(orient, tuple(children), tuple(sizes))
+
+
+def shape(node: Node) -> tuple | Hashable:
+    """Structure only (orientation and keys, no sizes), for "same tree?" checks."""
+    if isinstance(node, Leaf):
+        return node.key
+    return (node.orient, tuple(shape(c) for c in node.children))

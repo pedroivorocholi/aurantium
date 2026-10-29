@@ -1,6 +1,7 @@
 """Pure geometry for per-panel divider drags (aurantium.tiling)."""
 
-from aurantium.tiling import Rect, movable_segment, move_segment, snap_delta
+from aurantium.tiling import (Leaf, Rect, Split, build_tree, movable_segment,
+                              move_segment, shape, snap_delta)
 
 # Pedro layout (column-major, gap 4, window 1280x736).
 PEDRO = {
@@ -17,6 +18,12 @@ GRID = {
 # Same, but the right column's line sits 2px lower: still a crossing.
 GRID_OFF2 = dict(GRID, b=Rect(402, 0, 398, 300), d=Rect(402, 304, 398, 296))
 MINS = {k: (80, 60) for k in PEDRO}
+# Pinwheel (gap 0): no full-length cut in either direction.
+PINWHEEL = {
+    "A": Rect(0, 0, 200, 100), "B": Rect(200, 0, 100, 200),
+    "C": Rect(100, 200, 200, 100), "D": Rect(0, 100, 100, 200),
+    "E": Rect(100, 100, 100, 100),
+}
 
 seg_news_right = movable_segment(PEDRO, "v", 314, along=600, gap=4)
 seg_news_top = movable_segment(PEDRO, "h", 368, along=100, gap=4)
@@ -82,3 +89,28 @@ def test_snap_pulls_to_nearby_parallel_edge():
 
 def test_snap_ignores_far_edges():
     assert snap_delta(PEDRO, seg_news_top, 60, 4) == 60
+
+
+def test_pedro_tree_matches_saved_structure():
+    t = build_tree(PEDRO, 4)
+    assert shape(t) == ("h", (("v", ("topic", "news")),
+                              ("v", ("chart", ("h", ("analyst", "company")))),
+                              ("v", ("watch", "comm"))))
+    assert t.sizes == (314, 617, 341)
+
+
+def test_stepped_grid_builds_columns():
+    stepped = {**GRID, "a": Rect(0, 0, 398, 340), "c": Rect(0, 344, 398, 256)}
+    assert shape(build_tree(stepped, 4))[0] == "h"
+
+
+def test_aligned_grid_respects_prefer():
+    rows_first = Split("v", (Split("h", (Leaf("a"), Leaf("b")), (398, 398)),
+                             Split("h", (Leaf("c"), Leaf("d")), (398, 398))),
+                       (298, 298))
+    assert shape(build_tree(GRID, 4, prefer=rows_first))[0] == "v"
+    assert shape(build_tree(GRID, 4))[0] == "h"   # default
+
+
+def test_pinwheel_returns_none():
+    assert build_tree(PINWHEEL, 0) is None
