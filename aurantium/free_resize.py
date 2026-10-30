@@ -14,8 +14,9 @@ from collections.abc import Callable
 
 import PySide6QtAds as QtAds
 from shiboken6 import isValid
-from PySide6.QtCore import QEvent, QObject, QPoint, Qt
-from PySide6.QtWidgets import QSplitterHandle, QWidget
+from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, Qt
+from PySide6.QtGui import QMouseEvent
+from PySide6.QtWidgets import QApplication, QSplitterHandle, QWidget
 
 from .tiling import (Leaf, Node, Rect, Rects, Segment, Split, build_tree,
                      move_segment, movable_segment, shape, snap_delta)
@@ -173,15 +174,22 @@ def apply_tree(container: QtAds.CDockContainerWidget, node: Node) -> None:
 
 # a drag whose release may never arrive (focus or app switch, a modal) ends here
 _DRAG_ENDERS = frozenset((QEvent.WindowDeactivate, QEvent.ApplicationDeactivate))
+_MOUSE = frozenset((QEvent.MouseMove, QEvent.MouseButtonRelease,
+                    QEvent.MouseButtonPress))
 
 
 class _Drag:
     """One divider drag in progress: everything fixed at press time."""
 
     def __init__(self, container, seg: Segment, press: QPoint, rects: Rects,
-                 mins, gap: int, tree: Node, grabber: QWidget):
+                 mins, gap: int, tree: Node, grabber: QWidget,
+                 handle: QSplitterHandle, splitter: QtAds.CDockSplitter):
         self.container = container
         self.grabber = grabber  # holds the mouse grab for the whole drag
+        self.handle = handle    # shows :pressed until the drag ends or it's gone
+        # handle's splitter, kept from press: calling handle.splitter() again
+        # later invalidates the root splitter's Python wrapper (shiboken6)
+        self.splitter = splitter
         self.seg = seg
         self.press = press  # global position, so the moving handle can't skew it
         self.rects = rects
@@ -207,14 +215,18 @@ class FreeResizeController(QObject):
         self._drag: _Drag | None = None
 
     def eventFilter(self, obj, event):  # noqa: N802 (Qt override)
+        t = event.type()
         if self._drag is None:
-            if (isinstance(obj, QSplitterHandle)
-                    and event.type() == QEvent.MouseButtonPress):
+            if t == QEvent.MouseButtonPress and isinstance(obj, QSplitterHandle):
                 return self._press(obj, event)
+            return False
+        if t in _MOUSE and not isinstance(obj, QWidget):
+            # The window's own copy, before Qt turns it into a widget event:
+            # let it through, or Qt never clears its implicit grab on release
+            # and later hovers keep going to the old handle (stuck cursor).
             return False
         # Mid-drag the root splitter holds the mouse grab (a re-nest deletes
         # the pressed handle), but act on mouse events whoever receives them.
-        t = event.type()
         if t == QEvent.MouseMove:
             if not event.buttons() & Qt.LeftButton:
                 self._end()  # the release went missing
@@ -233,8 +245,20 @@ class FreeResizeController(QObject):
 
     def _end(self) -> None:
         d, self._drag = self._drag, None
-        if d is not None and isValid(d.grabber):
+        if d is None:
+            return
+        if isValid(d.grabber):
             d.grabber.releaseMouse()
+        if isValid(d.handle) and isValid(d.splitter):
+            # The real release went to the grabber; this one clears :pressed.
+            # Opaque for the moment, or the handle would move its splitter to
+            # the release point (QtAds splitters default to non-opaque).
+            opaque = d.splitter.opaqueResize()
+            d.splitter.setOpaqueResize(True)
+            up = QMouseEvent(QEvent.MouseButtonRelease, QPointF(), QPointF(),
+                             Qt.LeftButton, Qt.NoButton, Qt.NoModifier)
+            QApplication.sendEvent(d.handle, up)
+            d.splitter.setOpaqueResize(opaque)
 
     def _press(self, handle: QSplitterHandle, event) -> bool:
         self._drag = None
@@ -270,15 +294,19 @@ class FreeResizeController(QObject):
             m = a.minimumSizeHint().expandedTo(a.minimumSize())
             mins[a] = (m.width(), m.height())
         self._drag = _Drag(container, seg, event.globalPosition().toPoint(),
-                           rects, mins, gap, tree, root)
+                           rects, mins, gap, tree, root, handle, splitter)
         # apply_tree reuses the root splitter, so the grab survives a re-nest
         root.grabMouse(handle.cursor())
-        return True
+        # The press still reaches the handle, so it paints its held (:pressed)
+        # look; QSplitterHandle only moves the splitter on mouse moves, and
+        # every move goes through this filter until the drag ends.
+        return False
 
     def _move(self, event) -> None:
         d = self._drag
-        if not isValid(d.container):
-            self._end()
+        if (not self._is_active() or not isValid(d.container)
+                or any(not isValid(a) or not a.isVisible() for a in d.rects)):
+            self._end()  # F11, a workspace load or a closed panel mid-drag
             return
         moved = event.globalPosition().toPoint() - d.press
         delta = moved.x() if d.seg.axis == "v" else moved.y()

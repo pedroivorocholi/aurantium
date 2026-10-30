@@ -116,6 +116,8 @@ def move_segment(rects: Rects, seg: Segment, delta: int, gap: int,
     mn = (lambda k: mins[k][0]) if v else (lambda k: mins[k][1])
     lo = -min((size(rects[k]) - mn(k) for k in seg.before), default=0)
     hi = min((size(rects[k]) - mn(k) for k in seg.after), default=0)
+    # an area already under its minimum may not shrink, but must not jump either
+    lo, hi = min(0, lo), max(0, hi)
     d = max(lo, min(hi, delta))
     out = dict(rects)
     for k in seg.before:

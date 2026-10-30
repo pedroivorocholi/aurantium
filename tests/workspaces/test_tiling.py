@@ -114,3 +114,13 @@ def test_aligned_grid_respects_prefer():
 
 def test_pinwheel_returns_none():
     assert build_tree(PINWHEEL, 0) is None
+
+
+def test_area_already_below_minimum_does_not_jump():
+    # news is already 40px narrower than its minimum; a zero move stays put and
+    # it can grow but not shrink further
+    seg = movable_segment(PEDRO, "v", 314, along=600, gap=4)
+    mins = dict(MINS, news=(354, 60))
+    assert move_segment(PEDRO, seg, 0, 4, mins)[1] == 0
+    assert move_segment(PEDRO, seg, -10, 4, mins)[1] == 0
+    assert move_segment(PEDRO, seg, 10, 4, mins)[1] == 10

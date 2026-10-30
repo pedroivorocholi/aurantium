@@ -4,11 +4,13 @@ import zlib
 
 import pytest
 import PySide6QtAds as QtAds
-from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
+from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, Qt
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (QApplication, QLabel, QMainWindow, QSplitterHandle,
                                QWidget)
+
+from shiboken6 import isValid
 
 from aurantium.free_resize import (FreeResizeController, apply_tree, handle_gap,
                                    read_rects, read_tree)
@@ -426,3 +428,114 @@ def test_drag_ends_when_button_no_longer_held(grid_window, controller):
     QApplication.sendEvent(h, mv)
     assert controller._drag is None
     assert QWidget.mouseGrabber() is None
+
+
+def _window_press(mgr, x, y):
+    """Press root point (x, y) through the window, as a real OS press arrives.
+    Returns ``at(dx, dy)``: window coordinates of the press point plus (dx, dy)."""
+    win = mgr.parentWidget()
+    root = mgr.rootSplitter()
+
+    def at(dx=0, dy=0):
+        return root.mapTo(win, QPoint(x + dx, y + dy))
+
+    QTest.mousePress(win.windowHandle(), Qt.LeftButton, Qt.NoModifier, at())
+    return at
+
+
+def test_window_drag_then_hover_reaches_panel(grid_window, controller, qapp):
+    """After a window-level drag that keeps the shape, Qt's implicit grab must
+    be cleared: a later hover over another panel reaches that panel, not the
+    old handle (a stuck resize cursor and dead tooltips otherwise)."""
+    mgr = grid_window
+    root, win = mgr.rootSplitter(), mgr.parentWidget()  # kept across the drag
+    wh = win.windowHandle()
+    old = named_rects(mgr)
+    at = _window_press(mgr, old["a"].x + 50, old["a"].bottom + 1)
+    for dy in (20, 40, 60):
+        QTest.mouseMove(wh, at(0, dy))
+        qapp.processEvents()
+    QTest.mouseRelease(wh, Qt.LeftButton, Qt.NoModifier, at(0, 60))
+    qapp.processEvents()
+    new = named_rects(mgr)
+    assert new["a"].h == old["a"].h + 60 and new["b"] == old["b"]
+
+    label = mgr.findDockWidget("d").widget()
+    label.setMouseTracking(True)
+    hits = []
+
+    class Spy(QObject):
+        def eventFilter(self, obj, event):
+            if event.type() == QEvent.MouseMove and isinstance(obj, QWidget):
+                hits.append(obj)
+            return False
+
+    spy = Spy()
+    qapp.installEventFilter(spy)
+    try:
+        assert isValid(root)  # its Python wrapper survived the drag
+        for k in (100, 120):
+            QTest.mouseMove(wh, root.mapTo(win, QPoint(new["d"].x + k, new["d"].y + k)))
+            qapp.processEvents()
+    finally:
+        qapp.removeEventFilter(spy)
+    assert hits and hits[0] is label  # parents see it too as it propagates
+    assert not any(isinstance(w, QSplitterHandle) for w in hits)
+    assert wh.cursor().shape() not in (Qt.SplitHCursor, Qt.SplitVCursor)
+
+
+def test_divider_looks_held_while_dragging(grid_window, controller, qapp):
+    """The pressed divider keeps its held (ACCENT_DEEP) fill for the drag."""
+    from aurantium import theme
+    mgr = grid_window
+    mgr.setStyleSheet(theme.ADS_STYLESHEET)
+    qapp.processEvents()
+    win, wh = mgr.parentWidget(), mgr.parentWidget().windowHandle()
+    old = named_rects(mgr)
+    x, y = old["a"].x + 50, old["a"].bottom + 1
+    h = handle_at(mgr, x, y)
+
+    def fill():
+        p = h.mapTo(win, QPoint(h.width() // 2, h.height() // 2))
+        return win.grab().toImage().pixelColor(p).name()
+
+    at = _window_press(mgr, x, y)
+    QTest.mouseMove(wh, at(0, 30))
+    qapp.processEvents()
+    assert controller._drag is not None
+    assert fill() == theme.ACCENT_DEEP.lower()
+    QTest.mouseRelease(wh, Qt.LeftButton, Qt.NoModifier, at(0, 30))
+    qapp.processEvents()
+    assert controller._drag is None
+    assert fill() != theme.ACCENT_DEEP.lower()
+
+
+@pytest.mark.parametrize("change", ["inactive", "hidden"])
+def test_drag_ends_when_layout_changes_under_it(grid_window, qapp, change):
+    """F11 (controller goes inactive) or a panel hidden mid-drag ends the drag
+    without touching the layout."""
+    active = [True]
+    ctrl = FreeResizeController(lambda: active[0])
+    qapp.installEventFilter(ctrl)
+    try:
+        mgr = grid_window
+        old = named_rects(mgr)
+        h = handle_at(mgr, old["a"].x + 50, old["a"].bottom + 1)
+        QTest.mousePress(h, Qt.LeftButton, Qt.NoModifier, QPoint(5, 1))
+        assert ctrl._drag is not None
+        if change == "inactive":
+            active[0] = False
+        else:
+            mgr.findDockWidget("d").toggleView(False)
+            qapp.processEvents()
+        before = named_rects(mgr, ("a", "c"))
+        QTest.mouseEvent(QTest.MouseAction.MouseMove, h, Qt.NoButton,
+                         Qt.NoModifier, QPoint(5, 40))
+        assert ctrl._drag is None
+        assert QWidget.mouseGrabber() is None
+        if change == "inactive":
+            assert named_rects(mgr, ("a", "c")) == before
+        QTest.mouseRelease(h, Qt.LeftButton, Qt.NoModifier, QPoint(5, 40))
+        qapp.processEvents()
+    finally:
+        qapp.removeEventFilter(ctrl)
