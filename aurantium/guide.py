@@ -121,6 +121,9 @@ SHORTCUT_GROUPS: tuple[tuple[str, tuple[Shortcut, ...]], ...] = (
         Shortcut("Ctrl+Shift+T", "Reopen the last panel you closed"),
         Shortcut("Ctrl+1 / Ctrl+2 / Ctrl+3 / Ctrl+4", "Put the focused panel in link group A, B, C or D"),
         Shortcut("Middle-click a tab", "Close that panel", bound=False),
+        Shortcut("Drag a divider", "Resize only the panels touching it", bound=False),
+        Shortcut("Shift+drag a divider", "Move the whole line, as before", bound=False),
+        Shortcut("Alt+drag a divider", "Resize without snapping to nearby edges", bound=False),
     )),
     ("search box", (
         Shortcut("Enter", "Send the ticker, or run a /command", bound=False),
@@ -235,6 +238,13 @@ LINKING = Page(
             "<b>F11</b> maximizes the focused panel; <b>Ctrl+W</b> closes it and "
             "<b>Ctrl+Shift+T</b> brings it back. The focused panel's title bar "
             "carries an amber underline.")),
+        Detail("Resizing panels", _p(
+            "Drag a divider and only the panels pressed against that edge resize. "
+            "Where edges on the two sides line up — they snap level when you get "
+            "within a few pixels — each side splits into pieces you can drag on "
+            "their own. Where they don't line up, every panel in the way moves "
+            "with the divider. Hold <b>Shift</b> while dragging to move the whole "
+            "straight line at once, or <b>Alt</b> to turn snapping off.")),
         Detail("Multiple monitors", _p(
             "Drag a panel by its tab, or a whole stack by the empty strip beside "
             "its tabs, past the edge of the window and let go: it becomes a "
