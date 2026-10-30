@@ -122,7 +122,7 @@ SHORTCUT_GROUPS: tuple[tuple[str, tuple[Shortcut, ...]], ...] = (
         Shortcut("Ctrl+1 / Ctrl+2 / Ctrl+3 / Ctrl+4", "Put the focused panel in link group A, B, C or D"),
         Shortcut("Middle-click a tab", "Close that panel", bound=False),
         Shortcut("Drag a divider", "Resize only the panels touching it", bound=False),
-        Shortcut("Shift+drag a divider", "Move the whole line, as before", bound=False),
+        Shortcut("Shift+drag a divider", "Move the whole straight line", bound=False),
         Shortcut("Alt+drag a divider", "Resize without snapping to nearby edges", bound=False),
     )),
     ("search box", (
@@ -243,7 +243,7 @@ LINKING = Page(
             "Where edges on the two sides line up — they snap level when you get "
             "within a few pixels — each side splits into pieces you can drag on "
             "their own. Where they don't line up, every panel in the way moves "
-            "with the divider. Hold <b>Shift</b> while dragging to move the whole "
+            "with the divider. Hold <b>Shift</b> as you start dragging to move the whole "
             "straight line at once, or <b>Alt</b> to turn snapping off.")),
         Detail("Multiple monitors", _p(
             "Drag a panel by its tab, or a whole stack by the empty strip beside "
