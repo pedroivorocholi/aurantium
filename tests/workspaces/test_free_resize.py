@@ -10,8 +10,9 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (QApplication, QLabel, QMainWindow, QSplitterHandle,
                                QWidget)
 
-from shiboken6 import isValid
+from shiboken6 import delete, getCppPointer, isValid
 
+from aurantium import free_resize
 from aurantium.free_resize import (FreeResizeController, apply_tree, handle_gap,
                                    read_rects, read_tree)
 from aurantium.tiling import SNAP_PX, Leaf, Rect, Split, build_tree, shape
@@ -539,3 +540,67 @@ def test_drag_ends_when_layout_changes_under_it(grid_window, qapp, change):
         qapp.processEvents()
     finally:
         qapp.removeEventFilter(ctrl)
+
+
+@pytest.fixture
+def shared(qapp, monkeypatch):
+    """A fresh shared controller for this test, removed afterwards."""
+    monkeypatch.setattr(free_resize, "_shared", None)
+    yield
+    ctrl = free_resize._shared
+    if ctrl is not None and isValid(ctrl):
+        qapp.removeEventFilter(ctrl)
+        delete(ctrl)
+
+
+def _drag_a_b_line(mgr):
+    """Drag the a|b divider at a's height; return (old, new) rects."""
+    old = named_rects(mgr)
+    drag(mgr, old["a"].right + 1, old["a"].y + 50, 40, 0)
+    return old, named_rects(mgr)
+
+
+def test_install_shares_one_filter(grid_window, shared, qapp):
+    """Every window registers with one app-wide filter, not one each: leftover
+    windows would otherwise pile filters up that see every event."""
+    other = QMainWindow()
+    try:
+        first = free_resize.install(grid_window, lambda: True)
+        assert free_resize.install(QtAds.CDockManager(other), lambda: True) is first
+    finally:
+        delete(other)
+
+
+def test_shared_filter_gates_each_manager(grid_window, shared, qapp):
+    gate = [False]
+    ctrl = free_resize.install(grid_window, lambda: gate[0])
+    a = named_rects(grid_window)["a"]
+    h = handle_at(grid_window, a.right + 1, a.y + 50)
+    for is_open in (False, True):
+        gate[0] = is_open
+        QTest.mousePress(h, Qt.LeftButton, Qt.NoModifier, QPoint(1, 5))
+        assert (ctrl._drag is not None) == is_open
+        QTest.mouseRelease(h, Qt.LeftButton, Qt.NoModifier, QPoint(1, 5))
+        qapp.processEvents()
+        assert ctrl._drag is None
+
+
+def test_shared_filter_leaves_unregistered_managers_alone(grid_window, shared):
+    other = QMainWindow()
+    try:
+        free_resize.install(QtAds.CDockManager(other), lambda: True)
+        old, new = _drag_a_b_line(grid_window)
+        assert new["c"] != old["c"]  # native: not ours to re-nest
+        assert free_resize._shared._drag is None
+    finally:
+        delete(other)
+
+
+def test_gate_dropped_when_manager_dies(shared, qapp):
+    other = QMainWindow()
+    mgr = QtAds.CDockManager(other)
+    key = getCppPointer(mgr)[0]
+    ctrl = free_resize.install(mgr, lambda: True)
+    assert key in ctrl._gates
+    delete(other)
+    assert key not in ctrl._gates

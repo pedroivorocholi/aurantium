@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 import PySide6QtAds as QtAds
-from shiboken6 import isValid
+from shiboken6 import getCppPointer, isValid
 from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, Qt
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QApplication, QSplitterHandle, QWidget
@@ -212,7 +212,17 @@ class FreeResizeController(QObject):
     def __init__(self, is_active: Callable[[], bool], parent=None):
         super().__init__(parent)
         self._is_active = is_active
+        # per dock manager gates, keyed by C++ address; once scoped (install())
+        # the controller leaves managers without a gate alone
+        self._gates: dict[int, Callable[[], bool]] = {}
+        self._scoped = False
         self._drag: _Drag | None = None
+
+    def _allowed(self, container) -> bool:
+        gate = self._gates.get(getCppPointer(container.dockManager())[0])
+        if gate is None:
+            return not self._scoped and self._is_active()
+        return self._is_active() and gate()
 
     def eventFilter(self, obj, event):  # noqa: N802 (Qt override)
         t = event.type()
@@ -265,11 +275,11 @@ class FreeResizeController(QObject):
         if event.button() != Qt.LeftButton:
             return False
         splitter = handle.splitter()
-        if not isinstance(splitter, QtAds.CDockSplitter) or not self._is_active():
+        if not isinstance(splitter, QtAds.CDockSplitter):
             return False
         area = splitter.findChild(QtAds.CDockAreaWidget)
         container = area.dockContainer() if area is not None else None
-        if container is None:
+        if container is None or not self._allowed(container):
             return False
         root = container.rootSplitter()
         all_areas = root.findChildren(QtAds.CDockAreaWidget)
@@ -304,7 +314,7 @@ class FreeResizeController(QObject):
 
     def _move(self, event) -> None:
         d = self._drag
-        if (not self._is_active() or not isValid(d.container)
+        if (not isValid(d.container) or not self._allowed(d.container)
                 or any(not isValid(a) or not a.isVisible() for a in d.rects)):
             self._end()  # F11, a workspace load or a closed panel mid-drag
             return
@@ -320,3 +330,25 @@ class FreeResizeController(QObject):
             return  # a pinwheel: hold the last valid position
         apply_tree(d.container, tree)
         d.tree, d.delta = tree, delta
+
+
+_shared: FreeResizeController | None = None
+
+
+def install(manager, is_active: Callable[[], bool]) -> FreeResizeController:
+    """Turn on per-panel drags in every container of ``manager``.
+
+    One app-wide filter serves every dock manager: a filter per window would
+    pile up (each sees every event in the app) once windows outlive their use,
+    as they do in the test suite. ``is_active`` gates only this manager.
+    """
+    global _shared
+    if _shared is None or not isValid(_shared):
+        app = QApplication.instance()
+        _shared = FreeResizeController(lambda: True, app)
+        _shared._scoped = True
+        app.installEventFilter(_shared)
+    ctrl, key = _shared, getCppPointer(manager)[0]
+    ctrl._gates[key] = is_active
+    manager.destroyed.connect(lambda *_: ctrl._gates.pop(key, None))
+    return ctrl

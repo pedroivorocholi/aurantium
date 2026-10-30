@@ -41,7 +41,7 @@ from .alerts import AlertEngine
 from .command_bar import CommandBar
 from .datahub import DataHub
 from .date_context import WINDOW_SPAN_DAYS, WINDOWS, DateContext, parse_iso
-from .free_resize import FreeResizeController
+from . import free_resize
 from . import motion
 from .layout_store import LayoutStore
 from .notifier import Notifier
@@ -238,11 +238,10 @@ class MainWindow(QMainWindow):
         self.dock_manager.floatingWidgetCreated.connect(self._on_window_created)
         # per-panel divider drags in every dock container (main + floating);
         # native drags while a panel is maximized (the others are hidden then).
-        # A child of the window, so Qt drops the filter when the window dies.
-        self._free_resize = FreeResizeController(
-            lambda: not self._maximized_instance, self
+        # One app-wide filter shared by every window; this gate is ours only.
+        self._free_resize = free_resize.install(
+            self.dock_manager, lambda: not self._maximized_instance
         )
-        QApplication.instance().installEventFilter(self._free_resize)
         self._register_dock_icons()
 
         self._build_menus()
