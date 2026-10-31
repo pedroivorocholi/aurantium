@@ -385,6 +385,36 @@ def test_ticks_without_a_grid_are_untouched(qapp, monkeypatch, feeds):
     assert len(_grid_specs(p)) == len(stock[1])
 
 
+def test_the_candles_fade_in_where_they_will_land(qapp, monkeypatch, feeds):
+    """The real candles are drawn through the price axis: fading in while the
+    axis was still rescaling, they showed as a second chart off to one side
+    of the morphing one. The axis lands before the crossfade starts."""
+    p = _make_chart(monkeypatch, animate=True, feeds=feeds)
+    _load_first(p, monkeypatch)
+    p.on_symbol("BBB")
+    morph = p._morph
+    anim = morph.anim
+    for frac in (0.5, 0.6, 0.8):
+        anim.setCurrentTime(int(anim.duration() * frac))
+        y_now = tuple(p.plot_widget.getViewBox().viewRange()[1])
+        assert y_now == pytest.approx(morph._y_to)
+    _settle(p)
+    _assert_final(p)
+
+
+def test_the_first_frame_ignores_the_last_morphs_clock(qapp, monkeypatch, feeds):
+    """Frame 0 is painted before the animation restarts; its clock still
+    reads the previous morph's end, which must not show the real candles."""
+    p = _make_chart(monkeypatch, animate=True, feeds=feeds)
+    _load_first(p, monkeypatch)
+    p.on_symbol("BBB")
+    _settle(p)
+    morph = p._morph
+    assert morph.anim.currentTime() == morph.anim.duration()  # stale clock
+    morph._step(0.0)
+    assert p.candle_item.opacity() == 0.0
+
+
 def test_a_morph_frame_repaints_through_the_scene_only(qapp, monkeypatch, feeds):
     """The overlay is a child of the viewport, so the scene's repaint already
     repaints it. Asking the overlay separately cost a second full paint per

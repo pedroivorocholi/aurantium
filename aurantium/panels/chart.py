@@ -1363,8 +1363,18 @@ class _SeriesMorph:
         try:
             self._t = float(value)
             panel = self._panel
+            # Linear time drives the axis and the crossfade. Before start()
+            # (frame 0) the clock still reads the last morph's end: use t.
+            duration = self.anim.duration()
+            if self.running() and duration:
+                linear = self.anim.currentTime() / duration
+            else:
+                linear = self._t
+            # The axis lands by the time the crossfade starts: the real series
+            # is drawn through it, and fading in on a half-rescaled axis it
+            # showed as a second chart beside the morphing one.
             (a0, a1), (b0, b1) = self._y_from, self._y_to
-            t = self._t
+            t = self.anim.easingCurve().valueForProgress(min(1.0, linear / 0.5))
             panel._fitting_y = True  # keep _fit_y_to_visible out of the way
             try:
                 panel.plot_widget.getViewBox().setYRange(
@@ -1375,8 +1385,6 @@ class _SeriesMorph:
             # The crossfade runs on linear time, not the eased value: the line
             # does its travelling early (EASE_OUT), and the real series takes
             # over across the second half, once the shape has nearly landed.
-            duration = self.anim.duration()
-            linear = self.anim.currentTime() / duration if duration else 1.0
             fade = min(1.0, max(0.0, (linear - 0.5) / 0.5))
             for item in self._faded_items():
                 item.setOpacity(fade)
