@@ -41,6 +41,9 @@ def make_translucent(widget: QWidget) -> None:
 class RoundedPopupFilter(QObject):
     """App-wide filter: makes every menu/dropdown/tooltip window translucent."""
 
+    #: the only event types eventFilter acts on (see events.py)
+    EVENTS = (QEvent.Type.Polish,)
+
     def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt override)
         if event.type() == QEvent.Type.Polish and is_rounded_popup(obj):
             try:
@@ -52,6 +55,6 @@ class RoundedPopupFilter(QObject):
 
 def install(app) -> RoundedPopupFilter:
     """Install on ``app``; keep the returned object alive."""
-    flt = RoundedPopupFilter(app)
-    app.installEventFilter(flt)
-    return flt
+    from . import events
+
+    return events.route(app, RoundedPopupFilter(app), RoundedPopupFilter.EVENTS)

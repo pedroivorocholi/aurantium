@@ -39,7 +39,7 @@ from PySide6.QtCore import (
     Signal,
 )
 from PySide6.QtGui import QKeyEvent, QStandardItem, QStandardItemModel
-from PySide6.QtWidgets import QApplication, QCompleter, QLineEdit
+from PySide6.QtWidgets import QApplication, QCompleter, QLineEdit, QListView
 
 from .symbol_catalog import (
     FX_ENTRIES,
@@ -335,7 +335,16 @@ class SuggestField(QObject):
         # insertion text (pathFromIndex) comes from this role, display from
         # DisplayRole — rows can show "CODE — Name" while accepting fills CODE
         self._completer.setCompletionRole(_CODE_ROLE)
-        popup = self._completer.popup()
+        # Our own view, not popup(): an app-wide Python event filter can meet
+        # the completer's default popup mid-construction, while it is only a
+        # QWidget, and popup() then hands back that QWidget wrapper.
+        popup = QListView()
+        # what QCompleter sets on the default popup it would have built
+        popup.setEditTriggers(QListView.EditTrigger.NoEditTriggers)
+        popup.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        popup.setSelectionBehavior(QListView.SelectionBehavior.SelectRows)
+        popup.setSelectionMode(QListView.SelectionMode.SingleSelection)
+        self._completer.setPopup(popup)  # the completer takes ownership
         popup.setObjectName("suggestPopup")
         popup.setUniformItemSizes(True)
         line_edit.setCompleter(self._completer)

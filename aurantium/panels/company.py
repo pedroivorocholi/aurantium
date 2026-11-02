@@ -5,7 +5,9 @@ These used to be four panels, which meant four docks to open, arrange and keep
 in the same link group just to read one company. Each tab is still the full
 panel class (so each keeps its own fetches, settings and tests); the host owns
 the header, the link group and the symbol, and hands the symbol only to the
-tab on screen — a tab you never open never fetches.
+tab on screen — a tab you never open never fetches, and is never even built:
+building all four up front held the UI thread for seconds while a workspace
+restored, long enough for Windows to mark the app "Not responding".
 
 The four retired panel ids stay openable: they are aliases that open this
 panel on the matching tab, and ``migrate_layout`` folds a saved layout's
@@ -16,7 +18,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PySide6.QtWidgets import QTabWidget
+from PySide6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
 
 from ..guide import PanelGuide
 from ..components.fit_width import fit_tabs
@@ -65,19 +67,46 @@ class CompanyPanel(Panel):
         fit_tabs(self.tabs)  # labels elide in a narrow panel; no scroll arrows
         self.tabs.tabBar().setMinimumWidth(1)  # below its floor, clip — never widen
         self.tabs.setMinimumWidth(1)
+        #: built tabs only; a tab is built the first time it is needed
         self.children_by_key: dict[str, Panel] = {}
-        for key, label, cls in TABS:
-            child = cls(self.tabs)
-            child._host = self
-            child.set_link_group(UNLINKED)  # the host drives its symbol
-            child._header.hide()
-            child.build()
-            # one inset for every tab, so content lines up as you switch
-            child.content_layout.setContentsMargins(*TAB_INSET)
-            self.tabs.addTab(child, label)
-            self.children_by_key[key] = child
+        #: saved settings of tabs not built yet, applied when they are
+        self._pending_settings: dict[str, dict] = {}
+        self._pages: dict[str, QWidget] = {}
+        for key, label, _cls in TABS:
+            page = QWidget(self.tabs)
+            QVBoxLayout(page).setContentsMargins(0, 0, 0, 0)
+            self.tabs.addTab(page, label)
+            self._pages[key] = page
         self.tabs.currentChanged.connect(self._on_tab)
         self.content_layout.addWidget(self.tabs, 1)
+
+    def _ensure(self, key: str) -> Panel:
+        """The tab's panel, built into its page on first call."""
+        child = self.children_by_key.get(key)
+        if child is not None:
+            return child
+        cls = next(c for k, _l, c in TABS if k == key)
+        page = self._pages[key]
+        child = cls(page)
+        child._host = self
+        child.set_link_group(UNLINKED)  # the host drives its symbol
+        child._header.hide()
+        child.build()
+        # one inset for every tab, so content lines up as you switch
+        child.content_layout.setContentsMargins(*TAB_INSET)
+        page.layout().addWidget(child)
+        self.children_by_key[key] = child
+        pending = self._pending_settings.pop(key, None)
+        if pending is not None:
+            try:
+                child.restore(pending)
+            except Exception:
+                pass
+        return child
+
+    def showEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        self._ensure(self.current_key)
+        super().showEvent(event)
 
     # -- tabs ---------------------------------------------------------------
 
@@ -86,17 +115,18 @@ class CompanyPanel(Panel):
         return KEYS[max(self.tabs.currentIndex(), 0)]
 
     def child(self, key: str) -> Panel:
-        return self.children_by_key[key]
+        return self._ensure(key)
 
     def show_tab(self, key: str) -> Optional[Panel]:
         """Switch to a tab by key; returns that tab's panel."""
-        if key not in self.children_by_key:
+        if key not in KEYS:
             return None
+        child = self._ensure(key)
         self.tabs.setCurrentIndex(KEYS.index(key))
-        return self.children_by_key[key]
+        return child
 
     def _on_tab(self, _i: int) -> None:
-        child = self.children_by_key[self.current_key]
+        child = self._ensure(self.current_key)
         if self.current_symbol:
             child._apply_symbol(self.current_symbol)  # lazy: fetch on first view
         self._child_header_changed(child)
@@ -114,14 +144,17 @@ class CompanyPanel(Panel):
     # -- symbol -------------------------------------------------------------
 
     def on_symbol(self, symbol: str) -> None:
-        self.children_by_key[self.current_key]._apply_symbol(symbol)
+        self._ensure(self.current_key)._apply_symbol(symbol)
 
     # -- persistence ----------------------------------------------------------
 
     def settings(self) -> dict:
         return {
             "tab": self.current_key,
-            "tabs": {k: c.settings() for k, c in self.children_by_key.items()},
+            "tabs": {
+                **self._pending_settings,
+                **{k: c.settings() for k, c in self.children_by_key.items()},
+            },
         }
 
     def restore(self, settings: dict) -> None:
@@ -130,12 +163,17 @@ class CompanyPanel(Panel):
         per_tab = settings.get("tabs")
         if isinstance(per_tab, dict):
             for key, child_settings in per_tab.items():
-                if key in self.children_by_key and isinstance(child_settings, dict):
-                    try:
-                        self.children_by_key[key].restore(child_settings)
-                    except Exception:
-                        pass
-        if settings.get("tab") in self.children_by_key:
+                if key not in KEYS or not isinstance(child_settings, dict):
+                    continue
+                child = self.children_by_key.get(key)
+                if child is None:
+                    self._pending_settings[key] = child_settings
+                    continue
+                try:
+                    child.restore(child_settings)
+                except Exception:
+                    pass
+        if settings.get("tab") in KEYS:
             self.show_tab(settings["tab"])
 
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt override)

@@ -97,6 +97,9 @@ hiddenimports += [
     # ring, or fails at startup.
     "aurantium.focus",
     "aurantium.popups",
+    # The one app-wide event router focus/popups/press/transitions install
+    # through — imported inside their install(), so lazily like them.
+    "aurantium.events",
     # Press feedback filter. Imported the same lazy way as ``focus`` above,
     # from inside __main__.main(), so static analysis never sees it — without
     # this line a frozen build silently loses every button's press response.

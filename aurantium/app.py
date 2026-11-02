@@ -1772,6 +1772,18 @@ class MainWindow(QMainWindow):
                 level="warn",
             )
             return False
+        # Fetches wait until every panel is built: started as each panel
+        # subscribed, their worker threads took turns with this one on the GIL
+        # and stretched a restore past Windows' "Not responding" threshold.
+        # Cached values still arrive at once; see DataHub.hold.
+        hub = DataHub.instance()
+        hub.hold()
+        try:
+            return self._restore_layout(doc)
+        finally:
+            hub.release()
+
+    def _restore_layout(self, doc: dict) -> bool:
         # Nothing of the first pass reaches the screen: until the saved
         # arrangement is applied, the docks sit wherever they were added —
         # stacked in one column — and the splash's progress step would

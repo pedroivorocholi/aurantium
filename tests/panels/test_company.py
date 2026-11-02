@@ -20,8 +20,11 @@ def company(qapp):
 
 
 def _record_symbols(company):
+    from aurantium.panels.company import KEYS
+
     seen = {}
-    for key, child in company.children_by_key.items():
+    for key in KEYS:
+        child = company.child(key)
         child.on_symbol = lambda s, k=key: seen.setdefault(k, []).append(s)
     return seen
 
@@ -51,10 +54,46 @@ def test_only_the_visible_tab_fetches(company):
     assert seen["profile"] == ["AAPL", "MSFT"]
 
 
+def test_tabs_are_built_only_when_first_needed(qapp, company):
+    # Building all four tabs up front took seconds on the UI thread during a
+    # workspace restore — long enough for Windows to mark the app hung.
+    assert company.children_by_key == {}
+    company.show()
+    qapp.processEvents()
+    assert set(company.children_by_key) == {"profile"}
+    company.show_tab("earnings")
+    assert set(company.children_by_key) == {"profile", "earnings"}
+
+
+def test_restore_opens_only_the_saved_tab(qapp):
+    from aurantium.panels.company import CompanyPanel
+
+    p = CompanyPanel()
+    p.build()
+    p.restore({"tab": "earnings", "tabs": {}})
+    p.show()
+    qapp.processEvents()
+    assert set(p.children_by_key) == {"earnings"}
+    p.close()
+
+
+def test_unbuilt_tab_keeps_its_saved_settings(qapp):
+    from aurantium.panels.company import CompanyPanel
+
+    saved = {"tab": "profile", "tabs": {"key_metrics": {"custom": ["alpha"]}}}
+    p = CompanyPanel()
+    p.build()
+    p.restore(saved)
+    assert "key_metrics" not in p.children_by_key
+    assert p.settings()["tabs"]["key_metrics"] == {"custom": ["alpha"]}
+    p.close()
+
+
 def test_children_are_unlinked_and_headerless(company):
     from aurantium.panel import UNLINKED
+    from aurantium.panels.company import KEYS
 
-    for child in company.children_by_key.values():
+    for child in (company.child(k) for k in KEYS):
         assert child._host is company
         assert child.link_group == UNLINKED
         assert child._header.isHidden()

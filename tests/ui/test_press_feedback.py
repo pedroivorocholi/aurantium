@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from aurantium import motion, press, theme
+from aurantium import events, motion, press, theme
 
 
 @pytest.fixture
@@ -31,7 +31,7 @@ def filt(qapp):
     cannot leak into the next one's widgets."""
     flt = press.install(qapp)
     yield flt
-    qapp.removeEventFilter(flt)
+    events.unroute(flt)
 
 
 def _click(qapp, widget, kind, button=Qt.MouseButton.LeftButton):

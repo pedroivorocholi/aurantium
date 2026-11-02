@@ -11,7 +11,7 @@ unrelated code. The Profile tab's price column was the one nested layout.
 
 from PySide6.QtWidgets import QApplication, QLabel, QLayout, QVBoxLayout, QWidget
 
-from aurantium import transitions
+from aurantium import events, transitions
 from aurantium.components.responsive_row import ResponsiveRow
 
 
@@ -66,4 +66,4 @@ def test_destroying_a_company_panel_raises_nothing(qapp):
         QApplication.sendPostedEvents(None, 52)  # QEvent.DeferredDelete
         QApplication.processEvents()
     finally:
-        qapp.removeEventFilter(flt)
+        events.unroute(flt)

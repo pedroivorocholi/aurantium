@@ -143,3 +143,31 @@ def test_engine_serves_cache_without_second_remote_call(qapp):
     assert not engine._timer.isActive()
     assert calls == ["nvda"]
     assert any(s.code == "NVDA" for s in got[-1][1])
+
+
+def test_suggest_field_survives_an_early_qwidget_wrapper(qapp):
+    """An app-wide Python event filter sees the completer's popup while its C++
+    constructor is still running, when the object is only a QWidget. Kept
+    alive, that wrapper was what ``QCompleter.popup()`` later returned, and
+    ``setUniformItemSizes`` raised AttributeError — intermittently, depending
+    on whether anything still held it."""
+    from PySide6.QtCore import QObject
+    from PySide6.QtWidgets import QLineEdit
+
+    from aurantium.components.symbol_search import SuggestField
+
+    class _Hoard(QObject):
+        seen = []
+
+        def eventFilter(self, obj, event):  # noqa: N802
+            self.seen.append(obj)  # keeps each first-seen wrapper alive
+            return False
+
+    hoard = _Hoard()
+    qapp.installEventFilter(hoard)
+    try:
+        edit = QLineEdit()
+        SuggestField(edit, engine=SuggestionEngine(remote=lambda q: []))
+    finally:
+        qapp.removeEventFilter(hoard)
+        _Hoard.seen.clear()

@@ -498,6 +498,15 @@ class PressFeedbackFilter(QObject):
         #: ``_end_if_owned``.
         self._target: QWidget | None = None
 
+    #: the only event types eventFilter acts on (see events.py)
+    EVENTS = (
+        QEvent.Type.MouseButtonPress,
+        QEvent.Type.MouseButtonRelease,
+        QEvent.Type.MouseButtonDblClick,
+        QEvent.Type.Hide,
+        QEvent.Type.WindowDeactivate,
+    )
+
     def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt override)
         kind = event.type()
         if kind == QEvent.Type.MouseButtonPress:
@@ -585,6 +594,6 @@ def install(app) -> PressFeedbackFilter:
     collected stops filtering, silently, and every control simply goes back to
     acknowledging nothing.
     """
-    flt = PressFeedbackFilter(app)
-    app.installEventFilter(flt)
-    return flt
+    from . import events
+
+    return events.route(app, PressFeedbackFilter(app), PressFeedbackFilter.EVENTS)

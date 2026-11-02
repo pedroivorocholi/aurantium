@@ -231,11 +231,11 @@ def test_company_tables_keep_their_height(qapp, width):
     from PySide6.QtWidgets import QScrollArea
 
     from aurantium import valuation as V
-    from aurantium.panels.company import CompanyPanel
+    from aurantium.panels.company import KEYS, CompanyPanel
 
     p = CompanyPanel()
     p.build()
-    for c in p.children_by_key.values():
+    for c in (p.child(k) for k in KEYS):
         c.on_symbol = lambda s: None
     p.child("key_metrics")._on_metrics(V.build_metrics({"symbol": "T", "info": {"trailingPE": 20}}))
     dock = QScrollArea()

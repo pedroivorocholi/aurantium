@@ -64,6 +64,9 @@ class FocusVisibleFilter(QObject):
         # grabs focus from a style event). Re-entering here would recurse.
         self._settling = False
 
+    #: the only event types eventFilter acts on (see events.py)
+    EVENTS = (QEvent.Type.FocusIn, QEvent.Type.FocusOut)
+
     def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt override)
         kind = event.type()
         if kind == QEvent.Type.FocusIn:
@@ -103,6 +106,6 @@ def install(app) -> FocusVisibleFilter:
     The returned object must be kept alive — an event filter that gets garbage
     collected stops filtering, silently, and the rings simply never appear.
     """
-    flt = FocusVisibleFilter(app)
-    app.installEventFilter(flt)
-    return flt
+    from . import events
+
+    return events.route(app, FocusVisibleFilter(app), FocusVisibleFilter.EVENTS)

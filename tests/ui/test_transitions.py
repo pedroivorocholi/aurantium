@@ -13,14 +13,14 @@ from PySide6.QtGui import QMouseEvent
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QButtonGroup, QMenu, QPushButton, QWidget
 
-from aurantium import motion, theme, transitions
+from aurantium import events, motion, theme, transitions
 
 
 @pytest.fixture
 def filt(qapp):
     flt = transitions.install(qapp)
     yield flt
-    qapp.removeEventFilter(flt)
+    events.unroute(flt)
 
 
 @pytest.fixture

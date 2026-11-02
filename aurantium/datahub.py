@@ -106,6 +106,10 @@ class DataHub(QObject):
         # owners whose destroyed→cleanup is already wired, so we connect it at
         # most once per QObject no matter how many topics it subscribes to.
         self._tracked_owners: set[int] = set()
+        # hold(): requests made while held wait here (insertion-ordered) for
+        # release(); a topic forced by any of them is forced when sent
+        self._holds = 0
+        self._held: dict[str, bool] = {}
         self._pool = QThreadPool.globalInstance()
         self._publish_sig.connect(self._do_publish)
         self._error_sig.connect(self._do_publish_error)
@@ -248,8 +252,35 @@ class DataHub(QObject):
         st = self._topics.get(topic)
         return st.value if st and st.has_value else None
 
+    def hold(self) -> None:
+        """Defer fetches until the matching ``release()``; holds nest.
+
+        For a workspace restore: panels subscribe as they are built, and a
+        fetch per subscription would set dozens of worker threads parsing in
+        Python while the UI thread is still building — each taking turns with
+        it on the GIL, which stretched the restore long enough for Windows to
+        mark the app "Not responding". Cached values are still served at once;
+        only the network waits."""
+        self._holds += 1
+
+    def release(self) -> None:
+        if self._holds == 0:
+            return
+        self._holds -= 1
+        if self._holds or not self._held:
+            return
+        held, self._held = self._held, {}
+        forced = [t for t, f in held.items() if f]
+        if forced:
+            self.request(forced, force=True)
+        self.request([t for t, f in held.items() if not f])
+
     def request(self, topics: list[str], force: bool = False) -> None:
         """Ask for a refresh now, respecting min_interval unless forced."""
+        if self._holds:
+            for topic in topics:
+                self._held[topic] = self._held.get(topic, False) or force
+            return
         now = time.monotonic()
         by_provider: dict[int, tuple[Provider, list[str]]] = {}
         for topic in topics:

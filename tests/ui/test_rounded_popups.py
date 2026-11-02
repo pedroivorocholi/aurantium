@@ -4,7 +4,7 @@ rounded borders don't sit inside square opaque corners."""
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtWidgets import QComboBox, QMenu, QToolTip
 
-from aurantium import popups
+from aurantium import events, popups
 from aurantium.theme import apply_theme
 
 
@@ -39,4 +39,4 @@ def test_popups_have_transparent_corners(qapp):
         assert _corner_alpha(tip) == 0
         QToolTip.hideText()
     finally:
-        qapp.removeEventFilter(flt)
+        events.unroute(flt)

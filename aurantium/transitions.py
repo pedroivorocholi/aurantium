@@ -493,6 +493,14 @@ class TransitionFilter(QObject):
         super().__init__(parent)
         self._pending: dict = {}  # button -> (checked, pixmap)
 
+    #: the only event types eventFilter acts on (see events.py)
+    EVENTS = (
+        QEvent.Type.Polish,
+        QEvent.Type.MouseButtonPress,
+        QEvent.Type.MouseButtonRelease,
+        QEvent.Type.Show,
+    )
+
     def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt override)
         kind = event.type()
         try:
@@ -555,6 +563,6 @@ def fade_in_popup(popup: QWidget) -> None:
 
 def install(app) -> TransitionFilter:
     """Install on ``app``; keep the returned object alive."""
-    flt = TransitionFilter(app)
-    app.installEventFilter(flt)
-    return flt
+    from . import events
+
+    return events.route(app, TransitionFilter(app), TransitionFilter.EVENTS)
