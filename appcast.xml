@@ -20,6 +20,67 @@
     <language>en</language>
 
     <item>
+      <title>Aurantium 1.15.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.15.1</h3>
+        <ul>
+          <li>The app no longer shows &quot;Not responding&quot; while it opens your workspace</li>
+          <li>Opening a saved layout is about 7x faster (23s down to ~3s on a typical desk)</li>
+          <li>The Company panel builds only the tab you are looking at; the others build when you first open them</li>
+          <li>Data fetches start once your panels are in place, so the window stays responsive while it loads</li>
+          <li>Cached data still appears instantly while live data loads</li>
+          <li>Fixed an intermittent error in the symbol search dropdown</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 02 Nov 2026 21:52:04 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.15.1/aurantium-setup.exe"
+        sparkle:version="1.15.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76662903"
+        sparkle:edSignature="lB4gzM+bydCmvwUeT1hnPLuMr1p5I3EFsty/AMRYP9S6/LH9RUL6nBbWHiJxwQcC9XBSDqInxLRyPb+hJdo0Cg=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.15.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.15.1</h3>
+        <ul>
+          <li>The app no longer shows &quot;Not responding&quot; while it opens your workspace</li>
+          <li>Opening a saved layout is about 7x faster (23s down to ~3s on a typical desk)</li>
+          <li>The Company panel builds only the tab you are looking at; the others build when you first open them</li>
+          <li>Data fetches start once your panels are in place, so the window stays responsive while it loads</li>
+          <li>Cached data still appears instantly while live data loads</li>
+          <li>Fixed an intermittent error in the symbol search dropdown</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 02 Nov 2026 21:52:04 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.15.1/aurantium-mac.zip"
+        sparkle:version="1.15.1"
+        sparkle:os="macos"
+        length="298253452"
+        sparkle:edSignature="+dTwSX8hGwMEI/2r+xqNFHxiUTIZQGbNBuhFY4dTya+AianpnWG5UIrop4NeW6RKD6cgjvWkIJnUouOJQ+g/CA=="
+        type="application/zip" />
+    </item>
+    <item>
       <title>Aurantium 1.15.0</title>
       <description><![CDATA[
         <style>
