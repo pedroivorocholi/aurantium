@@ -1,10 +1,15 @@
-"""News provider: ``news:SYM`` via a source waterfall (adapted from Fincept).
+"""News provider: ``news:SYM`` and ``newsq:QUERY`` from merged sources.
 
-Order: publisher RSS feeds (Fincept's default-feed approach, free and
-keyless) -> NewsAPI.org (if NEWSAPI_KEY is set) -> gnews package ->
-yfinance Ticker.news as a last resort. RSS results are only accepted when
-enough headlines match the symbol/query; otherwise the fetch falls through
-to the next source, so thin RSS matches never mask the older sources.
+Live news asks every fast source at once — publisher RSS feeds (Fincept's
+default-feed approach, free and keyless), Finnhub (if FINNHUB_API_KEY is set),
+Google News via the gnews package, and yfinance for symbols — then merges the
+results: off-topic items dropped, duplicates collapsed, anything older than
+``FRESH_DAYS`` dropped while enough fresher items exist, newest first.
+
+NewsAPI.org only tops up a thin result. Its free tier serves articles 24 hours
+late and matches words anywhere in an article body, so when it ranked ahead of
+Google News (as it once did) a topic like "Brazil" showed day-old football
+coverage and every panel's top story was a day or two old.
 
 **Language handling.** Every source is scoped to the languages the user reads
 (``languages.spoken_languages``): RSS fetches only the feeds published in those
@@ -23,7 +28,7 @@ import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any, Optional
 from xml.etree import ElementTree
@@ -33,7 +38,10 @@ import requests
 from .. import languages
 from ..datahub import DataHub, Provider
 
-MAX_ITEMS = 25
+#: Headlines per panel, and per source request. 25 covered only the last
+#: 24 minutes of "markets" on a busy day; 75 shows hours. NewsAPI's pageSize
+#: caps at 100, as does a Google News feed.
+MAX_ITEMS = 75
 
 # Curated market-focused RSS feeds — free, no key. The English set is a subset
 # of Fincept Terminal's defaults (fincept-qt/src/services/news/
@@ -85,7 +93,25 @@ RSS_FEEDS: list[tuple[str, str, str, str]] = [
 
 RSS_CACHE_TTL = 180.0  # seconds; keeps feed polling polite across panels
 RSS_FETCH_TIMEOUT = 6.0
-RSS_MIN_MATCHES = 5  # fewer matches than this -> fall through to next source
+
+#: Live headlines older than this give way to fresher ones...
+FRESH_DAYS = 7
+#: ...as long as at least this many fresh ones exist; below it (a quiet name)
+#: the window widens to MAX_AGE_DAYS, and NewsAPI is asked to top up.
+MIN_FRESH = 8
+#: Never shown as live news, however quiet the name: Google News will happily
+#: return a 2017 quote page for a thin query.
+MAX_AGE_DAYS = 30
+
+#: Topic queries that name a Finnhub market-news category.
+FINNHUB_CATEGORIES = {
+    "markets": "general", "market": "general", "general": "general",
+    "forex": "forex", "fx": "forex", "crypto": "crypto",
+    "mergers": "merger", "m&a": "merger",
+}
+#: Finnhub's free company-news endpoint covers North American listings only;
+#: suffixed symbols (PETR4.SA) get a 403, so they aren't even asked.
+_FINNHUB_SYMBOL = re.compile(r"^[A-Z][A-Z0-9]{0,6}(?:-[A-Z])?$")
 _RSS_HEADERS = {"User-Agent": "Mozilla/5.0 (aurantium RSS reader)"}
 
 # Cache keyed by the active language set, so changing languages in Settings
@@ -255,9 +281,6 @@ def _fetch_one_feed(feed: tuple[str, str, str, str]) -> list[dict]:
 # in an article body (NRG -> Houston Texans at NRG Stadium), and yfinance's
 # ticker feed mixes in peers' stories. A headline must name the company.
 
-#: Enough on-topic items that the waterfall stops asking further sources.
-RELEVANT_ENOUGH = 10
-
 _LEGAL_SUFFIXES = {
     "inc", "incorporated", "corp", "corporation", "company", "co", "ltd",
     "limited", "plc", "llc", "lp", "l.p", "nv", "n.v", "sa", "s.a", "ag",
@@ -318,21 +341,54 @@ def _ticker_pattern(symbol: str) -> re.Pattern:
     base = _ticker_base(symbol)
     # BRK-B is written BRK.B / BRK/B / BRK-B in headlines
     body = r"[.\-/]".join(re.escape(p) for p in base.split("-"))
-    return re.compile(rf"(?<![A-Za-z0-9])\$?{body}(?![A-Za-z0-9])")
+    # Not glued to another symbol: for F, "(KC=F)" and "(639.F)" are other
+    # instruments' quote pages, and "U.S." is not ticker S.
+    return re.compile(
+        rf"(?<![A-Za-z0-9.=^])\$?{body}(?![A-Za-z0-9=]|\.[A-Za-z0-9])"
+    )
+
+
+def name_aliases(name: str) -> list[str]:
+    """Every name a company goes by in ``name``: Yahoo writes some as
+    "Petróleo Brasileiro S.A. - Petrobras", and headlines use either half."""
+    out: list[str] = []
+    for part in (name or "").split(" - "):
+        core = name_core(part)
+        if core and core.lower() not in {o.lower() for o in out}:
+            out.append(core)
+    return out
 
 
 def _name_patterns(name: str) -> list[re.Pattern]:
-    core = name_core(name)
-    if not core:
-        return []
-    terms = [core]
-    if _FUND_WORDS & {w.lower() for w in core.split()}:
-        return [re.compile(rf"(?<!\w){re.escape(core)}(?!\w)", re.IGNORECASE)]
-    terms += [
-        w for w in core.split()
-        if len(w) >= 4 and w.lower().strip(".&'") not in _GENERIC_NAME_WORDS
-    ]
-    return [re.compile(rf"(?<!\w){re.escape(t)}(?!\w)", re.IGNORECASE) for t in terms]
+    patterns: list[re.Pattern] = []
+    for core in name_aliases(name):
+        terms = [core]
+        if not _FUND_WORDS & {w.lower() for w in core.split()}:
+            terms += [
+                w for w in core.split()
+                if len(w) >= 4 and w.lower().strip(".&'") not in _GENERIC_NAME_WORDS
+            ]
+        patterns += [
+            re.compile(rf"(?<!\w){re.escape(t)}(?!\w)", re.IGNORECASE) for t in terms
+        ]
+    return patterns
+
+
+def symbol_search_query(symbol: str, name: str) -> str:
+    """The Google News query for ``symbol``'s headlines.
+
+    Search by name: a one- or two-letter ticker is noise to a search engine
+    (``"F" stock`` returned quote pages for KC=F and 639.F), so it only joins
+    the query from three letters up. Futures and indices ("GC=F", "^TNX") are
+    searched by name alone, without "stock"."""
+    tradable = not any(c in symbol for c in "=^")
+    base = _ticker_base(symbol)
+    terms = [f'"{a}"' for a in name_aliases(name)]
+    if not terms or (tradable and len(base) >= 3):
+        terms.append(f'"{base}"')
+    body = terms[0] if len(terms) == 1 else f"({' OR '.join(terms)})"
+    # bare "Gold" found Gold Glove awards
+    return f"{body} stock" if tradable else f"{body} (price OR futures OR market)"
 
 
 def is_relevant(item: dict, symbol: str, name: str) -> bool:
@@ -401,6 +457,143 @@ def _sort_by_published(items: list[dict]) -> list[dict]:
         key=lambda i: _parse_feed_datetime(i.get("published", "")) or epoch,
         reverse=True,
     )
+
+
+GOOGLE_NEWS_RSS = "https://news.google.com/rss/search"
+#: A 100-item search feed (~140 KB) sometimes takes 8 s to arrive; the 6 s
+#: publisher-feed timeout silently dropped it, leaving RSS's handful of items.
+GOOGLE_NEWS_TIMEOUT = 15.0
+
+
+def _google_news_rss(query: str, code: str, period: Optional[str]) -> list[dict]:
+    """One Google News search feed, read directly: a single request.
+
+    The gnews package fetches the same feed, then spends one more HTTP request
+    per article trying to resolve Google's redirect link — which, without
+    playwright installed, hands the same news.google.com link back. 25
+    pointless round trips took ~20 s per language. Links stay Google redirects;
+    the browser follows them, and the preview resolves one on click."""
+    country = GNEWS_COUNTRY.get(code, "US")
+    q = f"{query} when:{period}" if period else query
+    try:
+        resp = requests.get(
+            GOOGLE_NEWS_RSS,
+            params={"q": q, "hl": code, "gl": country, "ceid": f"{country}:{code}"},
+            headers=_RSS_HEADERS,
+            timeout=GOOGLE_NEWS_TIMEOUT,
+        )
+        resp.raise_for_status()
+        root = ElementTree.fromstring(resp.text)
+    except Exception:
+        return []
+    items: list[dict] = []
+    for node in root.iter("item"):
+        publisher = (node.findtext("source") or "").strip()
+        title = _strip_publisher((node.findtext("title") or "").strip(), publisher)
+        if not title:
+            continue
+        # the description is only "<a>headline</a> publisher" again
+        summary = _clean_summary(node.findtext("description"))
+        if summary.casefold().startswith(title.casefold()):
+            summary = ""
+        items.append(
+            {
+                "title": title,
+                "publisher": publisher,
+                "url": (node.findtext("link") or "").strip(),
+                "published": (node.findtext("pubDate") or "").strip(),
+                "summary": summary,
+                "lang": code,
+            }
+        )
+        if len(items) >= MAX_ITEMS:
+            break
+    return items
+
+
+def _strip_publisher(title: str, publisher: str) -> str:
+    """Google News appends " - Publisher" to every headline; the panel shows
+    the publisher separately, and the suffix defeats de-duplication."""
+    suffix = f" - {publisher}" if publisher else ""
+    if suffix and title.endswith(suffix):
+        return title[: -len(suffix)].rstrip()
+    return title
+
+
+def _dedupe_key(item: dict) -> str:
+    title = _strip_publisher(item.get("title") or "", item.get("publisher") or "")
+    return re.sub(r"\W+", " ", title.lower()).strip()
+
+
+def _age_days(item: dict, now: float) -> Optional[float]:
+    dt = _parse_feed_datetime(item.get("published") or "")
+    return (now - dt.timestamp()) / 86400 if dt else None
+
+
+def _fresh_count(items: list[dict]) -> int:
+    now = time.time()
+    return sum(
+        1 for i in items
+        if (age := _age_days(i, now)) is not None and age <= FRESH_DAYS
+    )
+
+
+def _freshest(items: list[dict]) -> list[dict]:
+    """Newest first, trimmed by age: only the last ``FRESH_DAYS`` when at
+    least ``MIN_FRESH`` such items exist, else the last ``MAX_AGE_DAYS``
+    (undated items kept, at the bottom). Nothing older is ever live news."""
+    now = time.time()
+    fresh, recent = [], []
+    for item in items:
+        age = _age_days(item, now)
+        if age is not None and age <= FRESH_DAYS:
+            fresh.append(item)
+        if age is None or age <= MAX_AGE_DAYS:
+            recent.append(item)
+    return _sort_by_published(fresh if len(fresh) >= MIN_FRESH else recent)
+
+
+def _gather(sources) -> list[list[dict]]:
+    """Run every source concurrently; a source that raises or returns None
+    contributes nothing. Results follow the order of ``sources``."""
+    def run(fetch):
+        try:
+            return fetch() or []
+        except Exception:
+            return []
+
+    with ThreadPoolExecutor(max_workers=len(sources)) as pool:
+        return list(pool.map(run, sources))
+
+
+#: Google News indexes Yahoo/Moomoo quote and option-chain pages as if they
+#: were articles ("NRG Nov 2026 120.000 call (...) Stock Price, News, Quote &
+#: History"). They name the symbol, so relevance alone lets them through.
+_QUOTE_PAGE = re.compile(
+    r"stock price,? news,? quote|quote & history|interactive stock chart"
+    r"|options chain|historical prices|seasonal returns chart"
+    r"|stock forecast & analyst ratings|analyst ratings, stock forecast",
+    re.IGNORECASE,
+)
+
+
+def _merge(batches, keep=lambda item: True, seen: Optional[set] = None) -> list[dict]:
+    """Flatten ``batches``, dropping quote pages, items ``keep`` rejects and
+    repeats of a headline already seen (earlier batches win)."""
+    seen = set() if seen is None else seen
+    out: list[dict] = []
+    for batch in batches:
+        for item in batch:
+            key = _dedupe_key(item)
+            if (
+                not key or key in seen
+                or _QUOTE_PAGE.search(item.get("title") or "")
+                or not keep(item)
+            ):
+                continue
+            seen.add(key)
+            out.append(item)
+    return out
 
 
 def feeds_for(langs: list[str]) -> list[tuple[str, str, str, str]]:
@@ -476,62 +669,56 @@ class NewsProvider(Provider):
             hub.publish_error(topic, f"news fetch failed: {exc}")
 
     def _symbol_items(self, symbol: str, langs: list[str]) -> list[dict]:
-        """Walk the sources in order, keeping only headlines about ``symbol``
-        and topping up from the next source until there are enough.
+        """Every fast source at once, merged: only headlines about ``symbol``,
+        duplicates collapsed, newest first, trimmed by age (``_freshest``).
+        NewsAPI tops up only when that leaves fewer than ``MIN_FRESH``.
 
-        The old rule — first source to return *anything* wins — let one
-        loose NewsAPI match set (NRG -> NRG Stadium -> Texans coverage) mask
-        a Google News result that was entirely on topic. If nothing at all
-        passes the relevance check (an ETF or index whose headlines rarely
-        name it), the first non-empty source is shown as before rather than
-        an empty panel.
+        If nothing at all passes the relevance check (an ETF or index whose
+        headlines rarely name it), the first non-empty source is shown rather
+        than an empty panel — still trimmed by age.
         """
         name = company_name(symbol)
-        core = name_core(name)
-        # Finance terms keep "Netflix" from meaning its shows' premieres.
-        subject = f'("{core}" OR {_ticker_base(symbol)})' if core else symbol
-        newsapi_q = f"{subject} AND (stock OR shares OR earnings OR analyst OR investors)"
-        sources = (
-            lambda: self._from_rss_symbol(symbol, langs),
-            lambda: self._from_newsapi(newsapi_q, langs),
-            lambda: self._from_gnews(symbol, langs),
+        batches = _gather((
+            lambda: self._from_finnhub_company(symbol, langs),
+            lambda: self._from_gnews(symbol, langs, symbol_search_query(symbol, name)),
+            lambda: self._from_rss_symbol(symbol, langs, name),
             lambda: self._from_yfinance(symbol),
-        )
-        kept: list[dict] = []
+        ))
+
+        def relevant(item: dict) -> bool:
+            return is_relevant(item, symbol, name)
+
         seen: set[str] = set()
-        fallback: Optional[list[dict]] = None
-        for fetch in sources:
-            items = fetch()
-            if not items:
-                continue
-            if fallback is None:
-                fallback = items
-            for item in items:
-                key = re.sub(r"\W+", " ", (item.get("title") or "").lower()).strip()
-                if key in seen or not is_relevant(item, symbol, name):
-                    continue
-                seen.add(key)
-                kept.append(item)
-            if len(kept) >= RELEVANT_ENOUGH:
-                break
+        kept = _merge(batches, relevant, seen)
+        if _fresh_count(kept) < MIN_FRESH:
+            aliases = name_aliases(name)
+            # Finance terms keep "Netflix" from meaning its shows' premieres.
+            subject = (
+                f'("{aliases[0]}" OR {_ticker_base(symbol)})' if aliases else symbol
+            )
+            q = f"{subject} AND (stock OR shares OR earnings OR analyst OR investors)"
+            kept += _merge([self._from_newsapi(q, langs) or []], relevant, seen)
         if not kept:
-            return fallback or []
-        return _sort_by_published(kept)
+            kept = next((b for b in batches if b), [])
+        return _freshest(kept)
 
     def _fetch_query(self, topic: str, query: str) -> None:
-        """Free-text query waterfall: NewsAPI -> gnews, no yfinance fallback
-        (yfinance's ``Ticker.news`` is symbol-only, not a text search)."""
+        """Free-text query: RSS, Finnhub (for a market category) and Google
+        News at once, merged newest first; NewsAPI only tops up. No yfinance
+        — ``Ticker.news`` is symbol-only, not a text search."""
         hub = DataHub.instance()
         try:
             langs = languages.spoken_languages()
-            items = self._from_rss_query(query, langs)
-            if items is None:
-                items = self._from_newsapi(query, langs)
-            if items is None:
-                items = self._from_gnews_query(query, langs)
-            if items is None:
-                items = []
-            hub.publish(topic, self._gate(items, langs))
+            batches = _gather((
+                lambda: self._from_rss_query(query, langs),
+                lambda: self._from_finnhub_general(query, langs),
+                lambda: self._from_gnews_query(query, langs),
+            ))
+            seen: set[str] = set()
+            items = _merge(batches, seen=seen)
+            if _fresh_count(items) < MIN_FRESH:
+                items += _merge([self._from_newsapi(query, langs) or []], seen=seen)
+            hub.publish(topic, self._gate(_freshest(items), langs))
         except Exception as exc:
             hub.publish_error(topic, f"news query fetch failed: {exc}")
 
@@ -610,41 +797,105 @@ class NewsProvider(Provider):
         return [{k: v for k, v in i.items() if k != "category"} for i in items]
 
     def _from_rss_symbol(
-        self, symbol: str, langs: Optional[list[str]] = None
+        self, symbol: str, langs: Optional[list[str]] = None, name: str = ""
     ) -> Optional[list[dict]]:
-        """Headlines mentioning the ticker as a standalone word (case-
-        sensitive: 'AAPL' matches, 'aapl' inside a word doesn't). Recall is
-        deliberately conservative — most symbols fall through to the
-        broader sources below."""
+        """Feed headlines about ``symbol`` (see ``is_relevant``); None when
+        there are none."""
         try:
-            pattern = re.compile(rf"\b{re.escape(symbol)}\b")
-            matches = [i for i in _rss_items(langs) if pattern.search(i["title"])]
-            if len(matches) < RSS_MIN_MATCHES:
-                return None
-            return self._strip_category(matches)
+            matches = [i for i in _rss_items(langs) if is_relevant(i, symbol, name)]
+            return self._strip_category(matches) or None
         except Exception:
             return None
 
     def _from_rss_query(
         self, query: str, langs: Optional[list[str]] = None
     ) -> Optional[list[dict]]:
-        """Headlines where every query word appears in the title, or where
-        the query names a feed category (e.g. the Topic News default
-        'markets' pulls the whole markets feed set)."""
+        """Headlines where every query word appears as a word in the title
+        (plurals allowed: "price" finds "prices", but "ai" no longer finds
+        "said"), or where the query names a feed category (the Topic News
+        default 'markets' pulls the whole markets feed set)."""
         try:
             tokens = [t for t in query.lower().split() if t]
             if not tokens:
                 return None
-            matches = []
-            for item in _rss_items(langs):
-                title = item["title"].lower()
-                if all(t in title for t in tokens) or query.lower() == item["category"]:
-                    matches.append(item)
-            if len(matches) < RSS_MIN_MATCHES:
-                return None
-            return self._strip_category(matches)
+            patterns = [
+                re.compile(rf"(?<!\w){re.escape(t)}(?:s|es)?(?!\w)", re.IGNORECASE)
+                for t in tokens
+            ]
+            matches = [
+                item for item in _rss_items(langs)
+                if query.lower() == item["category"]
+                or all(p.search(item["title"]) for p in patterns)
+            ]
+            return self._strip_category(matches) or None
         except Exception:
             return None
+
+    def _from_finnhub_company(
+        self, symbol: str, langs: Optional[list[str]] = None
+    ) -> Optional[list[dict]]:
+        """Finnhub ``/company-news`` for the last ``FRESH_DAYS``: near real
+        time, but it tags peers' stories with the symbol too, so the merge's
+        relevance check still applies. English only."""
+        api_key = os.environ.get("FINNHUB_API_KEY")
+        codes = langs if langs is not None else languages.spoken_languages()
+        if not api_key or "en" not in codes or not _FINNHUB_SYMBOL.match(symbol):
+            return None
+        today = date.today()
+        return self._finnhub(
+            "company-news",
+            {
+                "symbol": symbol.replace("-", "."),
+                "from": (today - timedelta(days=FRESH_DAYS)).isoformat(),
+                "to": today.isoformat(),
+            },
+            api_key,
+        )
+
+    def _from_finnhub_general(
+        self, query: str, langs: Optional[list[str]] = None
+    ) -> Optional[list[dict]]:
+        """Finnhub ``/news`` when the topic names one of its categories
+        ("markets", "forex", "crypto", "mergers"). English only."""
+        api_key = os.environ.get("FINNHUB_API_KEY")
+        codes = langs if langs is not None else languages.spoken_languages()
+        category = FINNHUB_CATEGORIES.get(query.strip().lower())
+        if not api_key or "en" not in codes or not category:
+            return None
+        return self._finnhub("news", {"category": category}, api_key)
+
+    @staticmethod
+    def _finnhub(path: str, params: dict, api_key: str) -> Optional[list[dict]]:
+        try:
+            resp = requests.get(
+                f"https://finnhub.io/api/v1/{path}",
+                params=params,
+                headers={"X-Finnhub-Token": api_key},
+                timeout=8,
+            )
+            resp.raise_for_status()
+            articles = resp.json()
+        except Exception:
+            return None
+        items = []
+        for a in articles if isinstance(articles, list) else []:
+            try:
+                published = datetime.fromtimestamp(
+                    int(a.get("datetime")), tz=timezone.utc
+                ).isoformat()
+            except (TypeError, ValueError, OSError):
+                published = ""
+            items.append(
+                {
+                    "title": a.get("headline") or "",
+                    "publisher": a.get("source") or "",
+                    "url": a.get("url") or "",
+                    "published": published,
+                    "summary": _clean_summary(a.get("summary")),
+                    "lang": "en",
+                }
+            )
+        return items or None
 
     def _from_newsapi(
         self,
@@ -707,16 +958,17 @@ class NewsProvider(Provider):
         return _sort_by_published(items)
 
     def _from_gnews(
-        self, symbol: str, langs: Optional[list[str]] = None
+        self, symbol: str, langs: Optional[list[str]] = None, query: str = ""
     ) -> Optional[list[dict]]:
-        return self._gnews_search(f'"{symbol}" stock', langs)
+        q = query or symbol_search_query(symbol, company_name(symbol))
+        return self._gnews_search(q, langs, period=f"{FRESH_DAYS}d")
 
     def _from_gnews_query(
         self, query: str, langs: Optional[list[str]] = None
     ) -> Optional[list[dict]]:
         """Like ``_from_gnews`` but for free-text queries: no stock-ticker
         decoration around the search string."""
-        return self._gnews_search(query, langs)
+        return self._gnews_search(query, langs, period=f"{FRESH_DAYS}d")
 
     @staticmethod
     def _gnews_search(
@@ -724,6 +976,7 @@ class NewsProvider(Provider):
         langs: Optional[list[str]] = None,
         start: Optional[str] = None,
         end: Optional[str] = None,
+        period: Optional[str] = None,
     ) -> Optional[list[dict]]:
         """One gnews edition per language, merged newest-first. GNews defaults
         to the US/English edition, so the language/country pair is what makes
@@ -731,13 +984,26 @@ class NewsProvider(Provider):
 
         ``start``/``end`` (ISO dates) turn this into a historical search:
         gnews translates them into Google News ``after:``/``before:``
-        operators (gnews.py:93-109), which reach back years."""
+        operators (gnews.py:93-109), which reach back years. ``period``
+        ("7d") is Google's ``when:`` window, for live searches — without it a
+        thin query returns pages years old."""
+        codes = langs if langs is not None else languages.spoken_languages()
+        window = _date_tuple(start), _date_tuple(end)
+        if not (window[0] and window[1]):
+            # A week's window alone is ranked by relevance and leaves gaps of
+            # days at the top; today's alone is empty for quiet topics. Ask
+            # for both — each is a single cheap request.
+            periods = ["1d", period] if period and period != "1d" else [period]
+            jobs = [(code, p) for code in codes[:MAX_LANGS_PER_FETCH] for p in periods]
+            batches = _gather([
+                lambda c=code, p=p: _google_news_rss(query, c, p) for code, p in jobs
+            ])
+            items = _merge(batches)
+            return _sort_by_published(items) if items else None
         try:
             from gnews import GNews
         except Exception:
             return None
-        codes = langs if langs is not None else languages.spoken_languages()
-        window = _date_tuple(start), _date_tuple(end)
         items: list[dict] = []
         for code in codes[:MAX_LANGS_PER_FETCH]:
             try:
@@ -746,8 +1012,7 @@ class NewsProvider(Provider):
                     country=GNEWS_COUNTRY.get(code, "US"),
                     max_results=MAX_ITEMS,
                 )
-                if window[0] and window[1]:
-                    gn.start_date, gn.end_date = window
+                gn.start_date, gn.end_date = window
                 results = gn.get_news(query) or []
             except Exception:
                 continue
@@ -757,7 +1022,7 @@ class NewsProvider(Provider):
                     publisher = publisher.get("title", "")
                 items.append(
                     {
-                        "title": r.get("title") or "",
+                        "title": _strip_publisher(r.get("title") or "", publisher or ""),
                         "publisher": publisher or "",
                         "url": r.get("url") or "",
                         "published": r.get("published date") or "",

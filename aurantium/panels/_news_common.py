@@ -29,7 +29,6 @@ from ..components.empty_state import EmptyState
 from ..components.fit_width import fit_columns
 from ..languages import main_language
 from ..panel import EMPTY_NO_SYMBOL, Panel
-from ..symbol_context import GROUPS, SymbolContext
 from ..theme import FG_DIM, LABEL
 
 
@@ -60,7 +59,8 @@ def parse_published(value: Any) -> Optional[datetime]:
 
 
 def format_when(dt: Optional[datetime]) -> str:
-    """HH:MM for today's items (in local time), 'Mon DD' for older ones."""
+    """HH:MM for today's items (in local time), 'Mon DD' for older ones this
+    year, 'Mon DD YY' before that — a bare 'Mar 17' read as this March."""
     if dt is None:
         return "—"
     if dt.tzinfo is not None:
@@ -68,7 +68,9 @@ def format_when(dt: Optional[datetime]) -> str:
     now = datetime.now(dt.tzinfo) if dt.tzinfo else datetime.now()
     if dt.date() == now.date():
         return dt.strftime("%H:%M")
-    return dt.strftime("%b %d")
+    if dt.year == now.year:
+        return dt.strftime("%b %d")
+    return dt.strftime("%b %d %y")
 
 
 def make_news_table(parent) -> QTableWidget:
@@ -98,22 +100,23 @@ def make_news_table(parent) -> QTableWidget:
 def _ranked_with_dates(items: list) -> list[tuple[dict, Optional[datetime]]]:
     """Parse each item's ``published`` exactly once, then rank the items.
 
-    Ranking rule (user-approved): relevance tier, then language tier, then
-    recency. Relevance tier 0 — headline mentions an active linked symbol
-    (word-boundary, case-sensitive ticker match across all link groups); tier 1
-    — the rest. Language tier 0 — the user's main language, or an item whose
-    source declared none (yfinance); tier 1 — their other languages. Untagged
-    items rank with the main language rather than below it, since sinking
-    unlabelled headlines would demote the entire yfinance fallback.
+    Ranking rule: language tier, then recency. Language tier 0 — the user's
+    main language, or an item whose source declared none (yfinance); tier 1 —
+    their other languages. Untagged items rank with the main language rather
+    than below it, since sinking unlabelled headlines would demote the entire
+    yfinance fallback.
+
+    There is deliberately no "mentions a linked ticker" tier any more: it
+    matched the ticker case-sensitively, so a two-day-old "AAPL ..." headline
+    outranked a fresh "Apple ..." one — and in Topic News it pinned whatever
+    named any link group's symbol. Symbol news is relevance-filtered by the
+    provider; the table only orders it.
 
     Within each tier newest first; items whose timestamp can't be parsed sink to
     the bottom of their tier. Returns ``(entry, parsed_dt)`` pairs so callers
     reuse the parsed datetime instead of parsing it again for display. Non-dict
     entries are dropped (they carry no renderable fields).
     """
-    ctx = SymbolContext.instance()
-    symbols = {s for s in (ctx.symbol(g) for g in GROUPS) if s}
-    patterns = [re.compile(rf"\b{re.escape(s)}\b") for s in symbols]
     main_lang = main_language()
 
     pairs: list[tuple[dict, Optional[datetime]]] = [
@@ -124,12 +127,10 @@ def _ranked_with_dates(items: list) -> list[tuple[dict, Optional[datetime]]]:
 
     def key(pair: tuple[dict, Optional[datetime]]) -> tuple:
         entry, dt = pair
-        title = entry.get("title") or ""
-        tier = 0 if any(p.search(title) for p in patterns) else 1
         lang = str(entry.get("lang") or "").split("-")[0].lower()
         lang_tier = 0 if not lang or lang == main_lang else 1
         ts = dt.timestamp() if dt is not None else float("-inf")
-        return (tier, lang_tier, -ts)
+        return (lang_tier, -ts)
 
     pairs.sort(key=key)
     return pairs

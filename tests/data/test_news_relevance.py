@@ -107,63 +107,20 @@ def test_generic_name_words_do_not_count():
     assert not is_relevant(_item("Energy stocks slide as oil falls"), "NRG", "NRG Energy, Inc.")
 
 
-# -- the waterfall ----------------------------------------------------------
-
-@pytest.fixture
-def provider(monkeypatch):
-    monkeypatch.setattr(news.languages, "spoken_languages", lambda: ["en"])
-    monkeypatch.setattr(news, "company_name", lambda sym: {"NRG": "NRG Energy, Inc."}.get(sym, ""))
-    p = NewsProvider()
-    published = {}
-
-    class _Hub:
-        def publish(self, topic, value):
-            published[topic] = value
-
-        def publish_error(self, topic, err):
-            published[topic] = err
-
-    monkeypatch.setattr(news.DataHub, "instance", staticmethod(lambda: _Hub()))
-    return p, published
+def test_a_ticker_glued_to_another_symbol_is_not_a_match():
+    """`"F" stock` used to return Yahoo quote pages for KC=F and 639.F."""
+    for title in (
+        "Coffee Dec 26 (KC=F) Stock Price, News, Quote & History",
+        "Spotify Technology S.A. (639.F) Stock Price, News, Quote & History",
+        "Barings Europe Select J EUR Inc (0P0001FAV9.F) stock price",
+    ):
+        assert not is_relevant(_item(title), "F", "Ford Motor Company")
+    assert is_relevant(_item("Ford Motor Company (F) is attracting attention"), "F", "Ford Motor Company")
 
 
-def test_junk_from_an_early_source_no_longer_masks_a_good_later_one(provider, monkeypatch):
-    p, published = provider
-    junk = [_item(t) for t in ("Tom Cruise stunt", "Texans fans wait", "Week 3 Ducks", "Creatorverse", "NFL Week 1")]
-    good = [_item(f"NRG Energy headline {i}") for i in range(8)]
-    monkeypatch.setattr(p, "_from_rss_symbol", lambda s, l=None: None)
-    monkeypatch.setattr(p, "_from_newsapi", lambda s, l=None, **k: junk)
-    monkeypatch.setattr(p, "_from_gnews", lambda s, l=None: good)
-    monkeypatch.setattr(p, "_from_yfinance", lambda s: [])
-    p._fetch("news:NRG", "NRG")
-    titles = [i["title"] for i in published["news:NRG"]]
-    assert titles == [i["title"] for i in good]
-
-
-def test_sources_are_merged_until_there_is_enough(provider, monkeypatch):
-    p, published = provider
-    a = [_item("NRG Energy one"), _item("Tom Cruise")]
-    b = [_item("NRG Energy one"), _item("NRG Energy two"), _item("NRG Energy three")]
-    c = [_item("NRG Energy four"), _item("NRG Energy five"), _item("NRG Energy six")]
-    monkeypatch.setattr(p, "_from_rss_symbol", lambda s, l=None: None)
-    monkeypatch.setattr(p, "_from_newsapi", lambda s, l=None, **k: a)
-    monkeypatch.setattr(p, "_from_gnews", lambda s, l=None: b)
-    monkeypatch.setattr(p, "_from_yfinance", lambda s: c)
-    p._fetch("news:NRG", "NRG")
-    titles = [i["title"] for i in published["news:NRG"]]
-    assert titles[:3] == ["NRG Energy one", "NRG Energy two", "NRG Energy three"]
-    assert "Tom Cruise" not in titles
-    assert titles.count("NRG Energy one") == 1  # de-duplicated
-
-
-def test_a_source_that_is_already_enough_stops_the_waterfall(provider, monkeypatch):
-    p, published = provider
-    many = [_item(f"NRG Energy {i}") for i in range(12)]
-    called = []
-    monkeypatch.setattr(p, "_from_rss_symbol", lambda s, l=None: None)
-    monkeypatch.setattr(p, "_from_newsapi", lambda s, l=None, **k: many)
-    monkeypatch.setattr(p, "_from_gnews", lambda s, l=None: called.append("gnews") or [])
-    monkeypatch.setattr(p, "_from_yfinance", lambda s: called.append("yf") or [])
-    p._fetch("news:NRG", "NRG")
-    assert called == []
-    assert len(published["news:NRG"]) == 12
+def test_a_dash_separated_alias_counts_as_a_name():
+    """Yahoo names Petrobras "Petróleo Brasileiro S.A. - Petrobras"."""
+    name = "Petróleo Brasileiro S.A. - Petrobras"
+    assert news.name_aliases(name) == ["Petróleo Brasileiro", "Petrobras"]
+    assert is_relevant(_item("Petrobras makes third oil discovery"), "PETR4.SA", name)
+    assert is_relevant(_item("Petróleo Brasileiro output rises"), "PETR4.SA", name)

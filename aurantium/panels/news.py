@@ -16,7 +16,10 @@ from ._news_common import NewsPanelBase
 @register_panel(id="news", title="News", category="News")
 class NewsPanel(NewsPanelBase):
     GUIDE = PanelGuide(
-        purpose="Headlines for the linked symbol, newest first.",
+        purpose=(
+            "Headlines about the linked symbol, newest first — the past week, merged "
+            "from publisher feeds, Google News and Finnhub (up to a month for quiet names)."
+        ),
         links="Follows the link group's symbol.",
         interactions=(
             "Single-click a headline for a preview below the list; it dims once read.",
