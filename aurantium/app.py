@@ -48,6 +48,8 @@ from .notifier import Notifier
 from .title_bar import NativeFrame, TitleBar, frame_panel_window
 from .components.fit_width import relax_min_widths
 from .panel import LoadingPlaceholder, Panel, PanelRegistry
+from .portfolio_import import import_from_layout_file, import_legacy_books
+from .portfolio_store import PortfolioStore
 from .paths import ASSETS_DIR, BUNDLE_DIR
 from .presets import Preset, available_presets
 from .symbol_context import DEFAULT_GROUP, GROUPS, SymbolContext
@@ -1931,6 +1933,7 @@ class MainWindow(QMainWindow):
             )
             if resp != QMessageBox.StandardButton.Yes:
                 return
+        import_from_layout_file(PortfolioStore.instance(), doc)
         self.layout_store.put(name, doc)
         self._rebuild_layout_menu()
         self.apply_layout(doc)
@@ -1965,6 +1968,21 @@ class MainWindow(QMainWindow):
         the caller's own subsequent close, since that path builds panels
         rather than asking a question."""
         last = self.layout_store.get_last()
+        # one-time adoption of the old per-layout portfolio books; runs before
+        # any panel is built so an open Portfolio panel shows the book at once
+        active = (
+            (str(last.get("name") or "Last session"), last)
+            if isinstance(last, dict) else None
+        )
+        moved = import_legacy_books(
+            PortfolioStore.instance(),
+            active,
+            {n: self.layout_store.get(n) or {} for n in self.layout_store.names()},
+        )
+        if moved:
+            QTimer.singleShot(2000, lambda: self.notify(
+                "Imported your portfolio from this layout. Other books were "
+                f"saved as a backup: {', '.join(moved)}", msecs=8000))
         if isinstance(last, dict) and last.get("panels"):
             self.apply_layout(last)
             return

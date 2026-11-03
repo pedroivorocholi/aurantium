@@ -36,6 +36,8 @@ def settings(monkeypatch):
 
     store: dict = {}
     monkeypatch.setattr(app_mod, "QSettings", lambda: _FakeSettings(store))
+    # the legacy-book import has its own tests; keep it off the real store
+    monkeypatch.setattr(app_mod, "import_legacy_books", lambda *a, **k: [])
     return store
 
 
@@ -61,6 +63,12 @@ class _Store:
 
     def get_last(self):
         return self._last
+
+    def names(self):
+        return []
+
+    def get(self, name):
+        return None
 
 
 def _preset():
