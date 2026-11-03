@@ -117,6 +117,7 @@ hiddenimports += [
     "aurantium.language_dialog",
     "aurantium.languages",
     "aurantium.alerts",
+    "aurantium.portfolio_store",
     "aurantium.date_context",
     "aurantium.sector_meta",
     "aurantium.command_bar",
