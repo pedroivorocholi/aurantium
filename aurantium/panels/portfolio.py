@@ -371,6 +371,14 @@ class PortfolioPanel(Panel):
         self._positions = PortfolioStore.instance().positions()
         self._rebuild_table()
 
+    def closeEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        # a closed panel awaiting deleteLater must not rebuild and resubscribe
+        try:
+            PortfolioStore.instance().changed.disconnect(self._on_store_changed)
+        except (RuntimeError, TypeError):
+            pass  # already disconnected / never connected
+        super().closeEvent(event)
+
     # -- tab construction --------------------------------------------------
 
     def _build_positions_tab(self) -> QWidget:
