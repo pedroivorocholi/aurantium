@@ -10,6 +10,7 @@ macro (themes that move everything).
 from __future__ import annotations
 
 import json
+import math
 from typing import Optional, TypedDict
 
 
@@ -78,40 +79,38 @@ _AGE_FLOOR = 1e-6      # known ages never decay below this ...
 _AGE_UNKNOWN = 1e-9    # ... so an undated item always ranks last
 
 
+def _pos_num(v) -> Optional[float]:
+    """A finite number > 0, else None (NaN, inf, zero, negative = absent)."""
+    ok = isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+    return float(v) if ok and v > 0 else None
+
+
 def build_book(open_positions: list[dict], prices: dict, sectors: dict) -> list[Holding]:
-    """Open positions -> weights. Value = qty x (price or cost); a position
-    with neither takes an equal share of what the valued ones leave over."""
+    """Open positions -> weights. Value = |qty| x (price or cost). A position
+    with no usable price or cost is valued at the mean of the valued ones; if
+    none is valued, all weigh the same. Zero/non-finite qty is dropped."""
     values: dict[str, Optional[float]] = {}
     for p in open_positions:
         sym = p.get("symbol")
-        if not sym:
+        qty = p.get("qty")
+        if not sym or not isinstance(qty, (int, float)) or isinstance(qty, bool):
             continue
-        unit = prices.get(sym) or p.get("cost")
-        qty = p.get("qty") or 0
-        v = qty * unit if unit else None
-        if v is None:
+        if not math.isfinite(qty) or qty == 0:
+            continue
+        unit = _pos_num(prices.get(sym)) or _pos_num(p.get("cost"))
+        if unit is None:
             values.setdefault(sym, None)
         else:
-            values[sym] = (values.get(sym) or 0.0) + v
+            values[sym] = (values.get(sym) or 0.0) + abs(qty) * unit
     if not values:
         return []
-    known = sum(v for v in values.values() if v)
-    missing = [s for s, v in values.items() if not v]
-    if not known:
-        weights = {s: 1.0 / len(values) for s in values}
-    elif missing:
-        # Unvalued positions take 1/n each; valued ones split the rest.
-        weights = {s: v / known for s, v in values.items() if v}
-        share = 1.0 / len(values)
-        for s in weights:
-            weights[s] *= 1.0 - share * len(missing)
-        for s in missing:
-            weights[s] = share
-    else:
-        weights = {s: v / known for s, v in values.items()}
+    valued = [v for v in values.values() if v is not None]
+    fill = sum(valued) / len(valued) if valued else 1.0
+    full = {s: (fill if v is None else v) for s, v in values.items()}
+    total = sum(full.values())
     book: list[Holding] = [
-        {"symbol": s, "weight": round(w, 2), "sector": sectors.get(s)}
-        for s, w in weights.items()
+        {"symbol": s, "weight": round(v / total, 2), "sector": sectors.get(s)}
+        for s, v in full.items()
     ]
     book.sort(key=lambda h: -h["weight"])
     return book

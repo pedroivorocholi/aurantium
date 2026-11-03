@@ -36,8 +36,7 @@ def test_build_book_duplicates_summed():
     assert {h["symbol"]: h["weight"] for h in book} == {"AAA": 0.5, "BBB": 0.5}
 
 
-def test_build_book_missing_gets_equal_share_of_remainder():
-    # Unvalued positions take 1/n each; valued ones split what is left.
+def test_build_book_unvalued_takes_mean_value():
     book = pn.build_book([_pos("A", 1, 60.0), _pos("B", 1, 20.0),
                           _pos("C", 1), _pos("D", 1)], {}, {})
     w = {h["symbol"]: h["weight"] for h in book}
@@ -80,3 +79,25 @@ def test_reason_for():
     assert pn.reason_for("sector", "Technology", 0.404) == "Tech 40%"
     assert pn.reason_for("sector", "Weird Sector", 0.2) == "Weird Sector 20%"
     assert pn.reason_for("macro", "oil", 0.0) == "Macro"
+
+
+def test_unvalued_valued_at_mean_and_not_largest():
+    book = pn.build_book([_pos("A", 1, 100.0), _pos("B", 1, 50.0), _pos("C", 1)],
+                         {}, {})
+    w = {h["symbol"]: h["weight"] for h in book}
+    assert w == {"A": 0.44, "B": 0.22, "C": 0.33}
+    assert book[0]["symbol"] == "A"
+
+
+def test_zero_qty_dropped_not_unvalued():
+    book = pn.build_book([_pos("A", 1, 10.0), _pos("Z", 0, 10.0)], {}, {})
+    assert [h["symbol"] for h in book] == ["A"]
+
+
+def test_nan_price_falls_back_and_negative_qty_by_magnitude():
+    book = pn.build_book([_pos("A", 1, 10.0), _pos("S", -3, 10.0),
+                          _pos("N", float("nan"), 10.0)],
+                         {"A": float("nan"), "S": -5.0}, {})
+    w = {h["symbol"]: h["weight"] for h in book}
+    assert w == {"S": 0.75, "A": 0.25}
+    assert all(0 <= x <= 1 for x in w.values()) and abs(sum(w.values()) - 1) < 0.02
