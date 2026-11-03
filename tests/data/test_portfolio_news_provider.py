@@ -28,6 +28,7 @@ def prov(monkeypatch):
     monkeypatch.setattr(news.languages, "spoken_languages", lambda: ["en"])
     monkeypatch.setattr(news, "company_name", lambda sym: "")
     monkeypatch.setattr(news, "_macro_cache", {})
+    monkeypatch.setattr(news, "_rss_items", lambda langs=None: [])  # no network warm-up
     p = NewsProvider()
     out = {}
 
@@ -141,7 +142,9 @@ def test_macro_boost_ranks_oil_above_generic(prov, monkeypatch):
 def test_macro_cached_across_books(prov, monkeypatch):
     p, out = prov
     calls = []
-    monkeypatch.setattr(p, "_from_rss_query", lambda q, l: calls.append(q) or [])
+    monkeypatch.setattr(
+        p, "_from_rss_query", lambda q, l: calls.append(q) or [_item(f"m {q}")]
+    )
     _run(p, out, [H("A", 1.0)])
     n = len(calls)
     _run(p, out, [H("B", 1.0)])
@@ -221,3 +224,41 @@ def test_feed_is_not_just_the_top_holding(prov, monkeypatch):
     assert 0 < reasons.count("Tech 50%") <= 8
     assert 0 < reasons.count("Energy 30%") <= 8
     assert 0 < reasons.count("Macro") <= 20
+
+
+def test_all_empty_macro_is_not_cached(prov, monkeypatch):
+    """An offline start must not blank the macro layer for the whole TTL."""
+    p, out = prov
+    calls = []
+    monkeypatch.setattr(p, "_from_rss_query", lambda q, l: calls.append(q) or [])
+    p._macro_items(["en"])
+    p._macro_items(["en"])
+    assert len(calls) == 2 * len(MACRO_QUERIES)
+
+
+def test_rss_items_single_flight(monkeypatch):
+    """Concurrent callers on a cold cache share one sweep of the feeds."""
+    import threading
+    import time as _time
+
+    monkeypatch.setattr(news, "_rss_cache", {})
+    monkeypatch.setattr(news, "feeds_for", lambda codes: [("a", "u", "p", "en"), ("b", "u", "p", "en")])
+    fetched = []
+
+    def one(feed):
+        fetched.append(feed[0])
+        _time.sleep(0.05)
+        return [_item(f"t {feed[0]}")]
+
+    monkeypatch.setattr(news, "_fetch_one_feed", one)
+    results = []
+    threads = [
+        threading.Thread(target=lambda: results.append(news._rss_items(["en"])))
+        for _ in range(8)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sorted(fetched) == ["a", "b"]
+    assert len(results) == 8 and all(r == results[0] and len(r) == 2 for r in results)

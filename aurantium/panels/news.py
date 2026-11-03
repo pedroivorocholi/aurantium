@@ -223,7 +223,7 @@ class NewsPanel(NewsPanelBase):
     def _rebuild_portfolio(self) -> None:
         if self._source != "portfolio" or self._store is None:
             return
-        from ..portfolio_news import build_book, encode_book
+        from ..portfolio_news import _pos_num, build_book, encode_book
 
         positions = self._store.open_positions()
         symbols = list(dict.fromkeys(p["symbol"] for p in positions))
@@ -243,8 +243,14 @@ class NewsPanel(NewsPanelBase):
                     on_error=lambda _err: None,
                 )
 
+        # Weights come from cost, so the topic (the cache key) is the same at
+        # every launch whether or not a quote has landed yet; a live price
+        # only stands in for a position with no usable cost.
+        costed = {p["symbol"] for p in positions if _pos_num(p.get("cost"))}
         prices = {}
         for sym in symbols:
+            if sym in costed:
+                continue
             quote = self._hub.peek(f"quote:{sym}")
             if isinstance(quote, dict) and quote.get("price") is not None:
                 prices[sym] = quote["price"]
@@ -282,7 +288,10 @@ class NewsPanel(NewsPanelBase):
 
     def _on_portfolio_news(self, data: Any) -> None:
         self.set_loading(False)
-        self.set_status(_status("portfolio", self._render_news(data, show_reason=True)))
+        count = self._render_news(data, show_reason=True)
+        if not count:  # resolved empty: "yet" would read as still loading
+            self.set_news_empty_text("No recent headlines for your portfolio")
+        self.set_status(_status("portfolio", count))
 
     def _on_cell_clicked(self, row: int, col: int) -> None:
         super()._on_cell_clicked(row, col)

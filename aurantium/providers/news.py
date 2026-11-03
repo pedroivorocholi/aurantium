@@ -118,6 +118,9 @@ _RSS_HEADERS = {"User-Agent": "Mozilla/5.0 (aurantium RSS reader)"}
 # Cache keyed by the active language set, so changing languages in Settings
 # invalidates it implicitly — no cross-wiring from the dialog needed.
 _rss_lock = threading.Lock()
+#: Held while a sweep runs, so concurrent cold callers wait for one fetch and
+#: then read its cache entry instead of each sweeping every feed.
+_rss_fetch_lock = threading.Lock()
 _rss_cache: dict[tuple[str, ...], dict[str, Any]] = {}
 #: Portfolio macro headlines are the same for every book: one fetch per
 #: language set, kept for MACRO_CACHE_TTL (the newsp: policy TTL).
@@ -615,23 +618,32 @@ def _rss_items(langs: Optional[list[str]] = None) -> list[dict]:
     RSS_CACHE_TTL per language set."""
     codes = langs if langs is not None else languages.spoken_languages()
     key = tuple(sorted(codes))
-    with _rss_lock:
-        entry = _rss_cache.get(key)
-        if entry and time.monotonic() - entry["ts"] < RSS_CACHE_TTL:
-            return entry["items"]
-    with ThreadPoolExecutor(max_workers=6) as pool:
-        results = list(pool.map(_fetch_one_feed, feeds_for(codes)))
-    items = [item for feed_items in results for item in feed_items]
-    epoch = datetime.fromtimestamp(0, tz=timezone.utc)
-    items.sort(
-        key=lambda i: _parse_feed_datetime(i["published"]) or epoch, reverse=True
-    )
-    with _rss_lock:
-        # Only the active set is worth keeping; languages change rarely, and an
-        # unbounded dict would pin every set the user ever tried in memory.
-        _rss_cache.clear()
-        _rss_cache[key] = {"ts": time.monotonic(), "items": items}
-    return items
+
+    def cached() -> Optional[list[dict]]:
+        with _rss_lock:
+            entry = _rss_cache.get(key)
+            if entry and time.monotonic() - entry["ts"] < RSS_CACHE_TTL:
+                return entry["items"]
+        return None
+
+    if (hit := cached()) is not None:
+        return hit
+    with _rss_fetch_lock:
+        if (hit := cached()) is not None:  # another caller swept while we waited
+            return hit
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            results = list(pool.map(_fetch_one_feed, feeds_for(codes)))
+        items = [item for feed_items in results for item in feed_items]
+        epoch = datetime.fromtimestamp(0, tz=timezone.utc)
+        items.sort(
+            key=lambda i: _parse_feed_datetime(i["published"]) or epoch, reverse=True
+        )
+        with _rss_lock:
+            # Only the active set is worth keeping; languages change rarely, and
+            # an unbounded dict would pin every set the user ever tried.
+            _rss_cache.clear()
+            _rss_cache[key] = {"ts": time.monotonic(), "items": items}
+        return items
 
 
 class NewsProvider(Provider):
@@ -732,6 +744,8 @@ class NewsProvider(Provider):
                 return hit["items"]
         res = _gather([lambda q=q: self._query_items(q, langs) for _, q in pn.MACRO_QUERIES])
         items = {theme: r for (theme, _), r in zip(pn.MACRO_QUERIES, res)}
+        if not any(items.values()):
+            return items  # offline start: don't pin an empty layer for the TTL
         with _macro_lock:
             _macro_cache.clear()  # only the active language set is worth keeping
             _macro_cache[key] = {"ts": time.monotonic(), "items": items}
@@ -748,6 +762,7 @@ class NewsProvider(Provider):
                 hub.publish(topic, [])
                 return
             langs = languages.spoken_languages()
+            _rss_items(langs)  # one sweep up front; the fan-out below reads the cache
             held = sorted(book, key=lambda h: -h["weight"])[: pn.HOLDINGS_CAP]
             sweights = pn.sector_weights(book)
             sectors = {

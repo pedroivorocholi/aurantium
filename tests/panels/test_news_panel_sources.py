@@ -233,7 +233,8 @@ def test_portfolio_resubscribes_on_store_change(store, make_panel):
     assert p._hub.newsp() == [second]
 
 
-def test_portfolio_uses_peeked_quotes_and_sectors(store, make_panel):
+def test_portfolio_topic_ignores_peeked_quotes_when_cost_known(store, make_panel):
+    """A quote that happens to be cached must not change the cache key."""
     store.add("NVDA", 1, 100.0, "2026-01-02")
     store.add("XOM", 1, 100.0, "2026-01-02")
     p = make_panel()
@@ -241,7 +242,34 @@ def test_portfolio_uses_peeked_quotes_and_sectors(store, make_panel):
     p.set_source("portfolio")
     [topic] = p._hub.newsp()
     book = json.loads(topic[len("newsp:"):])
+    assert {h["symbol"]: h["weight"] for h in book} == {"NVDA": 0.5, "XOM": 0.5}
+
+
+def test_portfolio_peeked_price_stands_in_for_missing_cost(store, make_panel):
+    store.add("NVDA", 1, 0.0, "2026-01-02")
+    store.add("XOM", 1, 100.0, "2026-01-02")
+    p = make_panel()
+    p._hub.cache["quote:NVDA"] = {"price": 300.0}
+    p.set_source("portfolio")
+    [topic] = p._hub.newsp()
+    book = json.loads(topic[len("newsp:"):])
     assert book[0]["symbol"] == "NVDA" and book[0]["weight"] == 0.75
+
+
+def test_portfolio_resolved_empty_is_not_yet(store, make_panel):
+    store.add("NVDA", 10, 100.0, "2026-01-02")
+    p = make_panel()
+    p.set_source("portfolio")
+    assert p._news_empty_title == "No headlines for your portfolio yet"
+    p._hub.subs[p._hub.newsp()[0]]([])
+    assert p._news_empty_title == "No recent headlines for your portfolio"
+
+
+def test_portfolio_sectors_arrive_via_profile(store, make_panel):
+    store.add("NVDA", 1, 100.0, "2026-01-02")
+    store.add("XOM", 1, 100.0, "2026-01-02")
+    p = make_panel()
+    p.set_source("portfolio")
     p._hub.subs["profile:XOM"]({"sector": "Energy"})
     _flush(p)
     [topic] = p._hub.newsp()
