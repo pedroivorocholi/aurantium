@@ -59,6 +59,17 @@ MACRO_BOOST: dict[str, str] = {
     "jobs": "Industrials",
 }
 
+#: Weight a macro theme scores with when its boosting sector is not in the book
+#: (or weighs less): macro news still ranks, just below anything the book owns.
+MACRO_DEFAULT_WEIGHT = 0.1
+
+
+def macro_weight(theme: str, sweights: dict[str, float]) -> float:
+    """Score weight for a macro theme: the weight of the sector that makes it
+    matter (``MACRO_BOOST``) when the book holds it, never below the default."""
+    return max(MACRO_DEFAULT_WEIGHT, sweights.get(MACRO_BOOST.get(theme, ""), 0.0))
+
+
 _SECTOR_SHORT = {
     "Technology": "Tech",
     "Financial Services": "Financials",

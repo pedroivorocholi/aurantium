@@ -36,6 +36,7 @@ from xml.etree import ElementTree
 import requests
 
 from .. import languages
+from .. import portfolio_news as pn
 from ..datahub import DataHub, Provider
 
 #: Headlines per panel, and per source request. 25 covered only the last
@@ -118,6 +119,11 @@ _RSS_HEADERS = {"User-Agent": "Mozilla/5.0 (aurantium RSS reader)"}
 # invalidates it implicitly — no cross-wiring from the dialog needed.
 _rss_lock = threading.Lock()
 _rss_cache: dict[tuple[str, ...], dict[str, Any]] = {}
+#: Portfolio macro headlines are the same for every book: one fetch per
+#: language set, kept for MACRO_CACHE_TTL (the newsp: policy TTL).
+MACRO_CACHE_TTL = 900.0
+_macro_lock = threading.Lock()
+_macro_cache: dict[tuple[str, ...], dict[str, Any]] = {}
 
 # gnews wants a country alongside the language; without a sensible pairing it
 # defaults to the US edition and returns English for every language.
@@ -632,7 +638,7 @@ class NewsProvider(Provider):
     """Serves ``news:*`` topics."""
 
     def topic_patterns(self) -> list[str]:
-        return ["news:*", "newsq:*", "newsr:*"]
+        return ["news:*", "newsq:*", "newsr:*", "newsp:*"]
 
     def refresh(self, topics: list[str]) -> None:
         hub = DataHub.instance()
@@ -640,6 +646,10 @@ class NewsProvider(Provider):
             if topic.startswith("newsq:"):
                 query = topic.split(":", 1)[1]
                 hub.run_async(lambda t=topic, q=query: self._fetch_query(t, q))
+                continue
+            if topic.startswith("newsp:"):
+                book = topic.split(":", 1)[1]
+                hub.run_async(lambda t=topic, b=book: self._fetch_portfolio(t, b))
                 continue
             if topic.startswith("newsr:"):
                 parts = topic.split(":")
@@ -668,10 +678,13 @@ class NewsProvider(Provider):
         except Exception as exc:
             hub.publish_error(topic, f"news fetch failed: {exc}")
 
-    def _symbol_items(self, symbol: str, langs: list[str]) -> list[dict]:
+    def _symbol_items(
+        self, symbol: str, langs: list[str], newsapi: bool = True
+    ) -> list[dict]:
         """Every fast source at once, merged: only headlines about ``symbol``,
         duplicates collapsed, newest first, trimmed by age (``_freshest``).
-        NewsAPI tops up only when that leaves fewer than ``MIN_FRESH``.
+        NewsAPI tops up only when that leaves fewer than ``MIN_FRESH`` (and
+        ``newsapi`` is true).
 
         If nothing at all passes the relevance check (an ETF or index whose
         headlines rarely name it), the first non-empty source is shown rather
@@ -690,7 +703,7 @@ class NewsProvider(Provider):
 
         seen: set[str] = set()
         kept = _merge(batches, relevant, seen)
-        if _fresh_count(kept) < MIN_FRESH:
+        if newsapi and _fresh_count(kept) < MIN_FRESH:
             aliases = name_aliases(name)
             # Finance terms keep "Netflix" from meaning its shows' premieres.
             subject = (
@@ -701,6 +714,84 @@ class NewsProvider(Provider):
         if not kept:
             kept = next((b for b in batches if b), [])
         return _freshest(kept)
+
+    def _query_items(self, query: str, langs: list[str]) -> list[dict]:
+        """Fast free-text sources only (RSS + Google News); never NewsAPI."""
+        batches = _gather((
+            lambda: self._from_rss_query(query, langs),
+            lambda: self._from_gnews_query(query, langs),
+        ))
+        return _merge(batches)
+
+    def _macro_items(self, langs: list[str]) -> dict[str, list[dict]]:
+        """theme -> items, shared by every book, cached per language set."""
+        key = tuple(sorted(langs))
+        with _macro_lock:
+            hit = _macro_cache.get(key)
+            if hit and time.monotonic() - hit["ts"] < MACRO_CACHE_TTL:
+                return hit["items"]
+        res = _gather([lambda q=q: self._query_items(q, langs) for _, q in pn.MACRO_QUERIES])
+        items = {theme: r for (theme, _), r in zip(pn.MACRO_QUERIES, res)}
+        with _macro_lock:
+            _macro_cache.clear()  # only the active language set is worth keeping
+            _macro_cache[key] = {"ts": time.monotonic(), "items": items}
+        return items
+
+    def _fetch_portfolio(self, topic: str, book_text: str) -> None:
+        """``newsp:<book>``: headlines for the held tickers, the sectors the
+        book is heavy in, and macro themes, scored and sorted best first.
+        A headline in several layers keeps its highest-scoring one."""
+        hub = DataHub.instance()
+        try:
+            book = pn.decode_book(book_text)
+            if not book:
+                hub.publish(topic, [])
+                return
+            langs = languages.spoken_languages()
+            held = sorted(book, key=lambda h: -h["weight"])[: pn.HOLDINGS_CAP]
+            sweights = pn.sector_weights(book)
+            sectors = {
+                s: w for s, w in sweights.items()
+                if w >= pn.SECTOR_MIN_WEIGHT and s in pn.SECTOR_QUERIES
+            }
+            hold_res = _gather([
+                lambda s=h["symbol"]: self._symbol_items(s, langs, newsapi=False)
+                for h in held
+            ])
+            sec_res = _gather([
+                lambda s=s: self._query_items(pn.SECTOR_QUERIES[s], langs) for s in sectors
+            ]) if sectors else []
+            macro = self._macro_items(langs)
+
+            now = time.time()
+            cands: list[dict] = []
+
+            def add(layer, key, weight, items, symbol=None):
+                for it in items:
+                    age = _age_days(it, now)
+                    row = dict(
+                        it,
+                        reason=pn.reason_for(layer, key, weight),
+                        score=pn.score_item(layer, weight, None if age is None else age * 24),
+                    )
+                    if symbol:
+                        row["symbol"] = symbol
+                    cands.append(row)
+
+            for h, items in zip(held, hold_res):
+                add("holding", h["symbol"], h["weight"], items, h["symbol"])
+            for (s, w), items in zip(sectors.items(), sec_res):
+                add("sector", s, w, items)
+            for theme, items in macro.items():
+                add("macro", theme, pn.macro_weight(theme, sweights), items)
+
+            cands.sort(key=lambda r: -r["score"])
+            kept = _merge([cands])  # shared seen set: first (best) copy wins
+            rows = self._gate(_freshest(kept), langs)
+            rows.sort(key=lambda r: -r["score"])
+            hub.publish(topic, rows)
+        except Exception as exc:
+            hub.publish_error(topic, f"portfolio news fetch failed: {exc}")
 
     def _fetch_query(self, topic: str, query: str) -> None:
         """Free-text query: RSS, Finnhub (for a market category) and Google

@@ -38,6 +38,7 @@ def register_all_providers() -> None:
     hub.set_policy("analyst:*", TopicPolicy(ttl_s=3600, min_interval_s=60))
     hub.set_policy("news:*", TopicPolicy(ttl_s=300, min_interval_s=30))
     hub.set_policy("newsq:*", TopicPolicy(ttl_s=300, min_interval_s=30))
+    hub.set_policy("newsp:*", TopicPolicy(ttl_s=900, min_interval_s=60))
     # Day Brief topics describe a *past* trading day, which never changes.
     # Long TTLs plus the SQLite topic cache mean re-opening a date the user
     # has looked at before is instant, and works with no network at all.
