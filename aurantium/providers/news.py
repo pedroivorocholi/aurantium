@@ -787,8 +787,9 @@ class NewsProvider(Provider):
 
             cands.sort(key=lambda r: -r["score"])
             kept = _merge([cands])  # shared seen set: first (best) copy wins
-            rows = self._gate(_freshest(kept), langs)
-            rows.sort(key=lambda r: -r["score"])
+            # score order *before* the gate, so its cap keeps the best 75
+            fresh = sorted(_freshest(kept), key=lambda r: -r["score"])
+            rows = self._gate(fresh, langs)
             hub.publish(topic, rows)
         except Exception as exc:
             hub.publish_error(topic, f"portfolio news fetch failed: {exc}")

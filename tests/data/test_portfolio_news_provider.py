@@ -59,15 +59,14 @@ def test_empty_book_publishes_empty(prov):
 
 def test_newsapi_never_called(prov, monkeypatch):
     p, out = prov
-
-    def boom(*a, **k):
-        raise AssertionError("NewsAPI called")
-
-    monkeypatch.setattr(p, "_from_newsapi", boom)
-    monkeypatch.setattr(p, "_from_gnews", lambda *a, **k: [])
+    calls = []
+    monkeypatch.setattr(p, "_from_newsapi", lambda *a, **k: calls.append(a) or [_item("x")])
+    # one holding item < MIN_FRESH, so symbol news would normally top up
+    monkeypatch.setattr(p, "_from_gnews", lambda *a, **k: [_item("NVDA up")])
     monkeypatch.setattr(p, "_from_rss_query", lambda *a, **k: [_item("Fed holds rates")])
     rows = _run(p, out, [H("NVDA", 1.0, "Technology")])
-    assert isinstance(rows, list) and rows
+    assert rows
+    assert calls == []
 
 
 def test_holdings_capped_at_ten(prov, monkeypatch):
@@ -147,3 +146,36 @@ def test_macro_cached_across_books(prov, monkeypatch):
     n = len(calls)
     _run(p, out, [H("B", 1.0)])
     assert n == len(MACRO_QUERIES) and len(calls) == n
+
+
+def test_sector_copy_outscoring_holding_wins(prov, monkeypatch):
+    p, out = prov
+    dup = _item("Chips rally on Fed", 1, url="u:dup")
+    monkeypatch.setattr(p, "_symbol_items", lambda s, l, newsapi=True: [dict(dup)])
+    monkeypatch.setattr(p, "_from_rss_query", lambda q, l: [dict(dup)] if q == "tech stocks" else None)
+    # tiny holding vs heavy Technology sector (two names share the sector)
+    book = [H("BIG", 0.85, "Technology"), H("TINY", 0.15, "Technology")]
+    monkeypatch.setattr(p, "_symbol_items", lambda s, l, newsapi=True: [dict(dup)] if s == "TINY" else [])
+    # holding score: 1.0*(1+0.3); sector score: 0.7*(1+2.0) = 2.1
+    rows = [r for r in _run(p, out, book) if r["url"] == "u:dup"]
+    assert len(rows) == 1
+    assert rows[0]["reason"] == "Tech 100%" and "symbol" not in rows[0]
+
+
+def test_cap_keeps_top_scoring_not_newest(prov, monkeypatch):
+    p, out = prov
+    old_hold = [_item(f"hold {i}", 30 + i * 0.01) for i in range(10)]
+    macro = [_item(f"macro {i}", 0.1 + i * 0.01) for i in range(80)]
+    monkeypatch.setattr(p, "_symbol_items", lambda s, l, newsapi=True: [dict(i) for i in old_hold])
+    monkeypatch.setattr(p, "_from_rss_query", lambda q, l: [dict(i, title=f"{q} {i['title']}", url=f"u:{q}:{i['title']}") for i in macro] if q == "Fed" else None)
+    rows = _run(p, out, [H("NVDA", 1.0)])
+    assert len(rows) == news.MAX_ITEMS
+    scores = [r["score"] for r in rows]
+    assert scores == sorted(scores, reverse=True)
+    # old holding rows (~1.26) outscore fresh macro rows (~0.6): a recency cap would drop them
+    from aurantium import portfolio_news as pn
+    holds = [pn.score_item("holding", 1.0, 30 + i * 0.01) for i in range(10)]
+    macros = [pn.score_item("macro", pn.MACRO_DEFAULT_WEIGHT, 0.1 + i * 0.01) for i in range(80)]
+    cutoff = sorted(holds + macros, reverse=True)[news.MAX_ITEMS - 1]
+    assert min(scores) >= cutoff - 1e-4
+    assert sum(r["reason"] == "NVDA" for r in rows) == sum(h >= cutoff - 1e-4 for h in holds)
