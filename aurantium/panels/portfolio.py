@@ -19,6 +19,7 @@ import pyqtgraph as pg
 from PySide6.QtCore import QDate, QSize, Qt
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import (
+    QApplication,
     QDateEdit,
     QDoubleSpinBox,
     QGridLayout,
@@ -48,6 +49,7 @@ from ..theme import (
     FG_MUTED,
     apply_tick,
 )
+from ..portfolio_store import PortfolioStore
 from ..undo import UndoStack
 from ..components.responsive_row import ResponsiveRow
 
@@ -309,7 +311,9 @@ class _AllocationBars(QWidget):
 @register_panel(id="portfolio", title="Portfolio", category="Analytics")
 class PortfolioPanel(Panel):
     GUIDE = PanelGuide(
-        purpose="Your positions marked to live prices, with allocation, performance and risk.",
+        purpose="Your positions marked to live prices, with allocation, performance and risk. "
+                "Your positions are one app-wide book — closing this panel keeps them, "
+                "and every Portfolio panel shows the same book.",
         links="Click a position to send its symbol to every panel in this link group.",
         interactions=(
             "Add a holding: symbol, **Qty**, **Price** and **Buy date**. Leave Price "
@@ -335,7 +339,10 @@ class PortfolioPanel(Panel):
     )
 
     def build(self) -> None:
-        self._positions: list[dict] = []  # [{"symbol", "qty", "cost"}, ...]
+        store = PortfolioStore.instance()
+        # read-through cache of the app-wide book; only the store is written
+        self._positions: list[dict] = store.positions()
+        self._filling_cost = False
         self._last_price: dict[str, Optional[float]] = {}
         self._sectors: dict[str, Optional[str]] = {}
         self._betas: dict[str, Optional[float]] = {}
@@ -355,6 +362,13 @@ class PortfolioPanel(Panel):
         self.tabs.currentChanged.connect(self._on_tab_changed)
         self.content_layout.addWidget(self.tabs, 1)
 
+        self._rebuild_table()
+        store.changed.connect(self._on_store_changed)
+
+    def _on_store_changed(self) -> None:
+        if self._filling_cost:
+            return  # our own quote filled a cost: rows update in place
+        self._positions = PortfolioStore.instance().positions()
         self._rebuild_table()
 
     # -- tab construction --------------------------------------------------
@@ -603,9 +617,12 @@ class PortfolioPanel(Panel):
         # a position added "at market" gets its cost basis filled from the first
         # live price we see for it
         if price is not None:
-            for pos in self._positions:
-                if pos["symbol"] == symbol and pos.get("cost") is None:
-                    pos["cost"] = float(price)
+            self._filling_cost = True
+            try:
+                PortfolioStore.instance().fill_market_cost(symbol, price)
+            finally:
+                self._filling_cost = False
+            self._positions = PortfolioStore.instance().positions()
         for row, pos in enumerate(self._positions):
             if pos["symbol"] == symbol:
                 self._update_position_row(row, pos)
@@ -761,12 +778,16 @@ class PortfolioPanel(Panel):
     # -- add / remove ------------------------------------------------------
 
     def _push_positions_undo(self, label: str) -> None:
-        snap = [dict(p) for p in self._positions]
+        snap = PortfolioStore.instance().positions()
 
         def _undo() -> None:
-            self._positions = [dict(p) for p in snap]
-            self._rebuild_table()
-            self.set_status(f"undo · {label}")
+            # no panel reference: it may be closed by the time this runs
+            PortfolioStore.instance().replace(snap)
+            for w in QApplication.topLevelWidgets():
+                notify = getattr(w, "notify", None)
+                if callable(notify):
+                    notify(f"undo · {label}")
+                    break
 
         UndoStack.instance().push(label, _undo)
 
@@ -776,17 +797,14 @@ class PortfolioPanel(Panel):
             return
         self._push_positions_undo("add position")
         cost_val = self.cost_spin.value()
-        self._positions.append({
-            "symbol": symbol,
-            "qty": self.qty_spin.value(),
-            "cost": cost_val if cost_val > 0 else None,  # None => fill at market
-            "date": self.date_edit.date().toString("yyyy-MM-dd"),
-            "sell_date": None,
-            "sell_price": None,
-        })
         self.symbol_edit.clear()
         self.cost_spin.setValue(0.0)
-        self._rebuild_table()
+        PortfolioStore.instance().add(
+            symbol,
+            self.qty_spin.value(),
+            cost_val if cost_val > 0 else None,  # None => fill at market
+            self.date_edit.date().toString("yyyy-MM-dd"),
+        )
 
     def _mark_sold(self) -> None:
         rows = sorted(
@@ -796,12 +814,8 @@ class PortfolioPanel(Panel):
         if not rows:
             return
         self._push_positions_undo("mark sold")
-        today = date.today().isoformat()
-        for r in rows:
-            pos = self._positions[r]
-            pos["sell_date"] = today
-            pos["sell_price"] = self._last_price.get(pos["symbol"])
-        self._rebuild_table()
+        PortfolioStore.instance().mark_sold(
+            rows, dict(self._last_price), date.today().isoformat())
 
     def _remove_selected(self) -> None:
         rows = sorted({idx.row() for idx in self.table.selectedIndexes()}, reverse=True)
@@ -809,9 +823,7 @@ class PortfolioPanel(Panel):
         if not to_remove:
             return
         self._push_positions_undo("remove position")
-        for row in to_remove:
-            del self._positions[row]
-        self._rebuild_table()
+        PortfolioStore.instance().remove(to_remove)
 
     # -- selection -> navigation -------------------------------------------
 
@@ -831,43 +843,7 @@ class PortfolioPanel(Panel):
     # -- persistence -------------------------------------------------------
 
     def settings(self) -> dict:
-        return {
-            "positions": [
-                [p["symbol"], p["qty"], p.get("cost"), p.get("date"),
-                 p.get("sell_date"), p.get("sell_price")]
-                for p in self._positions
-            ]
-        }
+        return {}  # positions live in the app-wide PortfolioStore
 
     def restore(self, settings: dict) -> None:
-        if not isinstance(settings, dict):
-            return
-        positions = settings.get("positions")
-        if not isinstance(positions, list):
-            return
-
-        def _num_or_none(v):
-            return float(v) if isinstance(v, (int, float)) else None
-
-        cleaned = []
-        for entry in positions:
-            # accepts the legacy 3-field [symbol, qty, cost] and the extended form
-            if not (isinstance(entry, list) and len(entry) >= 3):
-                continue
-            symbol = str(entry[0]).strip().upper()
-            try:
-                qty = float(entry[1])
-            except (TypeError, ValueError):
-                continue
-            if not symbol:
-                continue
-            cleaned.append({
-                "symbol": symbol,
-                "qty": qty,
-                "cost": _num_or_none(entry[2]),
-                "date": entry[3] if len(entry) > 3 and entry[3] else None,
-                "sell_date": entry[4] if len(entry) > 4 and entry[4] else None,
-                "sell_price": _num_or_none(entry[5]) if len(entry) > 5 else None,
-            })
-        self._positions = cleaned
-        self._rebuild_table()
+        pass  # legacy "positions" are imported into the store at startup
