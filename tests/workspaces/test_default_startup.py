@@ -95,6 +95,20 @@ def test_restores_saved_session_without_showing_chooser(monkeypatch):
     assert called == []
 
 
+def test_import_failure_does_not_abort_launch(monkeypatch):
+    from aurantium import app as app_mod
+
+    def boom(*a, **k):
+        raise RuntimeError("settings unwritable")
+
+    monkeypatch.setattr(app_mod, "import_legacy_books", boom)
+    saved = {"panels": [{"panel_id": "watchlist"}]}
+    host = _Host(saved)
+    app_mod.MainWindow.default_startup(host)
+
+    assert host.applied == [saved]
+
+
 def test_no_saved_session_shows_chooser_and_loads_chosen_preset(monkeypatch):
     from aurantium import app as app_mod
     import aurantium.workspace_chooser as wc_mod

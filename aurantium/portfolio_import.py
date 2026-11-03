@@ -54,9 +54,14 @@ def import_legacy_books(
         name, doc = active
         found += [(name, b) for b in books_in_layout(doc)]
     for name, doc in saved.items():
+        books = books_in_layout(doc)
         if active is not None and name == active[0]:
-            continue
-        found += [(name, b) for b in books_in_layout(doc)]
+            # the last session is usually a copy of the layout saved under the
+            # same name; only a genuinely different book is kept, relabelled
+            if books == books_in_layout(active[1]):
+                continue
+            name = f"{name} (saved)"
+        found += [(name, b) for b in books]
 
     if found and not qs.contains(_BACKUP_KEY):
         distinct: list[dict] = []

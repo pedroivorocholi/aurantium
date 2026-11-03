@@ -75,7 +75,7 @@ def test_flag_set_even_when_nothing_found(tmp_path):
 def test_never_merges_and_reports_other_books(tmp_path):
     qs, store = _setup(tmp_path)
     names = import_legacy_books(
-        store, ("Main", _doc(AAPL)), {"Main": _doc(MSFT), "Paper": _doc(TSLA)}, settings=qs)
+        store, ("Main", _doc(AAPL)), {"Main": _doc(AAPL), "Paper": _doc(TSLA)}, settings=qs)
     assert _syms(store) == ["AAPL"]
     assert names == ["Paper"]
     backup = json.loads(qs.value("portfolio/legacy_books", "", type=str))
@@ -114,3 +114,19 @@ def test_layout_file_import_only_fills_empty_store(tmp_path):
     assert _syms(store) == ["AAPL"]
     empty = PortfolioStore(_qs(tmp_path, "e.ini"))
     assert import_from_layout_file(empty, _doc([])) is False
+
+
+def test_same_name_saved_layout_with_different_book_is_kept(tmp_path):
+    qs, store = _setup(tmp_path)
+    names = import_legacy_books(
+        store, ("Main", _doc(AAPL)), {"Main": _doc(TSLA)}, settings=qs)
+    assert _syms(store) == ["AAPL"]
+    assert names == ["Main (saved)"]
+    backup = json.loads(qs.value("portfolio/legacy_books", "", type=str))
+    assert [b["layout"] for b in backup] == ["Main", "Main (saved)"]
+
+
+def test_same_name_saved_layout_with_same_book_is_skipped(tmp_path):
+    qs, store = _setup(tmp_path)
+    assert import_legacy_books(
+        store, ("Main", _doc(AAPL)), {"Main": _doc(AAPL)}, settings=qs) == []

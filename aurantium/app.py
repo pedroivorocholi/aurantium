@@ -1969,20 +1969,27 @@ class MainWindow(QMainWindow):
         rather than asking a question."""
         last = self.layout_store.get_last()
         # one-time adoption of the old per-layout portfolio books; runs before
-        # any panel is built so an open Portfolio panel shows the book at once
-        active = (
-            (str(last.get("name") or "Last session"), last)
-            if isinstance(last, dict) else None
-        )
-        moved = import_legacy_books(
-            PortfolioStore.instance(),
-            active,
-            {n: self.layout_store.get(n) or {} for n in self.layout_store.names()},
-        )
-        if moved:
-            QTimer.singleShot(2000, lambda: self.notify(
-                "Imported your portfolio from this layout. Other books were "
-                f"saved as a backup: {', '.join(moved)}", msecs=8000))
+        # any panel is built so an open Portfolio panel shows the book at once.
+        # Never allowed to abort launch.
+        try:
+            active = (
+                (str(last.get("name") or "Last session"), last)
+                if isinstance(last, dict) else None
+            )
+            moved = import_legacy_books(
+                PortfolioStore.instance(),
+                active,
+                {n: self.layout_store.get(n) or {}
+                 for n in self.layout_store.names()},
+            )
+            if moved:
+                QTimer.singleShot(2000, lambda: self.notify(
+                    "Imported your portfolio from this layout. Other books were "
+                    f"saved as a backup: {', '.join(moved)}", msecs=8000))
+        except Exception:  # noqa: BLE001
+            import traceback
+
+            traceback.print_exc()
         if isinstance(last, dict) and last.get("panels"):
             self.apply_layout(last)
             return
