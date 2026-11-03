@@ -16,6 +16,7 @@ from PySide6.QtCore import QSettings
 from .portfolio_store import PortfolioStore, normalize_positions
 
 _IMPORTED_KEY = "portfolio/imported"
+_SOURCE_KEY = "portfolio/imported_from"
 _BACKUP_KEY = "portfolio/legacy_books"
 
 
@@ -32,6 +33,12 @@ def books_in_layout(doc: dict) -> list[list[dict]]:
         if book:
             books.append(book)
     return books
+
+
+def imported_from(settings: Optional[QSettings] = None) -> str:
+    """The layout name the adopted book came from ("" if none was adopted)."""
+    qs = settings if settings is not None else QSettings()
+    return str(qs.value(_SOURCE_KEY, "", type=str) or "")
 
 
 def import_legacy_books(
@@ -72,8 +79,9 @@ def import_legacy_books(
 
     imported: Optional[list[dict]] = None
     if found and store.is_empty():
-        imported = found[0][1]
+        source, imported = found[0]
         store.replace(imported)
+        qs.setValue(_SOURCE_KEY, source)
 
     qs.setValue(_IMPORTED_KEY, True)
     qs.sync()

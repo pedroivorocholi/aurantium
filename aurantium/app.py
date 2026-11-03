@@ -48,7 +48,11 @@ from .notifier import Notifier
 from .title_bar import NativeFrame, TitleBar, frame_panel_window
 from .components.fit_width import relax_min_widths
 from .panel import LoadingPlaceholder, Panel, PanelRegistry
-from .portfolio_import import import_from_layout_file, import_legacy_books
+from .portfolio_import import (
+    import_from_layout_file,
+    import_legacy_books,
+    imported_from,
+)
 from .portfolio_store import PortfolioStore
 from .paths import ASSETS_DIR, BUNDLE_DIR
 from .presets import Preset, available_presets
@@ -1984,8 +1988,10 @@ class MainWindow(QMainWindow):
                  for n in self.layout_store.names()},
             )
             if moved:
+                source = imported_from()
+                where = f"layout \"{source}\"" if source else "this layout"
                 QTimer.singleShot(2000, lambda: self.notify(
-                    "Imported your portfolio from this layout. Other books were "
+                    f"Imported your portfolio from {where}. Other books were "
                     f"saved as a backup: {', '.join(moved)}", msecs=8000))
         except Exception:  # noqa: BLE001
             import traceback

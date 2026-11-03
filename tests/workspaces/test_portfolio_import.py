@@ -8,6 +8,7 @@ from aurantium.portfolio_import import (
     books_in_layout,
     import_from_layout_file,
     import_legacy_books,
+    imported_from,
 )
 from aurantium.portfolio_store import PortfolioStore
 
@@ -130,3 +131,21 @@ def test_same_name_saved_layout_with_same_book_is_skipped(tmp_path):
     qs, store = _setup(tmp_path)
     assert import_legacy_books(
         store, ("Main", _doc(AAPL)), {"Main": _doc(AAPL)}, settings=qs) == []
+
+
+def test_records_which_layout_the_book_came_from(tmp_path):
+    qs, store = _setup(tmp_path)
+    import_legacy_books(store, None, {"Empty": _doc([]), "Paper": _doc(TSLA)}, settings=qs)
+    assert imported_from(qs) == "Paper"
+
+
+def test_records_active_layout_as_source(tmp_path):
+    qs, store = _setup(tmp_path)
+    import_legacy_books(store, ("Main", _doc(AAPL)), {"Paper": _doc(TSLA)}, settings=qs)
+    assert imported_from(qs) == "Main"
+
+
+def test_no_source_when_nothing_adopted(tmp_path):
+    qs, store = _setup(tmp_path)
+    import_legacy_books(store, None, {}, settings=qs)
+    assert imported_from(qs) == ""
