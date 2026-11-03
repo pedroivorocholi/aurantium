@@ -835,7 +835,7 @@ class Panel(QWidget):
         super().__init__(parent)
         self._hub = DataHub.instance()
         self._ctx = SymbolContext.instance()
-        self._link_group = DEFAULT_GROUP
+        self._link_group = UNLINKED
         self._current_symbol = ""
         self._topics: set[str] = set()
         self._size_class = size_class_for(self.width())

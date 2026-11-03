@@ -1,10 +1,14 @@
-"""News panel — headlines from one of three sources, chosen per instance:
+"""News panel — headlines from one of three sources, chosen per instance
+from the link badge:
 
-* **Linked** follows the link group's symbol (topic ``news:SYM``);
-* **Topic** watches its own free-text query (``newsq:QUERY``) — what the
-  retired Topic News panel did, whose id now aliases here;
-* **Portfolio** reads the app-wide book (``PortfolioStore``) and shows the
-  headlines that can move it (``newsp:<book>``), each tagged with why.
+* **Topic** (unlinked, the default) watches its own free-text query
+  (``newsq:QUERY``) — what the retired Topic News panel did, whose id now
+  aliases here;
+* **Linked** (any link group) follows the group's symbol (``news:SYM``);
+* **Portfolio** (the badge menu's last entry) reads the app-wide book
+  (``PortfolioStore``) and shows the headlines that can move it
+  (``newsp:<book>``), each tagged with why. It keeps the panel's group, which
+  only receives the tickers clicked in it.
 
 Single-click a headline for a quick preview snippet (and it dims as read);
 double-click to open it in the browser. The filter box narrows the list live.
@@ -15,22 +19,17 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QButtonGroup, QLineEdit, QPushButton, QWidget
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import QLineEdit
 
 from ..components.responsive_row import ResponsiveRow
 from ..guide import PanelGuide
-from ..panel import EMPTY_NO_SYMBOL, PanelRegistry, register_panel
+from ..panel import EMPTY_NO_SYMBOL, Panel, PanelRegistry, register_panel
+from ..symbol_context import DEFAULT_GROUP, UNLINKED
 from ._news_common import NewsPanelBase, _set_news_columns, news_symbol_at
 
 SOURCES = ("linked", "topic", "portfolio")
 DEFAULT_QUERY = "markets"
-
-_SOURCE_LABELS = {"linked": "Linked", "topic": "Topic", "portfolio": "Portfolio"}
-_SOURCE_TIPS = {
-    "linked": "Headlines for the link group's symbol",
-    "topic": "Headlines for your own search query",
-    "portfolio": "Headlines that can move your portfolio",
-}
 #: store edits arrive in bursts (add, then a cost fill; undo of several rows)
 _PORTFOLIO_DEBOUNCE_MS = 750
 
@@ -44,36 +43,39 @@ def _status(prefix: str, count: int) -> str:
 class NewsPanel(NewsPanelBase):
     GUIDE = PanelGuide(
         purpose=(
-            "Headlines from one of three sources. **Linked**: the linked symbol, newest "
-            "first — the past week, merged from publisher feeds, Google News and Finnhub "
-            "(up to a month for quiet names). **Topic**: a free-text query — a theme, a "
-            "country, a sector — newest first. **Portfolio**: news that can move your open "
+            "Headlines from one of three sources. **Topic** (the default): a free-text "
+            "query — a theme, a country, a sector — newest first. **Linked**: the linked "
+            "symbol, newest first — the past week, merged from publisher feeds, Google "
+            "News and Finnhub (up to a month for quiet names). **Portfolio**: news that "
+            "can move your open "
             "positions — about the holdings themselves, the sectors the book leans on, and "
             "macro events — ranked by relevance: larger positions and fresher news first."
         ),
         links=(
-            "Linked follows the link group's symbol. Topic and Portfolio ignore it; in "
-            "Portfolio, clicking a headline tagged with a ticker sends that ticker to "
-            "the link group."
+            "The link badge picks the source: **Unlinked** is Topic, a **group** makes it "
+            "Linked news for that group's symbol, and **Portfolio news** at the bottom of "
+            "the badge menu switches to your book. Portfolio ignores the group's symbol, "
+            "but clicking a headline tagged with a ticker sends that ticker to the group."
         ),
         interactions=(
-            "**Linked · Topic · Portfolio** at the top picks the source; each panel "
-            "remembers its own, saved with the layout.",
-            "In Topic, type a query and press **Set** or Enter. *markets*, *forex*, "
+            "Each panel remembers its source, saved with the layout.",
+            "In Topic, type a topic in the left box and press Enter. *markets*, *forex*, "
             "*crypto* and *mergers* also pull Finnhub's market wire.",
             "In Portfolio, the **Why** column tags each headline: a ticker you hold, a "
             "sector and its weight in the book, or *Macro*. An empty portfolio shows "
             "nothing — add positions in the Portfolio panel.",
             "Single-click a headline for a preview below the list; it dims once read.",
             "Double-click to open the article in your browser.",
-            "The filter box narrows the headlines (and Why tags) as you type; read state "
+            "The filter box (right) narrows the headlines (and Why tags) as you type; read state "
             "is saved with the layout.",
             "Only your reading languages appear (Settings ▸ News Languages…).",
         ),
     )
 
     def build(self) -> None:
-        self._source = "linked"
+        # panels open unlinked, so a new News panel is Topic news; linking it
+        # to a group makes it Linked
+        self._source = "topic"
         self._query = DEFAULT_QUERY
         self._linked_symbol = ""
         # Portfolio mode
@@ -86,48 +88,75 @@ class NewsPanel(NewsPanelBase):
         self._portfolio_debounce.setInterval(_PORTFOLIO_DEBOUNCE_MS)
         self._portfolio_debounce.timeout.connect(self._rebuild_portfolio)
 
-        # -- source switch: the app's one-of-many chip style
-        source_row = ResponsiveRow()
-        self._source_group = QButtonGroup(self)
-        self._source_group.setExclusive(True)
-        self._source_btns: dict[str, QPushButton] = {}
-        for i, source in enumerate(SOURCES):
-            btn = QPushButton(_SOURCE_LABELS[source], self)
-            btn.setObjectName("chartChip")
-            btn.setCheckable(True)
-            btn.setToolTip(_SOURCE_TIPS[source])
-            self._source_group.addButton(btn, i)
-            self._source_btns[source] = btn
-            source_row.addWidget(btn)
-        source_row.addStretch(1)
-        self._source_group.idClicked.connect(lambda i: self.set_source(SOURCES[i]))
-        self.content_layout.addLayout(source_row)
-
-        # -- Topic's query row, hidden in the other modes
-        self._query_box = QWidget(self)
-        query_row = ResponsiveRow(self._query_box)
-        self.query_edit = QLineEdit(self._query_box)
-        self.query_edit.setText(self._query)
-        self.query_edit.setPlaceholderText("Search query…")
-        self.query_edit.returnPressed.connect(self._apply_query)
-        set_btn = QPushButton("Set", self._query_box)
-        set_btn.clicked.connect(self._apply_query)
-        query_row.addWidget(self.query_edit, 1)
-        query_row.addWidget(set_btn)
-        self.content_layout.addWidget(self._query_box)
-
         self._build_news_ui()
-        self.set_source("linked")
+
+        # -- one slim row: Topic's query (hidden in the other modes) beside
+        # the filter, so the headlines start right under the header
+        self.query_edit = QLineEdit(self)
+        self.query_edit.setText(self._query)
+        self.query_edit.setPlaceholderText("Topic — press Enter")
+        self.query_edit.setToolTip("The topic this panel follows; press Enter to apply")
+        self.query_edit.returnPressed.connect(self._apply_query)
+        self.content_layout.removeWidget(self._news_filter)
+        row = ResponsiveRow()
+        row.addWidget(self.query_edit, 1)
+        row.addWidget(self._news_filter, 1)
+        self.content_layout.insertLayout(0, row)
+
+        # -- Portfolio sits in the link badge's menu, under the groups
+        menu = self._badge.menu()
+        for act in menu.actions():
+            if act.text() == "Unlinked":
+                act.setText("Unlinked — topic news")
+        menu.addSeparator()
+        self._portfolio_act = QAction("Portfolio news", menu)
+        self._portfolio_act.setCheckable(True)
+        self._portfolio_act.toggled.connect(self._on_portfolio_toggled)
+        menu.addAction(self._portfolio_act)
+
+        self._show_source("topic")
 
     # -- source ------------------------------------------------------------
 
+    def set_link_group(self, group: str) -> None:
+        # the badge picks the source: a group is Linked, Unlinked is Topic —
+        # and choosing either leaves Portfolio
+        Panel.set_link_group(self, group)
+        if hasattr(self, "_portfolio_act"):  # built
+            self._show_source("topic" if group == UNLINKED else "linked")
+
     def set_source(self, source: str) -> None:
-        """Switch what this panel shows; drops the old source's subscriptions."""
+        """Switch what this panel shows, moving the link group to match:
+        Topic unlinks, Linked joins a group if it had none, Portfolio keeps
+        the group (it only receives clicked tickers)."""
         if source not in SOURCES:
-            source = "linked"
+            source = "topic"
+        if source == "topic" and self._link_group != UNLINKED:
+            Panel.set_link_group(self, UNLINKED)
+        elif source == "linked" and self._link_group == UNLINKED:
+            Panel.set_link_group(self, DEFAULT_GROUP)
+        self._show_source(source)
+
+    def _on_portfolio_toggled(self, on: bool) -> None:
+        if on:
+            self._show_source("portfolio")
+        else:
+            self._show_source("topic" if self._link_group == UNLINKED else "linked")
+
+    def _show_source(self, source: str) -> None:
+        """Show ``source``; drops the old source's subscriptions."""
         self._source = source
-        self._source_btns[source].setChecked(True)
-        self._query_box.setVisible(source == "topic")
+        self._portfolio_act.blockSignals(True)
+        self._portfolio_act.setChecked(source == "portfolio")
+        self._portfolio_act.blockSignals(False)
+        self._update_badge()
+        if source == "portfolio":
+            self._badge.setToolTip(
+                "Portfolio news — clicked tickers go to the link group"
+                if self._link_group != UNLINKED
+                else "Portfolio news — link a group to send clicked tickers to it"
+            )
+        self.query_edit.setVisible(source == "topic")
         self.refresh_header_symbol()
         self._portfolio_debounce.stop()
         self._watch_store(source == "portfolio")
@@ -188,7 +217,7 @@ class NewsPanel(NewsPanelBase):
             return
         self.set_status(query)
         self.set_news_empty_text(
-            f"No headlines for “{query}”", "Try a broader search above"
+            f"No headlines for “{query}”", "Try a broader topic"
         )
         self.unsubscribe_all()
         self.subscribe(f"newsq:{query}", self._on_topic_news)
@@ -318,12 +347,14 @@ class NewsPanel(NewsPanelBase):
         if isinstance(query, str) and query.strip():
             self._query = query.strip()
             self.query_edit.setText(self._query)
+        # The link group, restored first, already chose Linked or Topic; only
+        # Portfolio is stored on its own. A Topic dock that carried a group it
+        # ignored (Topic News, and this branch's first layouts) unlinks.
         source = settings.get("source")
-        if source not in SOURCES:
-            source = "linked"  # layouts from before the source switch
-        if source == "linked" and self._source == "linked":
-            return  # already showing it; don't drop a live subscription
-        self.set_source(source)
+        if source == "portfolio" or (source == "topic" and self._source != "topic"):
+            self.set_source(source)
+        elif self._source == "topic":
+            self._apply_query()  # the restored query, not the default
 
 
 # the retired Topic News panel: menus, commands and presets naming it open
@@ -351,6 +382,7 @@ def migrate_news_layout(doc: dict) -> dict:
         read = old.get("read")
         new_spec = dict(spec)
         new_spec["panel_id"] = "news"
+        new_spec["link_group"] = UNLINKED  # unlinked is what makes it Topic
         new_spec["settings"] = {
             "source": "topic",
             "query": old.get("query") or DEFAULT_QUERY,

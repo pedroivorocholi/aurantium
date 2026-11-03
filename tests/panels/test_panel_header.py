@@ -29,6 +29,7 @@ def panel(qapp):
 
     p = _P()
     p.build()
+    p.set_link_group("A")  # panels open unlinked; these tests are about a linked one
     yield p
     SymbolContext._inst = None
 

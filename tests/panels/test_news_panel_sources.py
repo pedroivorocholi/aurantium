@@ -52,6 +52,10 @@ def store(qapp, tmp_path):
 
 @pytest.fixture
 def make_panel(qapp):
+    from aurantium.symbol_context import SymbolContext
+
+    # joining a group takes its symbol; another test's must not leak in
+    SymbolContext._inst = None
     made = []
 
     def _make():
@@ -125,7 +129,7 @@ def test_migrate_news_layout(qapp):
     assert doc == snapshot  # input untouched
     news = [s for s in out["panels"] if s["panel_id"] == "news"]
     assert news == [{
-        "instance": "topic_news#1", "panel_id": "news", "link_group": "B",
+        "instance": "topic_news#1", "panel_id": "news", "link_group": "None",
         "settings": {"source": "topic", "query": "Brazil", "read": ["u"]},
     }]
     assert [s["panel_id"] for s in out["panels"]] == ["news", "company"]
@@ -150,13 +154,67 @@ def test_default_layout_has_no_topic_news():
     assert sorted(s["settings"]["query"] for s in topics) == ["Brazil", "energy commodities"]
     # the saved dock arrangement names these instance ids
     assert sorted(s["instance"] for s in topics) == ["topic_news#1", "topic_news#2"]
+    assert {s["link_group"] for s in topics} == {"None"}  # unlinked is Topic
 
 
 # -- settings / linking -------------------------------------------------------
 
 
+def test_new_panel_is_unlinked_topic(make_panel):
+    p = make_panel()
+    assert p.link_group == "None"
+    assert p.settings()["source"] == "topic"
+    assert "newsq:markets" in p._hub.subs
+    assert p.query_edit.isVisibleTo(p)
+
+
+def test_badge_group_picks_linked_or_topic(make_panel):
+    p = make_panel()
+    p.on_symbol("AAPL")  # remembered while Topic
+    p.set_link_group("B")
+    assert p.settings()["source"] == "linked"
+    assert "news:AAPL" in p._hub.subs
+    assert not p.query_edit.isVisibleTo(p)
+    p.set_link_group("None")
+    assert p.settings()["source"] == "topic"
+    assert "newsq:markets" in p._hub.subs
+
+
+def test_portfolio_is_in_the_badge_menu_and_keeps_the_group(store, make_panel):
+    p = make_panel()
+    p.set_link_group("B")
+    texts = [a.text() for a in p._badge.menu().actions()]
+    assert "Portfolio news" in texts and "Unlinked — topic news" in texts
+    p._portfolio_act.trigger()
+    assert p.settings()["source"] == "portfolio"
+    assert p.link_group == "B"  # clicked tickers still go to B
+    p._portfolio_act.trigger()  # unticking returns to what the group says
+    assert p.settings()["source"] == "linked"
+    p._portfolio_act.trigger()
+    p.set_link_group("C")  # picking a group leaves Portfolio
+    assert p.settings()["source"] == "linked"
+    assert not p._portfolio_act.isChecked()
+
+
+def test_topic_dock_with_a_group_restores_unlinked(make_panel):
+    p = make_panel()
+    p.set_link_group("A")  # what a saved layout does before restore()
+    p.restore({"source": "topic", "query": "Brazil", "read": []})
+    assert p.link_group == "None"
+    assert "newsq:Brazil" in p._hub.subs
+
+
+def test_portfolio_survives_restore(store, make_panel):
+    p = make_panel()
+    p.set_link_group("A")
+    p.restore({"source": "portfolio", "query": "markets", "read": []})
+    assert p.settings()["source"] == "portfolio"
+    assert p.link_group == "A"
+
+
 def test_old_news_settings_restore_as_linked(make_panel):
     p = make_panel()
+    p.set_link_group("A")  # old News docks were always in a group
     p.restore({"read": ["a"]})
     assert p.settings() == {"source": "linked", "query": "markets", "read": ["a"]}
     p.on_symbol("AAPL")
@@ -182,13 +240,21 @@ def test_on_symbol_ignored_outside_linked(make_panel):
     assert not any(t.startswith("newsq:") for t in p._hub.subs)
 
 
-def test_query_row_only_in_topic(make_panel):
+def test_query_box_only_in_topic(make_panel):
     p = make_panel()
-    assert p._query_box.isHidden()
-    p.set_source("topic")
-    assert not p._query_box.isHidden()
+    assert not p.query_edit.isHidden()
+    p.set_source("linked")
+    assert p.query_edit.isHidden()
     p.set_source("portfolio")
-    assert p._query_box.isHidden()
+    assert p.query_edit.isHidden()
+    assert not p._news_filter.isHidden()
+
+
+def test_query_and_filter_share_one_row(make_panel):
+    p = make_panel()
+    first = p.content_layout.itemAt(0).layout()
+    widgets = [first.itemAt(i).widget() for i in range(first.count())]
+    assert widgets == [p.query_edit, p._news_filter]
 
 
 # -- portfolio mode -----------------------------------------------------------
@@ -374,6 +440,7 @@ def test_profile_error_is_not_shown(store, qapp):
 
 def test_header_symbol_blank_outside_linked(make_panel):
     p = make_panel()
+    p.set_source("linked")
     p._apply_symbol("AAPL")
     assert p._symbol_lbl.text() == "AAPL"
     p.set_source("portfolio")

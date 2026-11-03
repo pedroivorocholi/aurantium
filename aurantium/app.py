@@ -1289,10 +1289,15 @@ class MainWindow(QMainWindow):
         """
         if parse_iso(anchor) is None:
             return
-        if not any(
-            getattr(d.widget(), "panel_id", "") == "day_brief"
-            for d in self._docks.values()
-        ):
+        briefs = [
+            d.widget() for d in self._docks.values()
+            if getattr(d.widget(), "panel_id", "") == "day_brief"
+        ]
+        if briefs and not any(b.link_group == group for b in briefs):
+            # panels open unlinked, so a brief the user opened from the menu
+            # hears no group; the date they just picked brings it in
+            briefs[0].set_link_group(group)
+        if not briefs:
             # Opened as its own window, not docked: wedging a brief into the
             # side of a tuned workspace steals width from every other panel to
             # show something the user will read once and close. Dragging it
@@ -1945,10 +1950,11 @@ class MainWindow(QMainWindow):
         self.notify(f"Layout imported: {name}", 5000)
 
     def _open_core_four(self) -> None:
-        self.add_panel("watchlist", area=QtAds.DockWidgetArea.LeftDockWidgetArea)
-        self.add_panel("chart", area=QtAds.DockWidgetArea.CenterDockWidgetArea)
-        self.add_panel("news", area=QtAds.DockWidgetArea.RightDockWidgetArea)
-        self.add_panel("analyst", area=QtAds.DockWidgetArea.BottomDockWidgetArea)
+        # the starter four are one linked set; panels opened later start unlinked
+        self.add_panel("watchlist", link_group=DEFAULT_GROUP, area=QtAds.DockWidgetArea.LeftDockWidgetArea)
+        self.add_panel("chart", link_group=DEFAULT_GROUP, area=QtAds.DockWidgetArea.CenterDockWidgetArea)
+        self.add_panel("news", link_group=DEFAULT_GROUP, area=QtAds.DockWidgetArea.RightDockWidgetArea)
+        self.add_panel("analyst", link_group=DEFAULT_GROUP, area=QtAds.DockWidgetArea.BottomDockWidgetArea)
 
     def default_startup(
         self, before_prompt: Callable[[], None] | None = None

@@ -199,11 +199,18 @@ def test_an_off_screen_window_is_pulled_back(win, qapp):
 def test_link_groups_reach_panels_in_other_windows(win, qapp):
     from aurantium.symbol_context import DEFAULT_GROUP, SymbolContext
 
-    dock = win.add_panel("company", floating=True)
+    dock = win.add_panel("company", link_group=DEFAULT_GROUP, floating=True)
     panel = dock.widget()
-    SymbolContext.instance().set_symbol(panel.link_group or DEFAULT_GROUP, "MSFT")
+    SymbolContext.instance().set_symbol(DEFAULT_GROUP, "MSFT")
     qapp.processEvents()
     assert panel.current_symbol == "MSFT"
+
+
+def test_new_panels_open_unlinked(win):
+    from aurantium.symbol_context import UNLINKED
+
+    for pid in ("chart", "company", "watchlist"):
+        assert win.add_panel(pid, floating=True).widget().link_group == UNLINKED
 
 
 def test_a_floating_panel_survives_save_and_restore(win):
