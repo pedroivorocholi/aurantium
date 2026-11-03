@@ -1808,8 +1808,9 @@ class MainWindow(QMainWindow):
             SymbolContext.instance().from_json(doc.get("symbols", {}))
             DateContext.instance().from_json(doc.get("dates", {}))
             from .panels.company import migrate_layout
+            from .panels.news import migrate_news_layout
 
-            doc = migrate_layout(doc)
+            doc = migrate_news_layout(migrate_layout(doc))
             # Two passes. First every dock is created holding its panel's loading
             # outline and the saved arrangement is applied, so the window shows
             # the workspace exactly as saved at once; then the panels are built

@@ -904,8 +904,8 @@ class NewsProvider(Provider):
     ) -> Optional[list[dict]]:
         """Headlines where every query word appears as a word in the title
         (plurals allowed: "price" finds "prices", but "ai" no longer finds
-        "said"), or where the query names a feed category (the Topic News
-        default 'markets' pulls the whole markets feed set)."""
+        "said"), or where the query names a feed category (the News panel's
+        Topic-mode default 'markets' pulls the whole markets feed set)."""
         try:
             tokens = [t for t in query.lower().split() if t]
             if not tokens:

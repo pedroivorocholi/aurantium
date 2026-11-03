@@ -1,4 +1,10 @@
-"""News panel — headlines for the linked symbol.
+"""News panel — headlines from one of three sources, chosen per instance:
+
+* **Linked** follows the link group's symbol (topic ``news:SYM``);
+* **Topic** watches its own free-text query (``newsq:QUERY``) — what the
+  retired Topic News panel did, whose id now aliases here;
+* **Portfolio** reads the app-wide book (``PortfolioStore``) and shows the
+  headlines that can move it (``newsp:<book>``), each tagged with why.
 
 Single-click a headline for a quick preview snippet (and it dims as read);
 double-click to open it in the browser. The filter box narrows the list live.
@@ -6,51 +12,328 @@ double-click to open it in the browser. The filter box narrows the list live.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
+from PySide6.QtCore import QTimer
+from PySide6.QtWidgets import QButtonGroup, QLineEdit, QPushButton, QWidget
+
+from ..components.responsive_row import ResponsiveRow
 from ..guide import PanelGuide
-from ..panel import register_panel
-from ._news_common import NewsPanelBase
+from ..panel import EMPTY_NO_SYMBOL, PanelRegistry, register_panel
+from ._news_common import NewsPanelBase, _set_news_columns, news_symbol_at
+
+SOURCES = ("linked", "topic", "portfolio")
+DEFAULT_QUERY = "markets"
+
+_SOURCE_LABELS = {"linked": "Linked", "topic": "Topic", "portfolio": "Portfolio"}
+_SOURCE_TIPS = {
+    "linked": "Headlines for the link group's symbol",
+    "topic": "Headlines for your own search query",
+    "portfolio": "Headlines that can move your portfolio",
+}
+#: store edits arrive in bursts (add, then a cost fill; undo of several rows)
+_PORTFOLIO_DEBOUNCE_MS = 750
+
+
+def _status(prefix: str, count: int) -> str:
+    suffix = f"{count} headlines" if count else "no news"
+    return f"{prefix} · {suffix}" if prefix else suffix
 
 
 @register_panel(id="news", title="News", category="News")
 class NewsPanel(NewsPanelBase):
     GUIDE = PanelGuide(
         purpose=(
-            "Headlines about the linked symbol, newest first — the past week, merged "
-            "from publisher feeds, Google News and Finnhub (up to a month for quiet names)."
+            "Headlines from one of three sources, newest first. **Linked**: the linked "
+            "symbol — the past week, merged from publisher feeds, Google News and Finnhub "
+            "(up to a month for quiet names). **Topic**: a free-text query — a theme, a "
+            "country, a sector. **Portfolio**: news that can move your open positions — "
+            "about the holdings themselves, the sectors the book leans on, and macro "
+            "events, larger positions ranked higher."
         ),
-        links="Follows the link group's symbol.",
+        links=(
+            "Linked follows the link group's symbol. Topic and Portfolio ignore it; in "
+            "Portfolio, clicking a headline tagged with a ticker sends that ticker to "
+            "the link group."
+        ),
         interactions=(
+            "**Linked · Topic · Portfolio** at the top picks the source; each panel "
+            "remembers its own, saved with the layout.",
+            "In Topic, type a query and press **Set** or Enter. *markets*, *forex*, "
+            "*crypto* and *mergers* also pull Finnhub's market wire.",
+            "In Portfolio, the **Why** column tags each headline: a ticker you hold, a "
+            "sector and its weight in the book, or *Macro*. An empty portfolio shows "
+            "nothing — add positions in the Portfolio panel.",
             "Single-click a headline for a preview below the list; it dims once read.",
             "Double-click to open the article in your browser.",
-            "The filter box narrows the headlines as you type; read state is saved with the layout.",
+            "The filter box narrows the headlines (and Why tags) as you type; read state "
+            "is saved with the layout.",
             "Only your reading languages appear (Settings ▸ News Languages…).",
         ),
     )
 
     def build(self) -> None:
+        self._source = "linked"
+        self._query = DEFAULT_QUERY
+        self._linked_symbol = ""
+        # Portfolio mode
+        self._store = None
+        self._news_topic: Optional[str] = None
+        self._profile_syms: set[str] = set()
+        self._sectors: dict[str, Optional[str]] = {}
+        self._portfolio_debounce = QTimer(self)
+        self._portfolio_debounce.setSingleShot(True)
+        self._portfolio_debounce.setInterval(_PORTFOLIO_DEBOUNCE_MS)
+        self._portfolio_debounce.timeout.connect(self._rebuild_portfolio)
+
+        # -- source switch: the app's one-of-many chip style
+        source_row = ResponsiveRow()
+        self._source_group = QButtonGroup(self)
+        self._source_group.setExclusive(True)
+        self._source_btns: dict[str, QPushButton] = {}
+        for i, source in enumerate(SOURCES):
+            btn = QPushButton(_SOURCE_LABELS[source], self)
+            btn.setObjectName("chartChip")
+            btn.setCheckable(True)
+            btn.setToolTip(_SOURCE_TIPS[source])
+            self._source_group.addButton(btn, i)
+            self._source_btns[source] = btn
+            source_row.addWidget(btn)
+        source_row.addStretch(1)
+        self._source_group.idClicked.connect(lambda i: self.set_source(SOURCES[i]))
+        self.content_layout.addLayout(source_row)
+
+        # -- Topic's query row, hidden in the other modes
+        self._query_box = QWidget(self)
+        query_row = ResponsiveRow(self._query_box)
+        self.query_edit = QLineEdit(self._query_box)
+        self.query_edit.setText(self._query)
+        self.query_edit.setPlaceholderText("Search query…")
+        self.query_edit.returnPressed.connect(self._apply_query)
+        set_btn = QPushButton("Set", self._query_box)
+        set_btn.clicked.connect(self._apply_query)
+        query_row.addWidget(self.query_edit, 1)
+        query_row.addWidget(set_btn)
+        self.content_layout.addWidget(self._query_box)
+
         self._build_news_ui()
+        self.set_source("linked")
+
+    # -- source ------------------------------------------------------------
+
+    def set_source(self, source: str) -> None:
+        """Switch what this panel shows; drops the old source's subscriptions."""
+        if source not in SOURCES:
+            source = "linked"
+        self._source = source
+        self._source_btns[source].setChecked(True)
+        self._query_box.setVisible(source == "topic")
+        self._portfolio_debounce.stop()
+        self._watch_store(source == "portfolio")
+        self.unsubscribe_all()
+        self._news_topic = None
+        self._profile_syms.clear()
+        self.table.setRowCount(0)
+        _set_news_columns(self.table, show_reason=source == "portfolio")
+        self.set_loading(False)
+        self.set_status("")
+        if source == "linked":
+            if self._linked_symbol:
+                self._subscribe_linked(self._linked_symbol)
+            else:
+                self.set_news_empty_text(
+                    EMPTY_NO_SYMBOL,
+                    "Click a ticker in any linked panel, or type one in the search box",
+                )
+        elif source == "topic":
+            self._apply_query()
+        else:
+            self._rebuild_portfolio()
+
+    # -- Linked ------------------------------------------------------------
 
     def on_symbol(self, symbol: str) -> None:
+        # remembered in every mode, so switching back to Linked picks it up
+        self._linked_symbol = symbol
+        if self._source == "linked":
+            self._subscribe_linked(symbol)
+
+    def _subscribe_linked(self, symbol: str) -> None:
         self.set_loading(True)
         self.set_news_empty_text(f"No recent headlines for {symbol}")
         self.unsubscribe_all()
-        self.subscribe(f"news:{symbol}", self._on_news)
+        self.subscribe(f"news:{symbol}", self._on_linked_news)
 
-    def _on_news(self, data: Any) -> None:
+    def _on_linked_news(self, data: Any) -> None:
         # The fetch resolved — lower the veil before deciding whether
         # there is anything to show.
         self.set_loading(False)
-        count = self._render_news(data)
-        suffix = f"{count} headlines" if count else "no news"
-        self.set_status(suffix)
+        self.set_status(_status("", self._render_news(data)))
+
+    # -- Topic -------------------------------------------------------------
+
+    def _apply_query(self) -> None:
+        query = self.query_edit.text().strip() or DEFAULT_QUERY
+        self.query_edit.setText(query)
+        self._query = query
+        if self._source != "topic":
+            return
+        self.set_status(query)
+        self.set_news_empty_text(
+            f"No headlines for “{query}”", "Try a broader search above"
+        )
+        self.unsubscribe_all()
+        self.subscribe(f"newsq:{query}", self._on_topic_news)
+
+    def _on_topic_news(self, data: Any) -> None:
+        self.set_status(_status(self._query, self._render_news(data)))
+
+    # -- Portfolio ---------------------------------------------------------
+
+    def _watch_store(self, on: bool) -> None:
+        """Follow the app-wide book only while in Portfolio mode — the store
+        isn't touched at all by Linked/Topic panels."""
+        if on and self._store is None:
+            from ..portfolio_store import PortfolioStore
+
+            self._store = PortfolioStore.instance()
+            self._store.changed.connect(self._schedule_portfolio)
+        elif not on and self._store is not None:
+            try:
+                self._store.changed.disconnect(self._schedule_portfolio)
+            except (RuntimeError, TypeError):
+                pass
+            self._store = None
+
+    def _schedule_portfolio(self) -> None:
+        self._portfolio_debounce.start()
+
+    def _unsubscribe(self, topic: str) -> None:
+        self._hub.unsubscribe(self, topic)
+        self._topics.discard(topic)
+
+    def _rebuild_portfolio(self) -> None:
+        if self._source != "portfolio" or self._store is None:
+            return
+        from ..portfolio_news import build_book, encode_book
+
+        positions = self._store.open_positions()
+        symbols = list(dict.fromkeys(p["symbol"] for p in positions))
+        # sectors feed the exposure layer; a profile that arrives later
+        # re-debounces, so the book catches up without blocking on it
+        for sym in self._profile_syms - set(symbols):
+            self._unsubscribe(f"profile:{sym}")
+        self._profile_syms &= set(symbols)
+        for sym in symbols:
+            if sym not in self._profile_syms:
+                self._profile_syms.add(sym)
+                self.subscribe(f"profile:{sym}", lambda d, s=sym: self._on_profile(s, d))
+
+        prices = {}
+        for sym in symbols:
+            quote = self._hub.peek(f"quote:{sym}")
+            if isinstance(quote, dict) and quote.get("price") is not None:
+                prices[sym] = quote["price"]
+        book = build_book(positions, prices, self._sectors)
+        if not book:
+            # an empty book shows nothing at all — not even macro news
+            self.unsubscribe_all()
+            self._news_topic = None
+            self._profile_syms.clear()
+            self.table.setRowCount(0)
+            self.set_loading(False)
+            self.set_status("")
+            self.set_news_empty_text(
+                "Your portfolio is empty", "Add positions in the Portfolio panel"
+            )
+            return
+        topic = "newsp:" + encode_book(book)
+        if topic == self._news_topic:
+            return
+        if self._news_topic is not None:
+            self._unsubscribe(self._news_topic)
+        self._news_topic = topic
+        self.set_news_empty_text("No headlines for your portfolio yet")
+        if self.table.rowCount() == 0:
+            self.set_loading(True)
+        self.subscribe(topic, self._on_portfolio_news)
+
+    def _on_profile(self, symbol: str, data: Any) -> None:
+        if not isinstance(data, dict):
+            return
+        sector = data.get("sector") or None
+        if self._sectors.get(symbol) != sector:
+            self._sectors[symbol] = sector
+            self._schedule_portfolio()
+
+    def _on_portfolio_news(self, data: Any) -> None:
+        self.set_loading(False)
+        self.set_status(_status("portfolio", self._render_news(data, show_reason=True)))
+
+    def _on_cell_clicked(self, row: int, col: int) -> None:
+        super()._on_cell_clicked(row, col)
+        if self._source == "portfolio":
+            symbol = news_symbol_at(self.table, row)
+            if symbol:
+                self.set_symbol(symbol)
+
+    def closeEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        self._portfolio_debounce.stop()
+        self._watch_store(False)
+        super().closeEvent(event)
 
     # -- persistence -------------------------------------------------------------
 
     def settings(self) -> dict:
-        return {"read": self._read_state()}
+        return {"source": self._source, "query": self._query, "read": self._read_state()}
 
     def restore(self, settings: dict) -> None:
-        if isinstance(settings, dict):
-            self._restore_read(settings.get("read"))
+        if not isinstance(settings, dict):
+            return
+        self._restore_read(settings.get("read"))
+        query = settings.get("query")
+        if isinstance(query, str) and query.strip():
+            self._query = query.strip()
+            self.query_edit.setText(self._query)
+        source = settings.get("source")
+        if source not in SOURCES:
+            source = "linked"  # layouts from before the source switch
+        if source == "linked" and self._source == "linked":
+            return  # already showing it; don't drop a live subscription
+        self.set_source(source)
+
+
+# the retired Topic News panel: menus, commands and presets naming it open
+# this panel in Topic mode
+PanelRegistry.add_alias("topic_news", "news", {"source": "topic"})
+
+
+def migrate_news_layout(doc: dict) -> dict:
+    """Rewrite a layout's retired ``topic_news`` docks as News panels in Topic
+    mode with their query and read state. Each keeps its instance id and link
+    group, so the saved dock arrangement still puts it where it was. Returns
+    ``doc`` itself when there is nothing to migrate, else a new dict; ``doc``
+    is never modified."""
+    panels = doc.get("panels") if isinstance(doc, dict) else None
+    if not isinstance(panels, list) or not any(
+        isinstance(s, dict) and s.get("panel_id") == "topic_news" for s in panels
+    ):
+        return doc
+    out: list = []
+    for spec in panels:
+        if not isinstance(spec, dict) or spec.get("panel_id") != "topic_news":
+            out.append(spec)
+            continue
+        old = spec.get("settings") if isinstance(spec.get("settings"), dict) else {}
+        read = old.get("read")
+        new_spec = dict(spec)
+        new_spec["panel_id"] = "news"
+        new_spec["settings"] = {
+            "source": "topic",
+            "query": old.get("query") or DEFAULT_QUERY,
+            "read": list(read) if isinstance(read, list) else [],
+        }
+        out.append(new_spec)
+    new = dict(doc)
+    new["panels"] = out
+    return new

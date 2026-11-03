@@ -27,9 +27,10 @@
     },
     {
       "instance": "topic_news#1",
-      "panel_id": "topic_news",
+      "panel_id": "news",
       "link_group": "A",
       "settings": {
+        "source": "topic",
         "query": "Brazil"
       }
     },
@@ -137,9 +138,10 @@
     },
     {
       "instance": "topic_news#2",
-      "panel_id": "topic_news",
+      "panel_id": "news",
       "link_group": "A",
       "settings": {
+        "source": "topic",
         "query": "energy commodities"
       }
     },

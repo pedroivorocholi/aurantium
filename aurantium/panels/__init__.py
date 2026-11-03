@@ -31,7 +31,6 @@ BUILTIN = (
     "portfolio",
     "profile",
     "sector_heatmap",
-    "topic_news",
     "watchlist",
     "world_indices",
 )

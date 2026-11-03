@@ -1,5 +1,6 @@
 """Shared news rendering: robust timestamp parsing + a clean Time/Headline
-table used by both the symbol News panel and the Topic News panel.
+table (Time/Why/Headline for Portfolio news) used by the News panel in every
+source mode.
 
 Underscore-prefixed so ``discover_panels`` skips it (it registers no panel).
 """
@@ -73,6 +74,24 @@ def format_when(dt: Optional[datetime]) -> str:
     return dt.strftime("%b %d %y")
 
 
+def headline_col(table: QTableWidget) -> int:
+    """The headline is always the last column: 1 in Time | Headline, 2 when
+    Portfolio news adds its Why tag between them."""
+    return table.columnCount() - 1
+
+
+def _set_news_columns(table: QTableWidget, show_reason: bool) -> None:
+    labels = ["Time", "Why", "Headline"] if show_reason else ["Time", "Headline"]
+    if table.columnCount() == len(labels):
+        return
+    table.setColumnCount(len(labels))
+    table.setHorizontalHeaderLabels(labels)
+    hh = table.horizontalHeader()
+    for c in range(len(labels) - 1):
+        hh.setSectionResizeMode(c, QHeaderView.ResizeMode.ResizeToContents)
+    hh.setSectionResizeMode(len(labels) - 1, QHeaderView.ResizeMode.Stretch)
+
+
 def make_news_table(parent) -> QTableWidget:
     table = QTableWidget(0, 2, parent)
     fit_columns(table)
@@ -100,7 +119,7 @@ def make_news_table(parent) -> QTableWidget:
 def _ranked_with_dates(items: list) -> list[tuple[dict, Optional[datetime]]]:
     """Parse each item's ``published`` exactly once, then rank the items.
 
-    Ranking rule: language tier, then recency. Language tier 0 — the user's
+    Ranking rule: language tier, then score, then recency. Language tier 0 — the user's
     main language, or an item whose source declared none (yfinance); tier 1 —
     their other languages. Untagged items rank with the main language rather
     than below it, since sinking unlabelled headlines would demote the entire
@@ -108,12 +127,15 @@ def _ranked_with_dates(items: list) -> list[tuple[dict, Optional[datetime]]]:
 
     There is deliberately no "mentions a linked ticker" tier any more: it
     matched the ticker case-sensitively, so a two-day-old "AAPL ..." headline
-    outranked a fresh "Apple ..." one — and in Topic News it pinned whatever
+    outranked a fresh "Apple ..." one — and in Topic mode it pinned whatever
     named any link group's symbol. Symbol news is relevance-filtered by the
     provider; the table only orders it.
 
-    Within each tier newest first; items whose timestamp can't be parsed sink to
-    the bottom of their tier. Returns ``(entry, parsed_dt)`` pairs so callers
+    Within each tier, items carrying a numeric ``score`` (Portfolio news, whose
+    score already folds in position size, layer and recency) come first,
+    highest score first; the rest — every Linked and Topic item — newest
+    first, with items whose timestamp can't be parsed sinking to the bottom of
+    their tier. Returns ``(entry, parsed_dt)`` pairs so callers
     reuse the parsed datetime instead of parsing it again for display. Non-dict
     entries are dropped (they carry no renderable fields).
     """
@@ -130,7 +152,10 @@ def _ranked_with_dates(items: list) -> list[tuple[dict, Optional[datetime]]]:
         lang = str(entry.get("lang") or "").split("-")[0].lower()
         lang_tier = 0 if not lang or lang == main_lang else 1
         ts = dt.timestamp() if dt is not None else float("-inf")
-        return (lang_tier, -ts)
+        score = entry.get("score")
+        if isinstance(score, (int, float)) and not isinstance(score, bool):
+            return (lang_tier, 0, -float(score), -ts)
+        return (lang_tier, 1, 0.0, -ts)
 
     pairs.sort(key=key)
     return pairs
@@ -143,10 +168,14 @@ def sort_news_items(items: list) -> list:
     return [entry for entry, _dt in _ranked_with_dates(items)]
 
 
-def populate_news_table(table: QTableWidget, data: Any) -> int:
+def populate_news_table(table: QTableWidget, data: Any, show_reason: bool = False) -> int:
     """Fill ``table`` from a list of news dicts, ranked per
-    ``_ranked_with_dates``. Returns the row count."""
+    ``_ranked_with_dates``. ``show_reason`` adds the Why column (each item's
+    ``reason`` tag: a ticker, a sector weight or "Macro"). Returns the row
+    count."""
     table.setRowCount(0)
+    _set_news_columns(table, show_reason)
+    head_col = headline_col(table)
     pairs = _ranked_with_dates(data) if isinstance(data, list) else []
     count = 0
     for entry, published_dt in pairs:
@@ -167,16 +196,23 @@ def populate_news_table(table: QTableWidget, data: Any) -> int:
         head_item.setToolTip(f"{title}\n— {publisher}" if publisher else title)
         head_item.setData(Qt.ItemDataRole.UserRole, entry.get("url"))
         head_item.setData(Qt.ItemDataRole.UserRole + 1, entry.get("summary") or "")
+        # holdings-layer Portfolio rows name their ticker; a click sends it on
+        head_item.setData(Qt.ItemDataRole.UserRole + 2, entry.get("symbol") or "")
         head_item.setFlags(head_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
         table.setItem(row, 0, time_item)
-        table.setItem(row, 1, head_item)
+        if show_reason:
+            why_item = QTableWidgetItem(str(entry.get("reason") or ""))
+            why_item.setForeground(QColor(LABEL))
+            why_item.setFlags(why_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            table.setItem(row, 1, why_item)
+        table.setItem(row, head_col, head_item)
         count += 1
     return count
 
 
 def news_url_at(table: QTableWidget, row: int) -> Optional[str]:
-    item = table.item(row, 1)
+    item = table.item(row, headline_col(table))
     if item is None:
         return None
     url = item.data(Qt.ItemDataRole.UserRole)
@@ -184,18 +220,31 @@ def news_url_at(table: QTableWidget, row: int) -> Optional[str]:
 
 
 def news_summary_at(table: QTableWidget, row: int) -> str:
-    item = table.item(row, 1)
+    item = table.item(row, headline_col(table))
     if item is None:
         return ""
     return str(item.data(Qt.ItemDataRole.UserRole + 1) or "")
 
 
+def news_symbol_at(table: QTableWidget, row: int) -> str:
+    """The ticker a holdings-layer Portfolio row is about, else ``""``."""
+    item = table.item(row, headline_col(table))
+    if item is None:
+        return ""
+    return str(item.data(Qt.ItemDataRole.UserRole + 2) or "")
+
+
 def filter_news_table(table: QTableWidget, text: str) -> None:
-    """Hide rows whose headline doesn't contain ``text`` (case-insensitive)."""
+    """Hide rows whose headline — or Why tag, when shown — doesn't contain
+    ``text`` (case-insensitive)."""
     needle = (text or "").strip().casefold()
+    cols = range(1, table.columnCount())  # every column but Time
     for r in range(table.rowCount()):
-        item = table.item(r, 1)
-        hay = item.text().casefold() if item is not None else ""
+        hay = " ".join(
+            item.text().casefold()
+            for item in (table.item(r, c) for c in cols)
+            if item is not None
+        )
         table.setRowHidden(r, bool(needle) and needle not in hay)
 
 
@@ -302,8 +351,8 @@ class NewsPanelBase(Panel):
 
     # -- rendering ---------------------------------------------------------
 
-    def _render_news(self, data: Any) -> int:
-        count = populate_news_table(self.table, data)
+    def _render_news(self, data: Any, show_reason: bool = False) -> int:
+        count = populate_news_table(self.table, data, show_reason)
         self._apply_read_styling()
         filter_news_table(self.table, self._news_filter.text())
         return count
@@ -337,7 +386,7 @@ class NewsPanelBase(Panel):
         for r in range(self.table.rowCount()):
             url = news_url_at(self.table, r)
             if url and url in self._read_urls:
-                for c in (0, 1):
+                for c in range(self.table.columnCount()):
                     item = self.table.item(r, c)
                     if item is not None:
                         item.setForeground(dim)
@@ -354,7 +403,7 @@ class NewsPanelBase(Panel):
             return
         self._mark_read(url)
         self._apply_read_styling()
-        title_item = self.table.item(row, 1)
+        title_item = self.table.item(row, headline_col(self.table))
         title = title_item.text() if title_item is not None else ""
         self._show_preview(url, news_summary_at(self.table, row), title)
 
