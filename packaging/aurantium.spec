@@ -119,6 +119,7 @@ hiddenimports += [
     "aurantium.alerts",
     "aurantium.portfolio_import",
     "aurantium.portfolio_store",
+    "aurantium.portfolio_news",
     "aurantium.date_context",
     "aurantium.sector_meta",
     "aurantium.command_bar",
