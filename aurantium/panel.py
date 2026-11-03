@@ -1233,11 +1233,23 @@ class Panel(QWidget):
         if not symbol or symbol == self._current_symbol:
             return
         self._current_symbol = symbol
-        self._symbol_lbl.setText(symbol)
+        self.refresh_header_symbol()
         try:
             self.on_symbol(symbol)
         except Exception:
             traceback.print_exc()
+
+    def header_symbol(self) -> str:
+        """The symbol the header's context bar shows: by default the link
+        group's. A panel whose content can ignore the group (News in Topic or
+        Portfolio mode) returns ``""`` then, so the header doesn't claim the
+        list is about a symbol it isn't."""
+        return self._current_symbol
+
+    def refresh_header_symbol(self) -> None:
+        """Re-read :meth:`header_symbol` into the header; call after a change
+        to whether this panel follows the link group."""
+        self._symbol_lbl.setText(self.header_symbol())
 
     def _show_error(self, error: str) -> None:
         """Default ``on_error`` for every subscription (see :meth:`subscribe`).

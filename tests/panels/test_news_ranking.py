@@ -2,7 +2,7 @@
 
 It used to rank any headline naming a linked ticker (case-sensitive) above
 everything else, so a two-day-old "AAPL ..." story sat above a ten-minute-old
-"Apple ..." one — in Topic News too, for every link group's symbol. The
+"Apple ..." one — in Topic mode too, for every link group's symbol. The
 provider already filters symbol news for relevance; the table only orders it.
 """
 

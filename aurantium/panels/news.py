@@ -44,12 +44,12 @@ def _status(prefix: str, count: int) -> str:
 class NewsPanel(NewsPanelBase):
     GUIDE = PanelGuide(
         purpose=(
-            "Headlines from one of three sources, newest first. **Linked**: the linked "
-            "symbol — the past week, merged from publisher feeds, Google News and Finnhub "
+            "Headlines from one of three sources. **Linked**: the linked symbol, newest "
+            "first — the past week, merged from publisher feeds, Google News and Finnhub "
             "(up to a month for quiet names). **Topic**: a free-text query — a theme, a "
-            "country, a sector. **Portfolio**: news that can move your open positions — "
-            "about the holdings themselves, the sectors the book leans on, and macro "
-            "events, larger positions ranked higher."
+            "country, a sector — newest first. **Portfolio**: news that can move your open "
+            "positions — about the holdings themselves, the sectors the book leans on, and "
+            "macro events — ranked by relevance: larger positions and fresher news first."
         ),
         links=(
             "Linked follows the link group's symbol. Topic and Portfolio ignore it; in "
@@ -128,6 +128,7 @@ class NewsPanel(NewsPanelBase):
         self._source = source
         self._source_btns[source].setChecked(True)
         self._query_box.setVisible(source == "topic")
+        self.refresh_header_symbol()
         self._portfolio_debounce.stop()
         self._watch_store(source == "portfolio")
         self.unsubscribe_all()
@@ -155,8 +156,15 @@ class NewsPanel(NewsPanelBase):
     def on_symbol(self, symbol: str) -> None:
         # remembered in every mode, so switching back to Linked picks it up
         self._linked_symbol = symbol
+        self.refresh_header_symbol()
         if self._source == "linked":
             self._subscribe_linked(symbol)
+
+    def header_symbol(self) -> str:
+        # Topic and Portfolio ignore the link group, so the header names no symbol
+        if getattr(self, "_source", "linked") != "linked":
+            return ""
+        return getattr(self, "_linked_symbol", "") or self._current_symbol
 
     def _subscribe_linked(self, symbol: str) -> None:
         self.set_loading(True)
@@ -227,7 +235,13 @@ class NewsPanel(NewsPanelBase):
         for sym in symbols:
             if sym not in self._profile_syms:
                 self._profile_syms.add(sym)
-                self.subscribe(f"profile:{sym}", lambda d, s=sym: self._on_profile(s, d))
+                # the sector layer is optional: a failed profile fetch
+                # mustn't post an error over headlines that are loading
+                self.subscribe(
+                    f"profile:{sym}",
+                    lambda d, s=sym: self._on_profile(s, d),
+                    on_error=lambda _err: None,
+                )
 
         prices = {}
         for sym in symbols:

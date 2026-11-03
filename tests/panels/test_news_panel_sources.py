@@ -308,3 +308,86 @@ def test_filter_matches_reason(store, make_panel):
     p._news_filter.setText("Macro")
     visible = [r for r in range(p.table.rowCount()) if not p.table.isRowHidden(r)]
     assert visible == [_row_of(p, "u-fed")]
+
+
+# -- review fixes ---------------------------------------------------------------
+
+
+class _ErrHub(_FakeHub):
+    """Also records on_error so a test can fail a subscription."""
+
+    def __init__(self):
+        super().__init__()
+        self.errs: dict = {}
+
+    def subscribe(self, owner, topic, callback, on_error=None):
+        super().subscribe(owner, topic, callback, on_error)
+        self.errs[topic] = on_error
+
+
+def test_profile_error_is_not_shown(store, qapp):
+    from aurantium.panels.news import NewsPanel
+
+    store.add("NVDA", 10, 100.0, "2026-01-02")
+    p = NewsPanel()
+    p._hub = _ErrHub()
+    p.build()
+    p.set_source("portfolio")
+    on_error = p._hub.errs["profile:NVDA"]
+    if on_error is None:
+        on_error = p._show_error  # what Panel.subscribe would fall back to
+    before = p._state_lbl.text()  # "Loading…": newsp: is still in flight
+    on_error("profile fetch failed")
+    assert p._state_lbl.text() == before
+    assert "⚠" not in p._state_lbl.text() and "failed" not in p._state_lbl.text()
+    p.close()
+    p.deleteLater()
+
+
+def test_header_symbol_blank_outside_linked(make_panel):
+    p = make_panel()
+    p._apply_symbol("AAPL")
+    assert p._symbol_lbl.text() == "AAPL"
+    p.set_source("portfolio")
+    assert p._symbol_lbl.text() == ""
+    p._apply_symbol("MSFT")  # remembered, not shown
+    assert p._symbol_lbl.text() == ""
+    p.set_source("topic")
+    assert p._symbol_lbl.text() == ""
+    p.set_source("linked")
+    assert p._symbol_lbl.text() == "MSFT"
+    assert "news:MSFT" in p._hub.subs
+    p._apply_symbol("NVDA")  # while linked, the header follows at once
+    assert p._symbol_lbl.text() == "NVDA"
+
+
+def test_closed_or_switched_panel_ignores_store_changes(store, qapp, monkeypatch):
+    from PySide6.QtCore import QCoreApplication, QEvent
+
+    from aurantium.panels.news import NewsPanel
+
+    store.add("NVDA", 10, 100.0, "2026-01-02")
+    closed = NewsPanel()
+    closed._hub = _FakeHub()
+    closed.build()
+    closed.set_source("portfolio")
+    closed.close()
+    closed.deleteLater()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+
+    switched = NewsPanel()
+    switched._hub = _FakeHub()
+    switched.build()
+    switched.set_source("portfolio")
+    switched.set_source("linked")
+
+    calls = []
+    monkeypatch.setattr(NewsPanel, "_schedule_portfolio", lambda self: calls.append("s"))
+    monkeypatch.setattr(NewsPanel, "_rebuild_portfolio", lambda self: calls.append("r"))
+    store.add("XOM", 5, 100.0, "2026-01-02")
+    qapp.processEvents()
+    assert calls == []
+    assert not switched._portfolio_debounce.isActive()
+    assert switched._hub.newsp() == []
+    switched.close()
+    switched.deleteLater()
