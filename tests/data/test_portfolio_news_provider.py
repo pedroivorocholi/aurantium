@@ -164,6 +164,8 @@ def test_sector_copy_outscoring_holding_wins(prov, monkeypatch):
 
 def test_cap_keeps_top_scoring_not_newest(prov, monkeypatch):
     p, out = prov
+    # pin the clock the provider ages items with to the one the items were built on
+    monkeypatch.setattr(news.time, "time", lambda: NOW.timestamp())
     old_hold = [_item(f"hold {i}", 30 + i * 0.01) for i in range(10)]
     macro = [_item(f"macro {i}", 0.1 + i * 0.01) for i in range(80)]
     monkeypatch.setattr(p, "_symbol_items", lambda s, l, newsapi=True: [dict(i) for i in old_hold])
@@ -177,5 +179,5 @@ def test_cap_keeps_top_scoring_not_newest(prov, monkeypatch):
     holds = [pn.score_item("holding", 1.0, 30 + i * 0.01) for i in range(10)]
     macros = [pn.score_item("macro", pn.MACRO_DEFAULT_WEIGHT, 0.1 + i * 0.01) for i in range(80)]
     cutoff = sorted(holds + macros, reverse=True)[news.MAX_ITEMS - 1]
-    assert min(scores) >= cutoff - 1e-4
-    assert sum(r["reason"] == "NVDA" for r in rows) == sum(h >= cutoff - 1e-4 for h in holds)
+    assert min(scores) >= cutoff - 1e-9
+    assert sum(r["reason"] == "NVDA" for r in rows) == sum(h >= cutoff - 1e-9 for h in holds)
