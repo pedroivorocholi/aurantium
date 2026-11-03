@@ -166,6 +166,9 @@ def test_cap_keeps_top_scoring_not_newest(prov, monkeypatch):
     p, out = prov
     # pin the clock the provider ages items with to the one the items were built on
     monkeypatch.setattr(news.time, "time", lambda: NOW.timestamp())
+    # isolate the final MAX_ITEMS cut from the per-reason caps
+    monkeypatch.setattr(news.pn, "cap_per_reason",
+                        lambda rows, book: sorted(rows, key=lambda r: -r["score"]))
     old_hold = [_item(f"hold {i}", 30 + i * 0.01) for i in range(10)]
     macro = [_item(f"macro {i}", 0.1 + i * 0.01) for i in range(80)]
     monkeypatch.setattr(p, "_symbol_items", lambda s, l, newsapi=True: [dict(i) for i in old_hold])
@@ -181,3 +184,40 @@ def test_cap_keeps_top_scoring_not_newest(prov, monkeypatch):
     cutoff = sorted(holds + macros, reverse=True)[news.MAX_ITEMS - 1]
     assert min(scores) >= cutoff - 1e-9
     assert sum(r["reason"] == "NVDA" for r in rows) == sum(h >= cutoff - 1e-9 for h in holds)
+
+
+def test_cap_per_reason_helper():
+    from aurantium import portfolio_news as pn
+    book = [H("BIG", 0.8), H("SM", 0.02)]
+    rows = (
+        [{"reason": "BIG", "symbol": "BIG", "score": 10 - i * .01} for i in range(40)]
+        + [{"reason": "SM", "symbol": "SM", "score": 9 - i * .01} for i in range(40)]
+        + [{"reason": "Tech 50%", "score": 8 - i * .01} for i in range(20)]
+        + [{"reason": "Macro", "score": 7 - i * .01} for i in range(30)]
+    )
+    out = pn.cap_per_reason(rows, book)
+    count = lambda r: sum(x["reason"] == r for x in out)
+    assert (count("BIG"), count("SM"), count("Tech 50%"), count("Macro")) == (20, 3, 8, 20)
+    assert [r["score"] for r in out] == sorted((r["score"] for r in out), reverse=True)
+    best = [r["score"] for r in rows if r["reason"] == "SM"][:3]
+    assert [r["score"] for r in out if r["reason"] == "SM"] == best
+
+
+def test_feed_is_not_just_the_top_holding(prov, monkeypatch):
+    p, out = prov
+    monkeypatch.setattr(p, "_symbol_items", lambda s, l, newsapi=True: [
+        _item(f"{s} story {i}", 0.5 + i * 0.01) for i in range(40)])
+
+    def q(query, langs):
+        n = 20 if query in ("tech stocks", "energy stocks") else 30
+        return [_item(f"{query} item {i}", 5 + i * 0.01) for i in range(n)]
+
+    monkeypatch.setattr(p, "_from_rss_query", q)
+    book = [H("AAA", 0.5, "Technology"), H("BBB", 0.3, "Energy"), H("CCC", 0.2)]
+    rows = _run(p, out, book)
+    reasons = [r["reason"] for r in rows]
+    for sym, cap in (("AAA", 12), ("BBB", 8), ("CCC", 5)):
+        assert 0 < reasons.count(sym) <= cap
+    assert 0 < reasons.count("Tech 50%") <= 8
+    assert 0 < reasons.count("Energy 30%") <= 8
+    assert 0 < reasons.count("Macro") <= 20

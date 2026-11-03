@@ -171,3 +171,28 @@ def reason_for(layer: str, key: str, weight: float) -> str:
     if layer == "sector":
         return f"{_SECTOR_SHORT.get(key, key)} {round(weight * 100)}%"
     return "Macro"
+
+
+SECTOR_ROW_CAP = 8
+MACRO_ROW_CAP = 20
+
+
+def cap_per_reason(rows: list[dict], book: list[Holding]) -> list[dict]:
+    """Best-scoring rows within each reason, so one heavy holding cannot fill
+    the feed: a holding keeps max(3, round(25 x weight)), a sector 8, macro 20
+    in total. Returns the survivors, best score first."""
+    weights = {h["symbol"]: h["weight"] for h in book}
+    kept: dict[str, int] = {}
+    out: list[dict] = []
+    for row in sorted(rows, key=lambda r: -r["score"]):
+        sym = row.get("symbol")
+        if sym:
+            key, cap = "h:" + sym, max(3, round(25 * weights.get(sym, 0.0)))
+        elif row["reason"] == "Macro":
+            key, cap = "macro", MACRO_ROW_CAP
+        else:
+            key, cap = "s:" + row["reason"], SECTOR_ROW_CAP
+        if kept.get(key, 0) < cap:
+            kept[key] = kept.get(key, 0) + 1
+            out.append(row)
+    return out

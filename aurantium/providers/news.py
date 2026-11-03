@@ -788,7 +788,7 @@ class NewsProvider(Provider):
             cands.sort(key=lambda r: -r["score"])
             kept = _merge([cands])  # shared seen set: first (best) copy wins
             # score order *before* the gate, so its cap keeps the best 75
-            fresh = sorted(_freshest(kept), key=lambda r: -r["score"])
+            fresh = pn.cap_per_reason(_freshest(kept), book)
             rows = self._gate(fresh, langs)
             hub.publish(topic, rows)
         except Exception as exc:
