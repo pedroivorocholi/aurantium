@@ -55,23 +55,23 @@ Any symbol Yahoo Finance knows works: stocks (`AAPL`), ETFs (`SPY`), futures
 ## Panel linking (the Bloomberg trick)
 
 A global `SymbolContext` holds the **active symbol per link group** (A–D).
-**Every panel starts in group A**, so clicking a ticker in any panel — a
-watchlist row, the command bar — updates every open panel instantly. The
-colored badge in each panel's header switches its group (or unlinks it):
-run two groups side-by-side to compare two securities.
+**A panel you add starts unlinked**; put it in a group with the badge in its
+header (or Ctrl+1…4), and clicking a ticker in any panel of that group — a
+watchlist row, the command bar — updates the rest instantly. Saved layouts and
+presets keep their groups. Run two groups side-by-side to compare two
+securities.
 
 ## Built-in panels
 
 All panels are in the Panels ▸ Add Panel menu; open as many instances of each
-as you like (e.g. two Topic News feeds with different queries):
+as you like (e.g. two News panels on different topics):
 
 | Panel | What it shows | In-panel customization |
 |---|---|---|
 | Watchlist | Live quote table; rows drive linked panels | Add/Remove any Yahoo symbols; list persists per instance |
 | Chart | Candlesticks + SMA 50/100/200 overlays + RSI(14) sub-chart | Period buttons (1d…max), indicator toggles; all persist |
 | Day Brief | Why a stock moved on one date: session OHLCV, volume vs 30-day average, move vs index and sector with the EXCESS between them, corporate events, and the news window | Date + `1D/3D/1W/1M` window (follows link group and the date bus) |
-| News | Company headlines for the linked symbol | — (follows link group) |
-| Topic News | Keyword news feed, independent of linked symbol | Editable query (e.g. "Brazil", "energy commodities") |
+| News | Headlines from one source, picked with the link badge: **Topic** when unlinked (a keyword feed, e.g. "Brazil"), **Linked** in a group (the group's symbol), or **Portfolio news** (what can move your open positions — holdings, sector exposure, macro — each tagged with why). The retired `topic_news` id opens it in Topic mode | Topic query; filter; read state |
 | Analyst Recs | Consensus, targets, upgrades/downgrades | — (follows link group) |
 | Company | Single-name research in one panel, as tabs: **Profile** (DES-style snapshot — live price, stat tiles that open the deeper tabs, 52-week range bar, description, officers), **Key Metrics**, **Financials**, **Earnings**. Only the visible tab fetches. The retired ids `profile`, `key_metrics`, `fundamentals`, `earnings` still open it on that tab, and old layouts fold into one Company panel per link group | Tab choice, plus each tab's own settings |
 | Chart Grid | Grid of mini index/commodity charts; click a cell to drive linked panels | Comma-separated symbol list |
