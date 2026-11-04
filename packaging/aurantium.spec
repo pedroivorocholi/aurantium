@@ -45,13 +45,6 @@ binaries = []
 # so PyInstaller's PySide6 hook won't detect it — list it explicitly.
 hiddenimports = ["PySide6.QtNetwork"]
 
-# WinSparkle auto-updater DLL (Windows only). It lives in packaging/windows/
-# (see docs/guides/RELEASING.md) and is bundled at the bundle root, where
-# paths.WINSPARKLE_DLL points in a frozen build.
-_WINSPARKLE = os.path.join(_WINDOWS_DIR, "WinSparkle.dll")
-if not IS_MAC and os.path.exists(_WINSPARKLE):
-    binaries.append((_WINSPARKLE, "."))
-
 # Panels are imported dynamically at runtime (importlib), so PyInstaller's
 # static analysis never sees them — list them explicitly from the package's
 # BUILTIN table. (collect_submodules can't help: it runs in an isolated
@@ -130,6 +123,10 @@ hiddenimports += [
     # Per-panel divider drags: tiling geometry and its QtAds splitter bridge.
     "aurantium.tiling",
     "aurantium.free_resize",
+    # The updater and its card. updater is imported inside __main__.main()
+    # and app.py, and imports update_card inside init() — lazy on both counts.
+    "aurantium.updater",
+    "aurantium.update_card",
 ]
 
 # macOS-only updater backend (see updater.py's docstring); imported lazily

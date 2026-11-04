@@ -1,10 +1,16 @@
-# Releasing Aurantium (with WinSparkle / updater_mac auto-updates)
+# Releasing Aurantium (in-app auto-updates)
 
-Aurantium ships updates through [WinSparkle](https://winsparkle.org/) on Windows
-and `aurantium/updater_mac.py` on macOS — both read the same **appcast** feed
-(`appcast.xml`) once a day; when a newer, correctly-signed build is available for
-their platform they offer to download and install it. Users click once — no
-manual re-install.
+Aurantium ships updates through its own updater (`aurantium/updater.py`, both
+platforms). Every launch it reads the **appcast** feed (`appcast.xml`); when a
+newer build exists for the platform, it downloads it and verifies the EdDSA
+signature in the background, then pops the update card (`update_card.py`) with
+the item's release notes and one **Update & restart** button. One click
+installs and relaunches — no manual re-install.
+
+> Builds up to **1.16.0** still update through WinSparkle (native dialog,
+> two clicks). They reach the in-app updater by taking one release through
+> WinSparkle, which reads the same appcast — so keep the appcast format
+> (`sparkle:*` attributes, `installerArguments`) exactly as it is.
 
 This doc has three parts: **one-time setup** (do once), the **automated
 release flow** (the normal way to cut a release — one tag push builds, signs,
@@ -63,7 +69,7 @@ fail, the two places it has historically been fragile are the Inno Setup
 
 ### 1. Create the public GitHub repo
 
-WinSparkle downloads the appcast and installer over plain HTTPS with **no
+The updater downloads the appcast and installer over plain HTTPS with **no
 authentication**, so both must live in a **public** repo.
 
 ```bash
@@ -106,23 +112,14 @@ on the `main` branch. If you keep `appcast.xml` in a subfolder, adjust the URL.
   EDDSA_PUBLIC_KEY = "…printed value…"
   ```
 
-### 5. Add WinSparkle.dll to the build
+### 5. Nothing to bundle
 
-Download the latest WinSparkle release zip from
-<https://github.com/vslavik/winsparkle/releases>, and copy the **64-bit** DLL
-(`x64/WinSparkle.dll` in the zip) to `app/packaging/windows/WinSparkle.dll`
-(already committed there; replace it only to upgrade WinSparkle).
-`packaging/aurantium.spec` bundles it automatically; it's what `updater.py`
-loads at runtime (via `paths.WINSPARKLE_DLL`).
-
-> The updater stays fully disabled until `GITHUB_USER` **and**
-> `EDDSA_PUBLIC_KEY` are set and the DLL is present — so a half-configured
-> build simply runs without updates instead of misbehaving.
-
-> **macOS needs none of this step.** There's no WinSparkle.dll equivalent to
-> download — `aurantium/updater_mac.py` is pure Python and reads the exact
-> same `GITHUB_USER` / `EDDSA_PUBLIC_KEY` set above. It just needs `<item>`s
-> in `appcast.xml` tagged `sparkle:os="macos"` — see the per-release checklist.
+The updater is pure Python (`requests` + `cryptography`), so there's no DLL to
+ship. It stays fully disabled until `GITHUB_USER` **and** `EDDSA_PUBLIC_KEY`
+are set — a half-configured build simply runs without updates. Each platform
+needs `<item>`s in `appcast.xml` tagged with its `sparkle:os` (`windows` /
+`macos`); the `<li>` lines of the item's `<description>` are what the update
+card lists under *What's new*.
 
 ---
 
@@ -139,7 +136,7 @@ Say you're going from 1.0.0 → **1.1.0**.
 - `aurantium/__init__.py` → `__version__ = "1.1.0"`
 - `packaging/windows/installer.iss` → `AppVersion=1.1.0`
 
-WinSparkle compares `__version__` against the appcast's `sparkle:version`.
+The updater compares `__version__` against the appcast's `sparkle:version`.
 
 ### 2. Build the exe and installer
 
@@ -181,11 +178,11 @@ Add a **new `<item>` at the top** (keep older ones for history):
 - `sparkle:version` must equal `__version__`.
 - `url` must match the release tag you create in the next step.
 - `pubDate` in RFC-822 (e.g. `date -R`).
-- **`sparkle:installerArguments` is required** — it makes WinSparkle run the
+- **`sparkle:installerArguments` is required** — it makes the updater run the
   Inno installer silently instead of showing the full setup wizard. `/VERYSILENT`
   hides the UI; `/FORCECLOSEAPPLICATIONS` closes a running Aurantium so its files
   can be replaced. Omit it and every update pops the full wizard.
-- **Relaunch** is handled by the installer, not the appcast (WinSparkle does not
+- **Relaunch** is handled by the installer, not the appcast (the updater does not
   relaunch the app itself, and `/RESTARTAPPLICATIONS` is unreliable). Silent
   auto-updates relaunch from `packaging/windows/installer.iss`'s `[Code]` `CurStepChanged` handler,
   which does `Sleep(6000)` then `Exec({app}\aurantium.exe)`. **The delay is
@@ -273,7 +270,7 @@ verification error instead — fix the appcast and retry.)
   everyone on an older build (they can't verify the new key), forcing a manual
   re-install — on **both** platforms, since Windows and macOS share one key
   pair and one `appcast.xml`.
-- **macOS** doesn't use WinSparkle — see `updater_mac.py` and step 4b above.
+- **macOS** installs by swapping the `.app` bundle — see `updater_mac.py` and step 4b above.
   Its swap-and-relaunch has only been reasoned through, not run on real
   hardware yet; the first macOS release is also the first real test of it.
   Verify it end-to-end (step 7, on a Mac) before trusting it for others.

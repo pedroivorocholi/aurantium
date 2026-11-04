@@ -8,7 +8,7 @@ from the repo root, so `dist/` and `build/` land there.
 | `aurantium.spec` | PyInstaller spec (Windows one-folder build and the macOS `.app`). Every first-party module reached by a lazy import must be listed in its `hiddenimports`. |
 | `run_aurantium.py` | The PyInstaller entry point, a thin wrapper around `aurantium.__main__.main`. |
 | `windows/installer.iss` | Inno Setup script that wraps `dist/aurantium/` into `dist/aurantium-setup.exe`. Its `AppVersion` is bumped with every release. |
-| `windows/WinSparkle.dll` | The 64-bit WinSparkle auto-updater, bundled into the Windows build. |
+| `windows/WinSparkle.dll` | No longer bundled (the in-app updater replaced it in 1.17.0); kept only for reference. |
 | `windows/probe.iss` | Throwaway diagnostic installer that logs the environment Inno gives a silent `[Run]` child. |
 
 ```

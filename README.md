@@ -56,7 +56,7 @@ aurantium/        the app package (panels/, providers/, components/ inside)
 user_panels/      drop-in panels loaded at startup; _example_macro.py is the tutorial
 layouts/          seed layouts bundled with the app; presets/ = shipped workspaces
 assets/           app art bundled into the build: icons/ (.ico, .icns), images/ (logos, splash)
-packaging/        aurantium.spec + PyInstaller entry point; windows/ = Inno Setup + WinSparkle.dll
+packaging/        aurantium.spec + PyInstaller entry point; windows/ = Inno Setup
 scripts/          dev conveniences (aurantium.bat: launch without a console)
 tools/            maintenance scripts, by job: release/ codegen/ data/ design/
 tests/            pytest suite, grouped by area (see tests/README.md); fixtures/ = recorded data

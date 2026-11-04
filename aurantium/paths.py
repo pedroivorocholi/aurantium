@@ -8,8 +8,6 @@
   ``assets/`` so the frozen layout mirrors the repo's.
 - ``LOG_DIR``: runtime logs. Next to the ``.exe`` when frozen (where support
   has always found them); ``logs/`` in the dev tree, so they don't litter the root.
-- ``WINSPARKLE_DLL``: the Windows updater DLL. PyInstaller puts it at the bundle
-  root; in the dev tree it lives with the other Windows packaging files.
 """
 
 from __future__ import annotations
@@ -31,10 +29,8 @@ ASSETS_DIR = BUNDLE_DIR / "assets"
 
 if getattr(sys, "frozen", False):
     LOG_DIR = EXT_DIR
-    WINSPARKLE_DLL = BUNDLE_DIR / "WinSparkle.dll"
 else:
     LOG_DIR = _DEV_ROOT / "logs"
-    WINSPARKLE_DLL = _DEV_ROOT / "packaging" / "windows" / "WinSparkle.dll"
 
 
 def log_file(name: str) -> Path:

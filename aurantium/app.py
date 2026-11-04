@@ -281,11 +281,12 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event) -> None:  # noqa: N802 (Qt override)
         super().resizeEvent(event)
-        # keep the notice pinned to the bottom-right corner as the window
-        # changes its size
-        notifier = getattr(self, "_notifier", None)
-        if notifier is not None:
-            notifier.reposition()
+        # keep the notice in the bottom-right corner and the update card
+        # centred as the window changes its size
+        for name in ("_notifier", "_update_card"):
+            widget = getattr(self, name, None)
+            if widget is not None:
+                widget.reposition()
 
     # -- native frame (Windows): see title_bar.py ----------------------------
 
@@ -1011,7 +1012,7 @@ class MainWindow(QMainWindow):
         from . import updater
 
         if updater.available():
-            updater.check_now()
+            updater.check_now()  # answers in the notice card / update card
         else:
             QMessageBox.information(
                 self, "Check for Updates", updater.unavailable_reason()

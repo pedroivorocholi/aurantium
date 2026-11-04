@@ -540,11 +540,11 @@ def main() -> int:
 
     QTimer.singleShot(600, _first_run_dialogs)
 
-    # Auto-update: silent daily check via WinSparkle (Windows only; a no-op if
-    # the updater isn't configured/available). Cleaned up after the event loop.
+    # Auto-update: a background check every launch; a verified download pops
+    # the update card (a no-op if the updater isn't configured/available).
     from . import updater
 
-    updater.init()
+    updater.init(win)
     try:
         return app.exec()
     finally:

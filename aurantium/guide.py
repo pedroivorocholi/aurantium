@@ -325,8 +325,10 @@ SETTINGS = Page(
             "<b>Keyboard Shortcuts &amp; Guide…</b> (<b>F1</b>) opens this window, "
             "and <b>Guide to the Focused Panel…</b> (<b>Shift+F1</b>) opens it on "
             "the page of the panel you are working in. <b>Check for "
-            "Updates…</b> asks for a new version now (aurantium also checks once a "
-            "day). <b>About</b> shows the version. <b>Quit</b> (<b>Ctrl+Q</b>) "
+            "Updates…</b> asks for a new version now (aurantium also checks every "
+            "launch). When one is ready, a card pops up that lists "
+            "what's new; <b>Update &amp; restart</b> installs it and reopens "
+            "aurantium. <b>About</b> shows the version. <b>Quit</b> (<b>Ctrl+Q</b>) "
             "exits even when Close to tray is on.")),
         Detail("Data and caching", _p(
             "Recently seen data is cached locally, so panels fill in instantly on "
