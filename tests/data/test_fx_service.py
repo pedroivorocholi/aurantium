@@ -12,25 +12,6 @@ from aurantium.datahub import DataHub
 from aurantium.fx import FxService
 
 
-@pytest.fixture
-def svc(isolated_settings):
-    """A fresh service on a fresh, cache-less hub, never the process-wide ones.
-
-    A warm hub would hand a previous test's rate to the next one on subscribe.
-    """
-    saved_hub = DataHub._inst
-    hub = DataHub()
-    hub._cache = None
-    DataHub._inst = hub
-    s = FxService()
-    FxService.reset_instance(s)
-    yield s
-    FxService.reset_instance(None)
-    hub._scheduler.stop()
-    hub.deleteLater()
-    DataHub._inst = saved_hub
-
-
 class _Burst:
     """Wait for the (coalesced) ``changed`` after a block of publishes."""
 

@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..fx import FxService, convert
 from ..guide import GuideSection, PanelGuide
 from ..components import MarketTable, attach_suggestions
 from ..components import fmt
@@ -56,6 +57,9 @@ from ..components.responsive_row import ResponsiveRow
 (COL_SYMBOL, COL_QTY, COL_COST, COL_DATE, COL_LAST, COL_MKTVAL, COL_PNL,
  COL_PNLPCT) = range(8)
 HEADERS = ["Symbol", "Qty", "Cost", "Date", "Last", "Mkt Value", "P&L", "P&L%"]
+#: Shown while a conversion waits on its rate; "—" is reserved for "cannot be".
+LOADING_GLYPH = "…"
+_UNKNOWN_TIP = "Currency unknown — left out of totals"
 
 _BENCH = "SPY"          # performance benchmark
 _HIST_TOPIC = "1y:1d"   # history window used by the analytics tabs
@@ -78,7 +82,7 @@ def _value(p: dict, last: float, to_pref) -> Optional[float]:
     val = last * p["qty"]
     if to_pref is None:
         return val
-    return to_pref(p["symbol"], val, p.get("sell_date"))
+    return to_pref(p["symbol"], val, p.get("sell_date") or None)
 
 
 def left_out(positions: list, currency_of: Callable[[str], Optional[str]]) -> int:
@@ -372,11 +376,15 @@ class PortfolioPanel(Panel):
         ),
         fields=(
             ("Qty / Cost", "Units held and the price paid for each"),
-            ("Mkt Value", "Qty × the latest price (or the sell price)"),
-            ("P&L / P&L%", "Gain or loss against cost"),
+            ("Mkt Val / P&L", "Qty × the latest price (or the sell price), shown in your preferred "
+             "currency. Cost converts at the buy-date rate, so P&L includes the "
+             "currency move. Last and Cost stay in the listing currency; a … means the "
+             "rate is still loading"),
+            ("P&L%", "Gain or loss against cost, in your preferred currency"),
         ),
         sections=(
-            GuideSection("Allocation", "Sector weights of the open positions, as bars."),
+            GuideSection("Allocation", "Sector weights of the open positions, as bars. Positions whose "
+                "currency is unknown are left out, and the tab says how many."),
             GuideSection("Performance", "Portfolio value from your earliest buy date — "
                 "each position counted only while held — rebased to 100 against SPY."),
             GuideSection("Risk", "Weighted beta, the largest position as a share of "
@@ -386,7 +394,7 @@ class PortfolioPanel(Panel):
         keywords=(
             "positions", "holdings", "my stocks", "book", "allocation", "P&L", "PnL",
             "profit", "loss", "risk", "cost basis", "import", "broker", "trades",
-            "account",
+            "account", "currency", "FX conversion",
         ),
     )
 
@@ -416,6 +424,7 @@ class PortfolioPanel(Panel):
 
         self._rebuild_table()
         store.changed.connect(self._on_store_changed)
+        FxService.instance().changed.connect(self._on_fx_changed)
 
     def _on_store_changed(self) -> None:
         if self._filling_cost:
@@ -429,7 +438,27 @@ class PortfolioPanel(Panel):
             PortfolioStore.instance().changed.disconnect(self._on_store_changed)
         except (RuntimeError, TypeError):
             pass  # already disconnected / never connected
+        try:
+            FxService.instance().changed.disconnect(self._on_fx_changed)
+        except (RuntimeError, TypeError):
+            pass
         super().closeEvent(event)
+
+    def _on_fx_changed(self) -> None:
+        """A rate arrived or the preferred currency changed: redo every figure
+        that depends on it, in place."""
+        self._set_headers()
+        for row, pos in enumerate(self._positions):
+            self._update_position_row(row, pos)
+        self._recompute_totals()
+        self._refresh_analytics()
+
+    def _set_headers(self) -> None:
+        cur = FxService.instance().preferred()
+        labels = list(HEADERS)
+        labels[COL_MKTVAL] = f"Mkt Val ({cur})"
+        labels[COL_PNL] = f"P&L ({cur})"
+        self.table.setHorizontalHeaderLabels(labels)
 
     # -- tab construction --------------------------------------------------
 
@@ -442,7 +471,7 @@ class PortfolioPanel(Panel):
         # gives up whole columns (dates, cost, quantity first) rather than
         # eliding all eight into "Sym ty ost …".
         self.table = MarketTable(0, len(HEADERS), w)
-        self.table.setHorizontalHeaderLabels(HEADERS)
+        self._set_headers()
         self.table.set_column_priority(
             keep=[COL_SYMBOL, COL_MKTVAL, COL_PNLPCT],
             droppable=[COL_DATE, COL_COST, COL_QTY, COL_LAST, COL_PNL],
@@ -496,6 +525,14 @@ class PortfolioPanel(Panel):
         lay.addLayout(add_row)
         return w
 
+    @staticmethod
+    def _note_label(parent: QWidget) -> QLabel:
+        note = QLabel("", parent)
+        note.setObjectName("secondary")
+        note.setWordWrap(True)
+        note.hide()
+        return note
+
     def _build_allocation_tab(self) -> QWidget:
         """The bars label their own rows, so the colour legend that used to sit
         beside the pie has nothing left to explain and is gone."""
@@ -504,6 +541,8 @@ class PortfolioPanel(Panel):
         lay.setContentsMargins(0, 0, 0, 0)
         self._alloc_bars = _AllocationBars(w)
         lay.addWidget(self._alloc_bars)
+        self._alloc_note = self._note_label(w)
+        lay.addWidget(self._alloc_note)
         lay.addStretch(1)
         return w
 
@@ -548,7 +587,9 @@ class PortfolioPanel(Panel):
             grid.addWidget(k, i, 0)
             grid.addWidget(v, i, 1)
             self._risk_labels[key] = v
-        grid.setRowStretch(len(rows), 1)
+        self._risk_note = self._note_label(w)
+        grid.addWidget(self._risk_note, len(rows), 0, 1, 2)
+        grid.setRowStretch(len(rows) + 1, 1)
         return w
 
     # -- lazy subscription on tab open -------------------------------------
@@ -672,6 +713,7 @@ class PortfolioPanel(Panel):
     def _on_quote(self, symbol: str, data: Any) -> None:
         if not isinstance(data, dict):
             return
+        FxService.instance().note_quote(symbol, data)
         price = data.get("price")
         self._last_price[symbol] = price
         # a position added "at market" gets its cost basis filled from the first
@@ -720,13 +762,38 @@ class PortfolioPanel(Panel):
             return pos.get("sell_price")
         return self._last_price.get(pos["symbol"])
 
-    def _update_position_row(self, row: int, pos: dict) -> None:
+    def _fx_value(self, pos: dict, amount: Optional[float], day: Optional[str]):
+        """``amount`` (listing currency) in the preferred one; None if the
+        currency is unknown or its rate has not arrived."""
+        return FxService.instance().value(pos["symbol"], amount, day or None)
+
+    def _blank_cell(self, item, pos: dict) -> None:
+        """A converted figure that came out None: "…" while the rate loads,
+        "—" (explained) when the currency itself is unknown."""
+        known = FxService.instance().currency_of(pos["symbol"]) is not None
+        item.setText(LOADING_GLYPH if known else NULL_GLYPH)
+        item.setToolTip("" if known else _UNKNOWN_TIP)
+        item.setForeground(QColor(FG_DIM))
+
+    def _position_figures(self, pos: dict):
+        """(market value, cost, P&L) in the preferred currency. Cost converts at
+        the buy-date rate, value at today's (a sold one at its sell date), so
+        P&L carries the currency move too. Any part may be None."""
+        last = self._position_price(pos)
         cost = pos.get("cost")
         qty = pos["qty"]
+        mkt = self._fx_value(
+            pos, last * qty if last is not None else None, pos.get("sell_date"))
+        cost_pref = self._fx_value(
+            pos, cost * qty if cost is not None else None, pos.get("date"))
+        pnl = mkt - cost_pref if (mkt is not None and cost_pref is not None) else None
+        return mkt, cost_pref, pnl
+
+    def _update_position_row(self, row: int, pos: dict) -> None:
+        cost = pos.get("cost")
         last = self._position_price(pos)
-        mkt_val = last * qty if last is not None else None
-        pnl = (last - cost) * qty if (last is not None and cost is not None) else None
-        pnl_pct = ((last - cost) / cost * 100.0) if (last is not None and cost) else None
+        mkt_val, cost_pref, pnl = self._position_figures(pos)
+        pnl_pct = (pnl / cost_pref * 100.0) if (pnl is not None and cost_pref) else None
 
         cost_item = self.table.item(row, COL_COST)
         if cost_item is not None:
@@ -741,12 +808,32 @@ class PortfolioPanel(Panel):
         # the price is what ticked; market value and P&L follow from it, so
         # flashing them too would light the whole row for one move
         self.table.flash_on_change(last_item, last)
-        mktval_item.setText(_fmt(mkt_val))
+        for item in (mktval_item, pnl_item, pnlpct_item):
+            item.setToolTip("")
+        if last is not None and mkt_val is None:
+            self._blank_cell(mktval_item, pos)
+        else:
+            mktval_item.setText(_fmt(mkt_val))
+        if last is not None and cost is not None and pnl is None:
+            self._blank_cell(pnl_item, pos)
+            self._blank_cell(pnlpct_item, pos)
+            return
         pnl_item.setText(fmt.signed(pnl))
         pnlpct_item.setText(fmt.signed_pct(pnl_pct))
         if pnl is not None:
             apply_tick(pnl_item, pnl, glyph=False)
             apply_tick(pnlpct_item, pnl)
+
+    def _left_out_text(self) -> str:
+        """One line naming the open, priced positions that cannot be converted
+        because their currency is unknown ('' when none)."""
+        n = left_out(
+            [p for p in self._current_positions() if p["symbol"] in self._last_price],
+            FxService.instance().currency_of,
+        )
+        if not n:
+            return ""
+        return f"{n} position{'s' if n != 1 else ''} left out: currency unknown"
 
     def _recompute_totals(self) -> None:
         total_row = self.table.rowCount() - 1
@@ -756,20 +843,35 @@ class PortfolioPanel(Panel):
         total_pnl = 0.0
         total_cost = 0.0
         any_data = False
+        loading = False
+        fx = FxService.instance()
         for pos in self._positions:
             last = self._position_price(pos)
             cost = pos.get("cost")
             if last is None or cost is None:
                 continue
+            if fx.currency_of(pos["symbol"]) is None:
+                continue  # cannot be converted: left out, and the note says so
+            mkt, cost_pref, pnl = self._position_figures(pos)
+            if pnl is None:
+                loading = True  # a rate is still on its way
+                continue
             any_data = True
-            total_mkt += last * pos["qty"]
-            total_pnl += (last - cost) * pos["qty"]
-            total_cost += cost * pos["qty"]
+            total_mkt += mkt
+            total_pnl += pnl
+            total_cost += cost_pref
 
-        mktval_item = self.table.item(total_row, COL_MKTVAL)
-        pnl_item = self.table.item(total_row, COL_PNL)
-        pnlpct_item = self.table.item(total_row, COL_PNLPCT)
-        if not (mktval_item and pnl_item and pnlpct_item):
+        items = [self.table.item(total_row, c) for c in (COL_MKTVAL, COL_PNL, COL_PNLPCT)]
+        if not all(items):
+            return
+        mktval_item, pnl_item, pnlpct_item = items
+        note = self._left_out_text()
+        for item in items:
+            item.setToolTip(note)
+        if loading:
+            for item in items:
+                item.setText(LOADING_GLYPH)
+                item.setForeground(QColor(FG_DIM))
             return
         if not any_data:
             mktval_item.setText(NULL_GLYPH)
@@ -805,29 +907,67 @@ class PortfolioPanel(Panel):
             for p in self._positions
         ]
 
+    @staticmethod
+    def _to_pref(symbol: str, amount: float, day: Optional[str]) -> Optional[float]:
+        return FxService.instance().value(symbol, amount, day)
+
+    def _show_note(self, label: QLabel) -> None:
+        text = self._left_out_text()
+        label.setText(text)
+        label.setVisible(bool(text))
+
     def _render_allocation(self) -> None:
-        weights = sector_weights(self._current_positions(), self._last_price, self._sectors)
+        weights = sector_weights(
+            self._current_positions(), self._last_price, self._sectors,
+            to_pref=self._to_pref)
+        self._show_note(self._alloc_note)
         # Sorting and the "Other" fold both live in the widget, so every caller
         # gets the same treatment.
         self._alloc_bars.set_rows(list(weights.items()))
 
     def _render_performance(self) -> None:
-        ts, values = portfolio_series(self._perf_positions(), self._histories)
+        fx = FxService.instance()
+        cur = fx.preferred()
+        self._name_series(self._perf_port, f"Portfolio ({cur})")
+        self._name_series(self._perf_bench, f"{_BENCH} ({cur})")
+        ts, values = portfolio_series(
+            self._perf_positions(), self._histories, to_pref=self._to_pref)
         if ts and values:
             self._perf_port.setData(ts, _normalize_to_100(values))
         else:
             self._perf_port.setData([], [])
+        # the benchmark is quoted in USD: convert each day like the portfolio
         bench = self._histories.get(_BENCH)
-        if bench and bench[0]:
-            self._perf_bench.setData(bench[0], _normalize_to_100(bench[1]))
-        else:
-            self._perf_bench.setData([], [])
+        b_ts: list = []
+        b_vals: list = []
+        for t, c in (zip(*bench) if bench else ()):
+            day = datetime.fromtimestamp(t).date().isoformat()
+            v = convert(c, "USD", cur, fx.rate_on("USD", day))
+            if v is not None:
+                b_ts.append(t)
+                b_vals.append(v)
+        self._perf_bench.setData(b_ts, _normalize_to_100(b_vals) if b_vals else [])
+        note = self._left_out_text()
+        self._perf_note.setText(
+            "Rebased to 100 at the window start." + (f"\n{note}" if note else ""))
+
+    def _name_series(self, curve, name: str) -> None:
+        """Rename a curve and its legend entry (the legend caches the label)."""
+        if curve.name() == name:
+            return
+        legend = self._perf_plot.plotItem.legend
+        legend.removeItem(curve)
+        curve.opts["name"] = name
+        legend.addItem(curve, name)
 
     def _render_risk(self) -> None:
         current = self._current_positions()
-        beta = weighted_beta(current, self._last_price, self._betas)
-        conc = concentration(current, self._last_price)
-        _ts, values = portfolio_series(self._perf_positions(), self._histories)
+        beta = weighted_beta(
+            current, self._last_price, self._betas, to_pref=self._to_pref)
+        conc = concentration(current, self._last_price, to_pref=self._to_pref)
+        _ts, values = portfolio_series(
+            self._perf_positions(), self._histories, to_pref=self._to_pref)
+        self._show_note(self._risk_note)
         dd = max_drawdown(values) if values else None
         self._risk_labels["beta"].setText(f"{beta:.2f}" if beta is not None else "—")
         self._risk_labels["concentration"].setText(
