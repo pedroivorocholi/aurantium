@@ -174,6 +174,10 @@ class ChartGridPanel(Panel):
             "Right-click a cell to remove it, **Add chart…**, or **Edit panel…**.",
         ),
         sections=(LIST_EDITOR,),
+        keywords=(
+            "multi chart", "small multiples", "many charts", "sparklines", "grid",
+            "overview", "compare charts", "graphs",
+        ),
     )
 
     def build(self) -> None:

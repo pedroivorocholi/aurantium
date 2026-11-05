@@ -86,6 +86,10 @@ class PerformancePanel(Panel):
             "Type symbols in **Compare**, separated by commas, and press **Apply** or Enter.",
             "The legend above the chart prints each line's total return.",
         ),
+        keywords=(
+            "returns", "total return", "compare", "comparison", "relative performance",
+            "benchmark", "YTD", "outperform", "underperform", "versus",
+        ),
     )
 
     def build(self) -> None:

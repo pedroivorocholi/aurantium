@@ -55,6 +55,10 @@ class DividendsPanel(Panel):
             ("Ex-Date", "Buy before this day to receive the next dividend"),
             ("Payout Ratio", "Dividends as a share of earnings"),
         ),
+        keywords=(
+            "dividend", "dividend yield", "payout", "income", "ex-dividend", "ex date",
+            "distributions", "splits", "stock split", "dividend history",
+        ),
     )
 
     def build(self) -> None:

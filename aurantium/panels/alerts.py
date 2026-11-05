@@ -43,6 +43,10 @@ class AlertsPanel(Panel):
             "Untick **On** to pause a rule; select one and **Remove selected** to delete it.",
             "Turn on **Close to tray** (Settings) to keep alerts running with the window closed.",
         ),
+        keywords=(
+            "alert", "notification", "notify", "alarm", "price target", "threshold",
+            "trigger", "reminder", "watch price",
+        ),
     )
 
     def build(self) -> None:

@@ -163,6 +163,7 @@ quick guide, not a manual: a few lines a user reads before trusting a panel.
 | `fields` | `(column or field, plain-language meaning)` pairs for anything not obvious. |
 | `shortcuts` | `(keys, what they do)` for keys only this panel handles. Global keys belong on the F1 Shortcuts page. |
 | `sections` | `GuideSection(title, text)` for tabs and sub-views; shown collapsed. |
+| `keywords` | Words someone might search the **Panels** menu with when they don't know the name: other names for the same thing (`"graph"` for a chart) and words that belong to it (`"debt"` for financials). Never shown. Required for built-in panels (`tests/ui/test_panel_search.py`); optional for yours, whose name and guide are searched anyway. |
 
 Text is plain; `**bold**` names a control. A host whose tabs are themselves
 panels sets `HOSTED_TABS = ((key, label, PanelClass), ...)` and each tab's

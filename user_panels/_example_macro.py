@@ -88,6 +88,9 @@ class ExampleMacroPanel(Panel):
             ("Bias", "bullish when speculators are net long, bearish when net short"),
             ("Chg%", "Change since the previous reading"),
         ),
+        # what someone might type in the Panels menu's search box looking for
+        # this panel without knowing its name — optional for your own panels
+        keywords=("speculators", "COT", "oil", "gold"),
     )
 
     def build(self) -> None:

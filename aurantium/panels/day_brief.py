@@ -162,6 +162,10 @@ class DayBriefPanel(Panel):
             ("EVENTS", "Earnings, dividends, splits and rating changes inside the window"),
             ("NEWS", "Headlines from the window"),
         ),
+        keywords=(
+            "why did it move", "move", "explain", "daily recap", "session", "today",
+            "catalyst", "what happened", "reaction", "gap", "summary",
+        ),
     )
 
 

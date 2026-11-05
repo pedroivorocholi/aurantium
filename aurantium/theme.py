@@ -935,6 +935,11 @@ QMenu {{
 QMenu::item {{ padding: 6px 24px 6px 12px; border-radius: {RADIUS_SM}px; color: {p['CHROME_TEXT']}; }}
 QMenu::item:selected {{ background: {p['ACCENT']}; color: {p['ON_ACCENT']}; }}
 QMenu::item:disabled {{ color: {p['FG_MUTED']}; }}
+/* the Panels menu's search box (panel_search.py) sits on the menu's chrome,
+   not on the black every QWidget gets by default */
+QWidget#panelSearchBox, QListWidget#panelSearchResults {{
+    background: {p['CHROME']}; border: none;
+}}
 QMenu::separator {{ height: 1px; background: {p['CHROME_BORDER']}; margin: 5px 10px; }}
 /* Sized but never filled, so a checkable action (Full screen, Colour-blind
    mode, the Theme radio group) rendered its tick with the native style on a

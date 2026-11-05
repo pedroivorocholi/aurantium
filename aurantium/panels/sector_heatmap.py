@@ -265,6 +265,10 @@ class SectorHeatmapPanel(Panel):
             "Tiles reflow into up to three columns as the panel widens.",
         ),
         sections=(LIST_EDITOR,),
+        keywords=(
+            "sectors", "industries", "heat map", "S&P sectors", "ETF", "XLK", "XLF",
+            "rotation", "market breadth", "tech", "financials", "map",
+        ),
     )
 
     def build(self) -> None:

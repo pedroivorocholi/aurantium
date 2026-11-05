@@ -1178,7 +1178,16 @@ class MainWindow(QMainWindow):
         self._open_core_four()
 
     def _rebuild_panels_menu(self) -> None:
+        from . import panel_search
+
         self._m_panels.clear()
+        # search box first: typing swaps the categories for ranked matches
+        self._panel_search = panel_search.PanelMenuSearch(
+            self._m_panels,
+            lambda: panel_search.build_entries(PanelRegistry.all(), PanelRegistry.resolve),
+            lambda pid: self.add_panel(pid, floating=True),
+        )
+        self._m_panels.addAction(self._panel_search.action)
         by_cat: dict[str, list] = {}
         for meta in PanelRegistry.all():
             by_cat.setdefault(meta.category, []).append(meta)

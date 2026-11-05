@@ -394,6 +394,11 @@ class KeyMetricsPanel(Panel):
             ("5Y Avg / Low / High", "The metric's own five-year average and range"),
             ("5Y %ile", "Where today sits in that range: 100% is its highest"),
         ),
+        keywords=(
+            "ratios", "valuation", "P/E", "EV/EBITDA", "multiples", "margins", "ROE",
+            "ROIC", "growth", "debt to equity", "leverage", "beta", "statistics",
+            "fundamentals", "cheap", "expensive",
+        ),
     )
 
     def build(self) -> None:

@@ -52,6 +52,12 @@ class CompanyPanel(Panel):
             "Click a stat tile on **Profile** to jump to the tab that explains it.",
             "The panel's **?** opens the guide for the tab you're on.",
         ),
+        keywords=(
+            # the tabs carry their own words ("debt" → Financials); these are
+            # for the panel as a whole
+            "research", "stock research", "single name", "company info",
+            "overview", "deep dive", "stock", "fundamentals",
+        ),
     )
 
     HOSTED_TABS = tuple(TABS)

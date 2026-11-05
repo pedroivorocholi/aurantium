@@ -69,6 +69,11 @@ class AnalystPanel(Panel):
             ("Action", "What the firm did: Maintain, Reiterate, Upgrade, Downgrade or Initiate"),
             ("From / To", "The rating before and after"),
         ),
+        keywords=(
+            "analysts", "ratings", "upgrades", "downgrades", "price target",
+            "consensus", "buy sell hold", "Wall Street", "recommendations", "estimates",
+            "coverage",
+        ),
     )
 
     def build(self) -> None:

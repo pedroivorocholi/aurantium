@@ -73,6 +73,11 @@ class FuturesCurvePanel(Panel):
             "Hover a point for its month and price; the first point is marked **front**.",
             "Covers metals, energy, agriculture and livestock.",
         ),
+        keywords=(
+            "term structure", "contango", "backwardation", "forward curve",
+            "delivery months", "contracts", "expiry", "roll", "calendar spread",
+            "oil curve",
+        ),
     )
 
     def build(self) -> None:

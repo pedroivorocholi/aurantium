@@ -91,6 +91,11 @@ class CommoditiesPanel(Panel):
             ("Range (1D)", "Today's low – high"),
         ),
         sections=(LIST_EDITOR,),
+        keywords=(
+            "oil", "crude", "WTI", "Brent", "natural gas", "gasoline", "gold", "silver",
+            "copper", "platinum", "metals", "energy", "wheat", "corn", "soybeans",
+            "agriculture", "livestock", "cattle", "futures", "raw materials",
+        ),
     )
 
     def build(self) -> None:
@@ -123,15 +128,14 @@ class CommoditiesPanel(Panel):
         self.table.set_row_actions(self._row_actions)
 
         self._filter = make_filter_edit(self.table, "Filter commodities…")
-        self.content_layout.addWidget(self._filter)
-        self.content_layout.addWidget(self.table, 1)
-
-        edit_row = ResponsiveRow()
-        edit_row.addStretch(1)
         edit_btn = QPushButton("Edit…", self)
         edit_btn.clicked.connect(self._open_edit_dialog)
-        edit_row.addWidget(edit_btn)
-        self.content_layout.addLayout(edit_row)
+        # filter and Edit share one row above the table — no bottom bar
+        top_row = ResponsiveRow()
+        top_row.addWidget(self._filter, 1)
+        top_row.addWidget(edit_btn)
+        self.content_layout.addLayout(top_row)
+        self.content_layout.addWidget(self.table, 1)
 
         self._rebuild_table()
 

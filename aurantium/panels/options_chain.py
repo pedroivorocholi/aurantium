@@ -220,6 +220,10 @@ class OptionsChainPanel(Panel):
             ("Vol", "Contracts traded today"),
             ("Δ Γ Θ Vega", "Greeks from Black–Scholes; Θ per day, Vega per 1% of volatility"),
         ),
+        keywords=(
+            "calls", "puts", "strikes", "strike", "expiry", "expiration", "greeks",
+            "implied volatility", "IV", "derivatives", "option chain", "open interest",
+        ),
     )
 
     def build(self) -> None:

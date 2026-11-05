@@ -63,6 +63,11 @@ class MoversPanel(Panel):
             ("Chg%", "Move since the previous close"),
             ("Volume", "Shares traded today"),
         ),
+        keywords=(
+            "gainers", "losers", "top gainers", "top losers", "most active",
+            "biggest movers", "winners", "hot stocks", "momentum", "volume leaders",
+            "trending",
+        ),
     )
 
     def build(self) -> None:

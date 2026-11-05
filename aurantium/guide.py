@@ -60,6 +60,10 @@ class PanelGuide:
     shortcuts: tuple[tuple[str, str], ...] = ()
     #: tabs and sub-views, each explained briefly
     sections: tuple[GuideSection, ...] = ()
+    #: words someone might search the Panels menu with when they don't know
+    #: the panel's name: other names for the same thing ("graph" for Chart)
+    #: and words that belong to it ("debt" for Financials). Never rendered.
+    keywords: tuple[str, ...] = ()
 
     def is_empty(self) -> bool:
         return not (self.purpose or "").strip()
@@ -69,6 +73,7 @@ class PanelGuide:
         parts += [f"{k} {v}" for k, v in self.fields]
         parts += [f"{k} {v}" for k, v in self.shortcuts]
         parts += [f"{s.title} {s.text}" for s in self.sections]
+        parts += self.keywords
         return " ".join(parts)
 
 
@@ -109,7 +114,8 @@ SHORTCUT_GROUPS: tuple[tuple[str, tuple[Shortcut, ...]], ...] = (
         Shortcut("F5 / Ctrl+R", "Refresh every live feed"),
         Shortcut("Ctrl+Z", "Undo the last edit (drawing, list or position change)"),
         Shortcut("Ctrl+S", "Save the current layout under a name"),
-        Shortcut("Alt+P / Alt+S", "Open the Panels / Settings menu from the title bar"),
+        Shortcut("Alt+P / Alt+S", "Open the Panels / Settings menu from the title bar "
+                 "(Panels opens ready to search)"),
         Shortcut("F1 / Ctrl+Shift+H / Help", "Open this guide (Help is the key some keyboards carry)"),
         Shortcut("Shift+F1 / Ctrl+Shift+G", "Open the guide on the focused panel's page"),
         Shortcut("Ctrl+Q", "Quit aurantium"),
@@ -204,7 +210,9 @@ GETTING_STARTED = Page(
            "and press Enter: every panel in the same link group re-centers on it. "
            "Clicking a symbol in any panel does the same.")
         + _p("Add panels from the <b>Panels</b> menu (the layout icon at the left "
-             "of the title bar). A new panel opens as its own "
+             "of the title bar). Not sure of a panel's name? Type what you're "
+             "after in the box at the top of the menu (<i>oil</i>, <i>debt</i>, "
+             "<i>graph</i>) and press Enter on the match. A new panel opens as its own "
              "window; drag its tab into the workspace and it snaps into place. "
              "Drag a panel off the window, onto a second monitor say, and it "
              "becomes a window of its own.")

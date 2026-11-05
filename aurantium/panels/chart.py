@@ -1664,6 +1664,11 @@ class ChartPanel(Panel):
             GuideSection("Narrow panels", "Squeezed narrow, the range and interval rows "
                 "keep the common choices; widen the panel and the rest come back."),
         ),
+        keywords=(
+            "graph", "plot", "candles", "candlestick", "OHLC", "price history",
+            "price chart", "technical analysis", "indicators", "moving average", "RSI",
+            "MACD", "Bollinger", "drawings", "trendline", "intraday",
+        ),
     )
 
     def build(self) -> None:

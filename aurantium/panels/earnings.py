@@ -55,6 +55,11 @@ class EarningsPanel(Panel):
             ("EPS Actual", "What the company reported"),
             ("Surprise%", "How far the result beat (+) or missed (−) the estimate"),
         ),
+        keywords=(
+            "EPS", "earnings date", "report date", "estimates", "surprise", "beat",
+            "miss", "quarterly results", "guidance", "earnings calendar",
+            "earnings call", "reports",
+        ),
     )
 
     def build(self) -> None:

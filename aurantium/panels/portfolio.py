@@ -336,6 +336,11 @@ class PortfolioPanel(Panel):
                 "the book, and the maximum drawdown over a year. The analytics tabs "
                 "start fetching only when first opened."),
         ),
+        keywords=(
+            "positions", "holdings", "my stocks", "book", "allocation", "P&L", "PnL",
+            "profit", "loss", "risk", "cost basis", "import", "broker", "trades",
+            "account",
+        ),
     )
 
     def build(self) -> None:

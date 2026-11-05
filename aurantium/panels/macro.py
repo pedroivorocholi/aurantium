@@ -131,6 +131,11 @@ class MacroPanel(Panel):
             ("Bias", "bullish when speculators are net long, bearish when net short"),
         ),
         sections=(LIST_EDITOR,),
+        keywords=(
+            "bonds", "treasuries", "yields", "yield curve", "interest rates", "rates",
+            "Fed", "FOMC", "inflation", "CPI", "economy", "economic data", "GDP",
+            "2s10s", "inversion", "CFTC", "positioning", "VIX", "dollar",
+        ),
     )
 
     def build(self) -> None:

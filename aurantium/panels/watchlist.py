@@ -78,6 +78,10 @@ class WatchlistPanel(Panel):
             ("Volume", "Shares or contracts traded today (K thousand, M million, B billion)"),
         ),
         shortcuts=(("Delete / Backspace", "Remove the selected symbol"),),
+        keywords=(
+            "watch list", "tickers", "symbols", "favorites", "quotes", "my list",
+            "monitor", "tracker", "stocks", "prices",
+        ),
     )
 
     def build(self) -> None:

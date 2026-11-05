@@ -70,6 +70,10 @@ class NewsPanel(NewsPanelBase):
             "is saved with the layout.",
             "Only your reading languages appear (Settings ▸ News Languages…).",
         ),
+        keywords=(
+            "headlines", "articles", "stories", "press", "media", "newsfeed", "RSS",
+            "sentiment", "topic", "breaking", "feed",
+        ),
     )
 
     def build(self) -> None:

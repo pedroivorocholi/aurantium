@@ -313,6 +313,12 @@ class FundamentalsPanel(Panel):
                 "and repaid. Quarterly figures are annualized ×4 for rates and multiples. "
                 "The implied rates are estimates; hover a line for its formula."),
         ),
+        keywords=(
+            "financial statements", "income statement", "balance sheet", "cash flow",
+            "revenue", "sales", "profit", "net income", "EBITDA", "debt", "liabilities",
+            "assets", "free cash flow", "10-K", "10-Q", "annual report", "quarterly",
+            "fundamentals",
+        ),
     )
 
     def build(self) -> None:

@@ -215,6 +215,11 @@ class ProfilePanel(Panel):
             "The 52-week bar marks where today's price sits between the year's low and high.",
             "**Show more** expands the description; the website link opens in your browser.",
         ),
+        keywords=(
+            "about", "business", "description", "overview", "sector", "industry",
+            "employees", "CEO", "management", "executives", "officers", "website",
+            "52 week", "market cap",
+        ),
     )
 
     def build(self) -> None:

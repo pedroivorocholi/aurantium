@@ -60,6 +60,11 @@ class HoldersPanel(Panel):
             ("% Held", "That stake as a share of shares outstanding"),
             ("Value", "Market value of the stake"),
         ),
+        keywords=(
+            "owners", "ownership", "who owns", "shareholders", "institutions",
+            "institutional", "insiders", "insider", "13F", "funds", "mutual funds",
+            "stakes",
+        ),
     )
 
     def build(self) -> None:

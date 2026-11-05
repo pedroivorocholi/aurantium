@@ -107,6 +107,9 @@ hiddenimports += [
     # pages). Imported by panel.py today, but listed on the same rule as every
     # first-party module: the onboarding dialog reaches it lazily.
     "aurantium.guide",
+    # The Panels menu's search box. Imported inside app.py's
+    # _rebuild_panels_menu, so lazily — the same shape as the dialogs here.
+    "aurantium.panel_search",
     "aurantium.language_dialog",
     "aurantium.languages",
     "aurantium.alerts",

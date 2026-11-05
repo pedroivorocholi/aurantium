@@ -70,6 +70,11 @@ class CotHistoryPanel(Panel):
         fields=(
             ("Net contracts", "Long minus short contracts held by large speculators; the axis abbreviates (300K = 300,000)"),
         ),
+        keywords=(
+            "CFTC", "COT", "commitments of traders", "speculators", "hedge funds",
+            "managed money", "net long", "net short", "positioning",
+            "futures positions", "sentiment",
+        ),
     )
 
     def build(self) -> None:
