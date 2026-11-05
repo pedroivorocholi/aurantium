@@ -101,3 +101,31 @@ def test_nan_price_falls_back_and_negative_qty_by_magnitude():
     w = {h["symbol"]: h["weight"] for h in book}
     assert w == {"S": 0.75, "A": 0.25}
     assert all(0 <= x <= 1 for x in w.values()) and abs(sum(w.values()) - 1) < 0.02
+
+
+def _rates(table):
+    """A ``to_pref`` stand-in: symbol -> rate, ``None`` while a rate is loading."""
+    def to_pref(sym, amount, day):
+        r = table.get(sym)
+        return None if r is None else amount * r
+    return to_pref
+
+
+def test_book_weights_use_converted_values():
+    # 100 BRL held at R$1 each is worth $20, not $100
+    book = pn.build_book([_pos("PETR4.SA", 100, 1.0), _pos("AAA", 1, 80.0)], {}, {},
+                         to_pref=_rates({"PETR4.SA": 0.2, "AAA": 1.0}))
+    assert {h["symbol"]: h["weight"] for h in book} == {"AAA": 0.8, "PETR4.SA": 0.2}
+
+
+def test_position_without_rate_is_left_out():
+    book = pn.build_book([_pos("PETR4.SA", 100, 1.0), _pos("AAA", 1, 80.0)], {}, {},
+                         to_pref=_rates({"AAA": 1.0}))
+    assert [h["symbol"] for h in book] == ["AAA"] and book[0]["weight"] == 1.0
+    assert pn.build_book([_pos("PETR4.SA", 1, 1.0)], {}, {}, to_pref=_rates({})) == []
+
+
+def test_to_pref_none_keeps_raw_behaviour_and_unpriced_still_mean_filled():
+    pos = [_pos("A", 1, 60.0), _pos("B", 1, 20.0), _pos("C", 1)]
+    assert pn.build_book(pos, {}, {}) == pn.build_book(pos, {}, {},
+                                                       to_pref=_rates({"A": 1, "B": 1, "C": 1}))

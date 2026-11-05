@@ -23,6 +23,7 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QLineEdit
 
 from ..components.responsive_row import ResponsiveRow
+from ..fx import FxService
 from ..guide import PanelGuide
 from ..panel import EMPTY_NO_SYMBOL, Panel, PanelRegistry, register_panel
 from ..symbol_context import DEFAULT_GROUP, UNLINKED
@@ -239,9 +240,15 @@ class NewsPanel(NewsPanelBase):
 
             self._store = PortfolioStore.instance()
             self._store.changed.connect(self._schedule_portfolio)
+            # a rate landing or a new preferred currency reweighs the book
+            FxService.instance().changed.connect(self._schedule_portfolio)
         elif not on and self._store is not None:
             try:
                 self._store.changed.disconnect(self._schedule_portfolio)
+            except (RuntimeError, TypeError):
+                pass
+            try:
+                FxService.instance().changed.disconnect(self._schedule_portfolio)
             except (RuntimeError, TypeError):
                 pass
             self._store = None
@@ -257,6 +264,8 @@ class NewsPanel(NewsPanelBase):
         if self._source != "portfolio" or self._store is None:
             return
         from ..portfolio_news import _pos_num, build_book, encode_book
+
+        fx = FxService.instance()
 
         positions = self._store.open_positions()
         symbols = list(dict.fromkeys(p["symbol"] for p in positions))
@@ -287,7 +296,17 @@ class NewsPanel(NewsPanelBase):
             quote = self._hub.peek(f"quote:{sym}")
             if isinstance(quote, dict) and quote.get("price") is not None:
                 prices[sym] = quote["price"]
-        book = build_book(positions, prices, self._sectors)
+        for sym in symbols:  # a quote also reveals the listing currency
+            quote = self._hub.peek(f"quote:{sym}")
+            if isinstance(quote, dict):
+                fx.note_quote(sym, quote)
+        book = build_book(positions, prices, self._sectors, to_pref=fx.value)
+        if positions and not book:
+            # every position is still waiting on its rate: hold the current
+            # list rather than flash "empty"; FxService.changed re-runs this
+            if self.table.rowCount() == 0:
+                self.set_loading(True)
+            return
         if not book:
             # an empty book shows nothing at all — not even macro news
             self.unsubscribe_all()

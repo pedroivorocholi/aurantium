@@ -96,10 +96,17 @@ def _pos_num(v) -> Optional[float]:
     return float(v) if ok and v > 0 else None
 
 
-def build_book(open_positions: list[dict], prices: dict, sectors: dict) -> list[Holding]:
+def build_book(
+    open_positions: list[dict], prices: dict, sectors: dict, *, to_pref=None
+) -> list[Holding]:
     """Open positions -> weights. Value = |qty| x (price or cost). A position
     with no usable price or cost is valued at the mean of the valued ones; if
-    none is valued, all weigh the same. Zero/non-finite qty is dropped."""
+    none is valued, all weigh the same. Zero/non-finite qty is dropped.
+
+    ``to_pref(symbol, amount_local, day)`` converts a listing-currency amount
+    into the preferred currency (``day`` is always None here). A position it
+    cannot value yet (rate loading, currency unknown) is left out of the book
+    until it can; ``None`` keeps the raw, unconverted behaviour."""
     values: dict[str, Optional[float]] = {}
     for p in open_positions:
         sym = p.get("symbol")
@@ -112,7 +119,12 @@ def build_book(open_positions: list[dict], prices: dict, sectors: dict) -> list[
         if unit is None:
             values.setdefault(sym, None)
         else:
-            values[sym] = (values.get(sym) or 0.0) + abs(qty) * unit
+            amount = abs(qty) * unit
+            if to_pref is not None:
+                amount = to_pref(sym, amount, None)
+                if amount is None:
+                    continue
+            values[sym] = (values.get(sym) or 0.0) + amount
     if not values:
         return []
     valued = [v for v in values.values() if v is not None]

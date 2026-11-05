@@ -313,6 +313,10 @@ SETTINGS = Page(
             "Swaps the green/red up-down colors for a deuteranopia-safe "
             "blue/orange pair and prefixes change values with <b>▲</b>/<b>▼</b>, "
             "so direction never depends on color alone. Restarts to apply.")),
+        Detail("Currency", _p(
+            "Pick the currency your portfolio is shown in (Settings ▸ Currency). "
+            "Holdings listed in other currencies are converted at live rates, "
+            "and News › Portfolio ranks holdings by those converted values.")),
         Detail("Close to tray", _p(
             "When on, the window's ✕ hides aurantium to the system tray instead of "
             "quitting, so price alerts keep firing. The tray icon's menu has "

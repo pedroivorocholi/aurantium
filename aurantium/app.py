@@ -806,6 +806,14 @@ class MainWindow(QMainWindow):
             sc = QShortcut(QKeySequence(key), self)
             sc.activated.connect(button.showMenu)
 
+    def _sync_currency_menu(self) -> None:
+        """Keep the Currency check in step when the preference changes elsewhere."""
+        from .fx import FxService
+
+        act = self._currency_acts.get(FxService.instance().preferred())
+        if act is not None and not act.isChecked():
+            act.setChecked(True)
+
     def _build_settings_menu(self) -> None:
         """The consolidated Settings menu — appearance, accessibility, layouts,
         data keys, help, and quit. Opens from the title bar beside Panels."""
@@ -828,6 +836,26 @@ class MainWindow(QMainWindow):
             )
             self._theme_group.addAction(act)
             theme_menu.addAction(act)
+
+        # -- preferred currency: values everywhere are shown in this one ----
+        from .fx import CURRENCIES, FxService
+
+        fx = FxService.instance()
+        cur_menu = m.addMenu("Currency")
+        self._currency_group = QActionGroup(self)
+        self._currency_group.setExclusive(True)
+        self._currency_acts: dict[str, QAction] = {}
+        for code in CURRENCIES:
+            act = QAction(code, self)
+            act.setCheckable(True)
+            act.setChecked(code == fx.preferred())
+            act.triggered.connect(
+                lambda _=False, c=code: FxService.instance().set_preferred(c)
+            )
+            self._currency_group.addAction(act)
+            cur_menu.addAction(act)
+            self._currency_acts[code] = act
+        fx.changed.connect(self._sync_currency_menu)
 
         a_cb = QAction("Color-blind mode", self)
         a_cb.setCheckable(True)
