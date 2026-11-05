@@ -26,6 +26,8 @@ def svc(isolated_settings):
     FxService.reset_instance(s)
     yield s
     FxService.reset_instance(None)
+    hub._scheduler.stop()
+    hub.deleteLater()
     DataHub._inst = saved_hub
 
 
@@ -72,6 +74,31 @@ def test_rate_arrives_from_quote_topic(svc):
 def test_rate_same_currency_needs_no_subscription(svc):
     assert svc.rate("USD", "USD") == 1.0
     assert svc.rate(None, "USD") is None
+    assert DataHub.instance()._subs == {}
+
+
+def test_repeated_asks_subscribe_once(svc):
+    svc.rate("BRL", "USD")
+    svc.rate("BRL", "USD")
+    assert len(DataHub.instance()._subs["quote:BRLUSD=X"]) == 1
+    svc.rate_on("BRL", "2026-11-01", "USD")
+    svc.rate_on("BRL", "2026-11-02", "USD")
+    assert len(DataHub.instance()._subs["history:BRLUSD=X:2y:1d"]) == 1
+
+
+def test_setting_current_value_is_a_no_op(svc, isolated_settings):
+    spy = QSignalSpy(svc.changed)
+    svc.set_preferred("USD")
+    QTest.qWait(300)
+    assert spy.count() == 0
+    assert QSettings().value("ui/currency") is None
+
+
+def test_hub_error_leaves_rate_missing(svc):
+    svc.rate("BRL", "USD")
+    DataHub.instance().publish_error("quote:BRLUSD=X", "boom")
+    QTest.qWait(50)
+    assert svc.rate("BRL", "USD") is None
 
 
 def test_rate_folds_minor_units_to_base_pair(svc):

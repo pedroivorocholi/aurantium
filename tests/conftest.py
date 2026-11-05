@@ -53,6 +53,8 @@ def isolated_settings(tmp_path, qapp):
     Dev runs share the installed app's QSettings, so a test that writes a
     preference must never reach the real store. Organisation and application
     names are set too: with neither, ``QSettings()`` has nowhere to write.
+    Only default-constructed ``QSettings()`` is isolated; the redirected search
+    path is not restored afterwards (Qt cannot report the previous one).
     """
     from PySide6.QtCore import QCoreApplication, QSettings
 
