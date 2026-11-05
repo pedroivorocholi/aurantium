@@ -44,3 +44,28 @@ def qapp():
 
     app = QApplication.instance() or QApplication([])
     yield app
+
+
+@pytest.fixture
+def isolated_settings(tmp_path, qapp):
+    """Point QSettings at an INI file under ``tmp_path`` for one test.
+
+    Dev runs share the installed app's QSettings, so a test that writes a
+    preference must never reach the real store. Organisation and application
+    names are set too: with neither, ``QSettings()`` has nowhere to write.
+    """
+    from PySide6.QtCore import QCoreApplication, QSettings
+
+    old_format = QSettings.defaultFormat()
+    old_org = QCoreApplication.organizationName()
+    old_app = QCoreApplication.applicationName()
+    QSettings.setDefaultFormat(QSettings.IniFormat)
+    QSettings.setPath(QSettings.IniFormat, QSettings.UserScope, str(tmp_path))
+    QCoreApplication.setOrganizationName("aurantium-test")
+    QCoreApplication.setApplicationName("aurantium-test")
+    try:
+        yield tmp_path
+    finally:
+        QSettings.setDefaultFormat(old_format)
+        QCoreApplication.setOrganizationName(old_org)
+        QCoreApplication.setApplicationName(old_app)

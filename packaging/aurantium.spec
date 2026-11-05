@@ -107,6 +107,9 @@ hiddenimports += [
     # pages). Imported by panel.py today, but listed on the same rule as every
     # first-party module: the onboarding dialog reaches it lazily.
     "aurantium.guide",
+    # Preferred-currency service. Reached lazily by the portfolio maths and
+    # panels, so static analysis may never see it.
+    "aurantium.fx",
     # The Panels menu's search box. Imported inside app.py's
     # _rebuild_panels_menu, so lazily — the same shape as the dialogs here.
     "aurantium.panel_search",
