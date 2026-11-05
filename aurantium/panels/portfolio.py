@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import bisect
 from datetime import date, datetime
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import pyqtgraph as pg
 from PySide6.QtCore import QDate, QSize, Qt
@@ -72,22 +72,47 @@ def _fmt(value: Any, decimals: int = 2) -> str:
 
 # -- pure analytics helpers (unit-tested) -----------------------------------
 
-def sector_weights(positions: list, last_price: dict, sectors: dict) -> dict:
+def _value(p: dict, last: float, to_pref) -> Optional[float]:
+    """qty·last, in the preferred currency when ``to_pref`` is given (a sold
+    position at its sell-date rate, an open one at today's); None if unconvertible."""
+    val = last * p["qty"]
+    if to_pref is None:
+        return val
+    return to_pref(p["symbol"], val, p.get("sell_date"))
+
+
+def left_out(positions: list, currency_of: Callable[[str], Optional[str]]) -> int:
+    """Open positions whose currency is unknown, so they cannot be converted.
+    A rate that is merely still loading does not count."""
+    return sum(
+        1 for p in positions
+        if not p.get("sell_date") and currency_of(p["symbol"]) is None
+    )
+
+
+def sector_weights(positions: list, last_price: dict, sectors: dict, *,
+                   to_pref: Optional[Callable] = None) -> dict:
     """{sector: market_value} = Σ qty·last per position, grouped by sector
-    (missing sector → 'Unknown'). Positions without a live price are skipped."""
+    (missing sector → 'Unknown'). Positions without a live price are skipped.
+    ``to_pref(symbol, amount, day)`` converts into the preferred currency; a
+    position it returns None for is skipped too."""
     out: dict[str, float] = {}
     for p in positions:
         last = last_price.get(p["symbol"])
         if last is None:
             continue
+        val = _value(p, last, to_pref)
+        if val is None:
+            continue
         sec = sectors.get(p["symbol"]) or "Unknown"
-        out[sec] = out.get(sec, 0.0) + last * p["qty"]
+        out[sec] = out.get(sec, 0.0) + val
     return out
 
 
-def weighted_beta(positions: list, last_price: dict, betas: dict) -> Optional[float]:
+def weighted_beta(positions: list, last_price: dict, betas: dict, *,
+                  to_pref: Optional[Callable] = None) -> Optional[float]:
     """Market-value-weighted portfolio beta over positions that have both a live
-    price and a known beta."""
+    price and a known beta (values in the preferred currency via ``to_pref``)."""
     total = 0.0
     acc = 0.0
     for p in positions:
@@ -95,18 +120,24 @@ def weighted_beta(positions: list, last_price: dict, betas: dict) -> Optional[fl
         beta = betas.get(p["symbol"])
         if last is None or beta is None:
             continue
-        val = last * p["qty"]
+        val = _value(p, last, to_pref)
+        if val is None:
+            continue
         total += val
         acc += val * beta
     return acc / total if total else None
 
 
-def concentration(positions: list, last_price: dict) -> Optional[float]:
-    """Largest single position as a % of total market value (priced positions)."""
+def concentration(positions: list, last_price: dict, *,
+                  to_pref: Optional[Callable] = None) -> Optional[float]:
+    """Largest single position as a % of total market value (priced positions,
+    in the preferred currency via ``to_pref``)."""
     vals = [
-        last_price[p["symbol"]] * p["qty"]
+        v
         for p in positions
         if last_price.get(p["symbol"]) is not None
+        for v in [_value(p, last_price[p["symbol"]], to_pref)]
+        if v is not None
     ]
     total = sum(vals)
     return (max(vals) / total * 100.0) if (vals and total) else None
@@ -124,7 +155,8 @@ def iso_to_ts(value: Any) -> Optional[float]:
         return None
 
 
-def portfolio_series(positions: list, histories: dict) -> tuple:
+def portfolio_series(positions: list, histories: dict, *,
+                     to_pref: Optional[Callable] = None) -> tuple:
     """(timestamps, values) of the portfolio's marked-to-market value over time,
     counting each position only while it was held.
 
@@ -133,7 +165,11 @@ def portfolio_series(positions: list, histories: dict) -> tuple:
     ``qty · close`` at every timestamp ``buy_ts ≤ t < sell_ts`` for which its
     symbol has a bar at or before ``t`` (last close forward-filled). The series
     starts at the earliest buy so a freshly opened book doesn't fake a year of
-    history."""
+    history.
+
+    With ``to_pref(symbol, amount, iso_day)`` each ``qty · close`` is converted
+    at that timestamp's local date; a timestamp where any held position cannot
+    be converted is omitted from both lists."""
     held = [p for p in positions if p["symbol"] in histories and histories[p["symbol"]][0]]
     if not held:
         return ([], [])
@@ -142,9 +178,11 @@ def portfolio_series(positions: list, histories: dict) -> tuple:
     all_ts = sorted({t for p in held for t in histories[p["symbol"]][0] if t >= start})
     if not all_ts:
         return ([], [])
+    ts_out: list = []
     values = []
     for t in all_ts:
         v = 0.0
+        day = datetime.fromtimestamp(t).date().isoformat() if to_pref else None
         for p in held:
             bt, st = p.get("buy_ts"), p.get("sell_ts")
             if bt is not None and t < bt:
@@ -154,9 +192,18 @@ def portfolio_series(positions: list, histories: dict) -> tuple:
             ts_list, close_list = histories[p["symbol"]]
             j = bisect.bisect_right(ts_list, t) - 1
             if j >= 0:
-                v += p["qty"] * close_list[j]
+                amt = p["qty"] * close_list[j]
+                if to_pref is not None:
+                    amt = to_pref(p["symbol"], amt, day)
+                    if amt is None:
+                        v = None
+                        break
+                v += amt
+        if v is None:
+            continue
+        ts_out.append(t)
         values.append(v)
-    return (all_ts, values)
+    return (ts_out, values)
 
 
 def max_drawdown(values: list) -> Optional[float]:
