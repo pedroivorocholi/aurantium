@@ -122,3 +122,39 @@ def test_performance_names_currency_and_converts_benchmark(store, panel):
     assert panel._perf_port.name() == "Portfolio (EUR)"
     _x, y = panel._perf_bench.getData()
     assert list(y) == pytest.approx([100.0, 110.0])  # rebased, constant rate
+
+
+@pytest.mark.parametrize("tab,check", [(2, "perf"), (3, "risk")])
+def test_unknown_currency_does_not_wipe_history_tabs(store, panel, tab, check):
+    store.add("AAPL", 10, 150.0, "")
+    store.add("FOO.XX", 5, 10.0, "")
+    panel.tabs.setCurrentIndex(tab)
+    _publish("quote:AAPL", {"price": 200.0, "currency": "USD"})
+    _publish("quote:FOO.XX", {"price": 12.0})
+    bars = {"t": [1_700_000_000, 1_700_086_400, 1_700_172_800], "c": [100.0, 120.0, 90.0]}
+    for sym in ("SPY", "AAPL", "FOO.XX"):
+        _publish(f"history:{sym}:1y:1d", bars)
+    _settle()
+    if check == "perf":
+        _x, y = panel._perf_port.getData()
+        assert y is not None and len(y) == 3
+        assert "1 position left out" in panel._perf_note.text()
+    else:
+        assert panel._risk_labels["drawdown"].text() != "—"
+        assert "1 position left out" in panel._risk_note.text()
+
+
+def test_converted_cells_are_not_dim_once_the_rate_lands(store, panel):
+    from PySide6.QtGui import QColor
+    from aurantium.theme import FG_DIM
+
+    store.add("PETR4.SA", 100, 30.0, "")
+    _publish("quote:PETR4.SA", {"price": 38.0, "currency": "BRL"})
+    _settle()
+    assert panel.table.item(0, COL_MKTVAL).text() == "…"
+    _publish("quote:BRLUSD=X", {"price": 0.18})
+    _settle()
+    for item in (panel.table.item(0, COL_MKTVAL),
+                 panel.table.item(panel._data_row_count, COL_MKTVAL)):
+        assert item.text() == "684.00"
+        assert item.foreground().color().name() != QColor(FG_DIM).name()

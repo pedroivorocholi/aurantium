@@ -810,6 +810,7 @@ class PortfolioPanel(Panel):
         self.table.flash_on_change(last_item, last)
         for item in (mktval_item, pnl_item, pnlpct_item):
             item.setToolTip("")
+            item.setData(Qt.ItemDataRole.ForegroundRole, None)  # undo a dimmed "…"
         if last is not None and mkt_val is None:
             self._blank_cell(mktval_item, pos)
         else:
@@ -868,6 +869,7 @@ class PortfolioPanel(Panel):
         note = self._left_out_text()
         for item in items:
             item.setToolTip(note)
+            item.setData(Qt.ItemDataRole.ForegroundRole, None)  # undo a dimmed "…"
         if loading:
             for item in items:
                 item.setText(LOADING_GLYPH)
@@ -911,6 +913,13 @@ class PortfolioPanel(Panel):
     def _to_pref(symbol: str, amount: float, day: Optional[str]) -> Optional[float]:
         return FxService.instance().value(symbol, amount, day)
 
+    @staticmethod
+    def _convertible(positions: list) -> list:
+        """Drop positions of unknown currency: they convert to None on every day
+        and would empty the whole series instead of being left out."""
+        cur = FxService.instance().currency_of
+        return [p for p in positions if cur(p["symbol"]) is not None]
+
     def _show_note(self, label: QLabel) -> None:
         text = self._left_out_text()
         label.setText(text)
@@ -931,7 +940,8 @@ class PortfolioPanel(Panel):
         self._name_series(self._perf_port, f"Portfolio ({cur})")
         self._name_series(self._perf_bench, f"{_BENCH} ({cur})")
         ts, values = portfolio_series(
-            self._perf_positions(), self._histories, to_pref=self._to_pref)
+            self._convertible(self._perf_positions()), self._histories,
+            to_pref=self._to_pref)
         if ts and values:
             self._perf_port.setData(ts, _normalize_to_100(values))
         else:
@@ -955,6 +965,7 @@ class PortfolioPanel(Panel):
         """Rename a curve and its legend entry (the legend caches the label)."""
         if curve.name() == name:
             return
+        # writes opts["name"] directly: the legend caches the label it was given
         legend = self._perf_plot.plotItem.legend
         legend.removeItem(curve)
         curve.opts["name"] = name
@@ -966,7 +977,8 @@ class PortfolioPanel(Panel):
             current, self._last_price, self._betas, to_pref=self._to_pref)
         conc = concentration(current, self._last_price, to_pref=self._to_pref)
         _ts, values = portfolio_series(
-            self._perf_positions(), self._histories, to_pref=self._to_pref)
+            self._convertible(self._perf_positions()), self._histories,
+            to_pref=self._to_pref)
         self._show_note(self._risk_note)
         dd = max_drawdown(values) if values else None
         self._risk_labels["beta"].setText(f"{beta:.2f}" if beta is not None else "—")
