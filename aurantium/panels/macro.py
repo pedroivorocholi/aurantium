@@ -68,6 +68,7 @@ from ..macro_model import (
     SPREAD_REASON_MISSING,
     SPREAD_STATE_RULES,
     comparison_date,
+    days_since,
     percentile,
     rate_at,
     spread_bp,
@@ -163,6 +164,7 @@ _EXTRA_QUOTES = [
 ]
 
 _SPARK_DAYS = "1M"  # gauge sparklines: one month
+_STALE_DAYS = 7  # an older curve reading names its date on the tile
 
 
 # -- small helpers --------------------------------------------------------------
@@ -229,6 +231,20 @@ def _short_date(iso: str, today: Optional[date] = None) -> str:
     today = today or date.today()
     text = f"{d.day} {d.strftime('%b')}" if has_day else d.strftime("%b")
     return text if d.year == today.year else f"{text} {d.year}"
+
+
+def _today() -> date:  # tests pin the clock here
+    return date.today()
+
+
+def _stale_note(as_of: str) -> str:
+    """'as of 1 Sep' when a curve's date is over _STALE_DAYS old, else ''."""
+    try:
+        if days_since(as_of, _today()) <= _STALE_DAYS:
+            return ""
+    except ValueError:
+        return ""
+    return f"as of {_short_date(as_of, _today())}"
 
 
 def _month_year(iso: str) -> str:
@@ -897,6 +913,9 @@ class MacroPanel(Panel):
             state = spread_state([v for _d, v in series])
             if state != "normal":
                 note, tone = state, ("down" if state == "inverted" else "")
+        stale = _stale_note(str(cur.get("as_of") or ""))
+        if stale:  # a monthly source (FRED) must not pass for today's level
+            note = f"{stale} · {note}" if note else stale
         return (value, change, sign, spark, note, tone)
 
     def _on_gauge_clicked(self, g: Gauge) -> None:

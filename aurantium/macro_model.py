@@ -11,7 +11,13 @@ import math
 from datetime import date, timedelta
 from typing import Optional
 
-TOLERANCE_Y = 0.05  # a point counts as "this tenor" within this many years
+TOLERANCE_Y = 0.05  # a point counts as "this tenor" within this many years…
+TOLERANCE_REL = 0.10  # …or this share of the tenor, whichever is wider
+
+# The relative band is for bond-by-bond curves (Tesouro), whose points sit at
+# each bond's own maturity — 10.16Y, not 10Y. The nearest bond is still an
+# observed rate, never an interpolated one, and across days it is the same bond
+# (it ages ~0.08Y a month), so changes compare like with like.
 
 SPREAD_REASON_MISSING = "This curve has no {tenor} point"
 
@@ -34,15 +40,16 @@ def tenor_label(years: float) -> str:
     """0.25 -> '3M', 0.5 -> '6M', 1 -> '1Y', 10 -> '10Y'."""
     if years < 1:
         return f"{round(years * 12)}M"
-    return f"{years:g}Y"
+    return f"{round(years, 1):g}Y"  # a bond's 1.1554Y reads as 1.2Y
 
 
 def rate_at(points, years: float) -> Optional[float]:
-    """The observed rate at ``years`` (within tolerance), else None."""
+    """The observed rate nearest ``years`` within tolerance, else None."""
+    tol = max(TOLERANCE_Y, TOLERANCE_REL * years)
     best = None
     for p in points or []:
         d = abs(p[0] - years)
-        if d <= TOLERANCE_Y and (best is None or d < best[0]):
+        if d <= tol and (best is None or d < best[0]):
             best = (d, p[1])
     return None if best is None else float(best[1])
 

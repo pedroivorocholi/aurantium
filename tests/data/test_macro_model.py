@@ -108,3 +108,22 @@ def test_spread_rules_text():
         "Inverted: below zero. Steepening: up 10 bp or more over 20 business days. "
         "Flattening: down 10 bp or more. Otherwise normal."
     )
+
+
+def test_bond_maturities_label_to_one_decimal():
+    assert [m.tenor_label(y) for y in (1.1554, 10.1574, 0.16, 2.0)] == ["1.2Y", "10.2Y", "2M", "2Y"]
+
+
+def test_bond_by_bond_curve_reads_its_nearest_bond_never_interpolates():
+    br = [[0.16, 13.58], [1.16, 14.36], [2.16, 14.94], [10.16, 15.21]]
+    assert m.rate_at(br, 10) == 15.21 and m.rate_at(br, 2) == 14.94
+    assert m.rate_at(br, 0.25) is None  # 2M is not 3M
+    assert m.rate_at(br, 5) is None     # nothing near 5Y: no made-up point
+    month_ago = [[0.24, 13.22], [1.24, 12.66], [2.24, 12.74], [10.24, 13.0]]
+    assert [round(bp) for _, bp in m.bp_changes(br, month_ago)] == [170, 220, 221]  # 2M vs 3M stays apart
+
+
+def test_standard_tenors_still_need_their_own_point():
+    us = [[1 / 12, 4.0], [0.25, 4.1], [2, 4.2], [7, 4.4], [10, 4.5]]
+    assert m.rate_at(us, 1 / 6) is None  # 1M and 3M do not stand in for 2M
+    assert m.rate_at(us, 8) is None      # 7Y and 10Y do not stand in for 8Y

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import re
 
+from datetime import date
+
 import pytest
 from PySide6.QtCore import QCoreApplication, QEvent
 from PySide6.QtTest import QTest
@@ -123,6 +125,8 @@ def _publish_error(topic, message):
 @pytest.fixture
 def make(svc, qapp, monkeypatch):
     monkeypatch.delenv("FRED_API_KEY", raising=False)
+    import aurantium.panels.macro as macro_mod
+    monkeypatch.setattr(macro_mod, "_today", lambda: date(2026, 11, 5))  # fixtures are dated 5 Nov
     UndoStack.instance()._stack.clear()
     made = []
 
@@ -620,3 +624,18 @@ def test_policy_note_never_says_zero_bp(make):
     _publish("rates:policy", flat)
     note = p.gauge_strip.reading(_index(p, "policy", "*")).note
     assert "0bp" not in note
+
+
+def test_old_curve_reading_names_its_date(make):
+    p = make()
+    p.curve_view.pick_country("GB")
+    _publish("rates:curve:GB", _curve("GB", [[0.25, 3.71], [10.0, 5.24]], "FRED", "2026-09-01", complete=False))
+    _flush()
+    r = p.gauge_strip.reading(_index(p, "curve", "*:10"))
+    assert r.value == "5.24%" and r.note == "as of 1 Sep"
+
+
+def test_fresh_curve_reading_has_no_date_note(make):
+    p = make()
+    _feed_us()
+    assert "as of" not in p.gauge_strip.reading(_index(p, "curve", "*:10")).note
