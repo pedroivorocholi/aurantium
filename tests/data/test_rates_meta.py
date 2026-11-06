@@ -57,3 +57,23 @@ def test_by_code_is_case_insensitive_and_safe():
 def test_curve_capable_excludes_none_sources():
     assert all(c.curve_source != "none" for c in curve_capable())
     assert any(c.code == "US" for c in curve_capable())
+
+
+def test_new_curve_sources_are_registered():
+    assert {"boc", "tesouro", "boe"} <= CURVE_SOURCES
+
+
+def test_canada_and_brazil_use_their_own_curve_sources():
+    ca, br = by_code("CA"), by_code("BR")
+    assert ca.curve_source == "boc" and ca.tenors == (2.0, 3.0, 5.0, 7.0, 10.0, 30.0)
+    assert "Bank of Canada" in ca.citation
+    assert br.curve_source == "tesouro" and len(br.tenors) >= 2
+    assert "Tesouro Nacional (ODbL)" in br.citation
+    assert {c.code for c in curve_capable()} >= {"CA", "BR"}
+
+
+def test_uk_stays_on_fred_while_the_boe_flag_is_off():
+    from aurantium import rates_meta
+
+    assert rates_meta.BOE_PERMITTED is False
+    assert by_code("GB").curve_source == "fred"

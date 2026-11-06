@@ -1,0 +1,6829 @@
+{
+    "terms": {
+        "url": "https://www.bankofcanada.ca/terms/"
+    },
+    "groupDetail": {
+        "label": "Selected benchmark bond yields",
+        "description": "The daily yields for a set of benchmark government bonds. These yields serve as reference rates for Canadian dollar-denominated fixed income securities and are used to assess market conditions and inform monetary policy decisions.",
+        "link": "https://www.bankofcanada.ca/?p=39890",
+        "metadata": {
+            "unit": "Percent",
+            "frequency": "Business daily"
+        }
+    },
+    "seriesDetail": {
+        "BD.CDN.2YR.DQ.YLD": {
+            "label": "Benchmark bond yield, 2-year",
+            "description": "The yield on the Government of Canada 2-year benchmark bond. This series reflects the prevailing interest rate for the 2-year term and is used to monitor short-term government borrowing costs.",
+            "dimension": {
+                "key": "d",
+                "name": "Date"
+            },
+            "dateFormat": "daily",
+            "metadata": {
+                "unit": "Percent",
+                "frequency": "Business daily"
+            }
+        },
+        "BD.CDN.3YR.DQ.YLD": {
+            "label": "Benchmark bond yield, 3-year",
+            "description": "The yield on the Government of Canada 3-year benchmark bond. This series measures the market interest rate for the Government of Canada’s 3-year bond, which serves as a reference rate for Canadian dollar-denominated debt securities.",
+            "dimension": {
+                "key": "d",
+                "name": "Date"
+            },
+            "dateFormat": "daily",
+            "metadata": {
+                "unit": "Percent",
+                "frequency": "Business daily"
+            }
+        },
+        "BD.CDN.5YR.DQ.YLD": {
+            "label": "Benchmark bond yield, 5-year",
+            "description": "The yield on the Government of Canada 5-year benchmark bond. This series reports the prevailing yield for the 5-year maturity point on the Canadian government bond yield curve.",
+            "dimension": {
+                "key": "d",
+                "name": "Date"
+            },
+            "dateFormat": "daily",
+            "metadata": {
+                "unit": "Percent",
+                "frequency": "Business daily"
+            }
+        },
+        "BD.CDN.7YR.DQ.YLD": {
+            "label": "Benchmark bond yield, 7-year",
+            "description": "The yield on the Government of Canada 7-year benchmark bond. This series represents the prevailing market yield for the 7-year maturity point on the Government of Canada yield curve.",
+            "dimension": {
+                "key": "d",
+                "name": "Date"
+            },
+            "dateFormat": "daily",
+            "metadata": {
+                "unit": "Percent",
+                "frequency": "Business daily"
+            }
+        },
+        "BD.CDN.10YR.DQ.YLD": {
+            "label": "Benchmark bond yield, 10-year",
+            "description": "The yield on the Government of Canada 10-year benchmark bond. This series represents the prevailing market interest rate for the 10-year Government of Canada bond and is used as a reference for financial market analysis and reporting.",
+            "dimension": {
+                "key": "d",
+                "name": "Date"
+            },
+            "dateFormat": "daily",
+            "metadata": {
+                "unit": "Percent",
+                "frequency": "Business daily"
+            }
+        },
+        "BD.CDN.LONG.DQ.YLD": {
+            "label": "Benchmark bond yield, long-term",
+            "description": "The yield on the Government of Canada long-term benchmark bond. This series represents the prevailing interest rate for the designated long-term benchmark bond and is used in the Bank of Canada’s reporting of financial market conditions.",
+            "dimension": {
+                "key": "d",
+                "name": "Date"
+            },
+            "dateFormat": "daily",
+            "metadata": {
+                "unit": "Percent",
+                "frequency": "Business daily"
+            }
+        },
+        "BD.CDN.RRB.DQ.YLD": {
+            "label": "Real Return Bonds yield, long-term",
+            "description": "The yield on Government of Canada Real Return Bonds. These bonds are part of the government securities held by the Bank of Canada and are reported in millions of Canadian dollars.",
+            "dimension": {
+                "key": "d",
+                "name": "Date"
+            },
+            "dateFormat": "daily",
+            "metadata": {
+                "unit": "Percent",
+                "frequency": "Business daily"
+            }
+        }
+    },
+    "observations": [
+        {
+            "d": "2026-11-04",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.81"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.32"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.43"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.52"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.70"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.04"
+            }
+        },
+        {
+            "d": "2026-11-03",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.85"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.26"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.36"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.49"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.58"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.77"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.09"
+            }
+        },
+        {
+            "d": "2026-11-02",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.83"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.26"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.35"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.46"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.56"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.74"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.06"
+            }
+        },
+        {
+            "d": "2026-10-30",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.86"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.28"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.38"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.51"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.60"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.78"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.11"
+            }
+        },
+        {
+            "d": "2026-10-29",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.89"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.36"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.46"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.58"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.67"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.84"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.13"
+            }
+        },
+        {
+            "d": "2026-10-28",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.90"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.41"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.51"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.62"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.70"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.87"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.15"
+            }
+        },
+        {
+            "d": "2026-10-27",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.87"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.36"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.45"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.57"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.66"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.83"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.12"
+            }
+        },
+        {
+            "d": "2026-10-26",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.88"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.37"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.47"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.58"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.66"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.84"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.13"
+            }
+        },
+        {
+            "d": "2026-10-23",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.87"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.33"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.44"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.56"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.66"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.83"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.12"
+            }
+        },
+        {
+            "d": "2026-10-22",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.85"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.32"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.50"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.58"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.78"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.10"
+            }
+        },
+        {
+            "d": "2026-10-21",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.91"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.32"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.43"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.62"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.70"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.90"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.19"
+            }
+        },
+        {
+            "d": "2026-10-20",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.92"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.32"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.43"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.62"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.70"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.90"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.20"
+            }
+        },
+        {
+            "d": "2026-10-19",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.97"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.33"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.44"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.64"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.72"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.93"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.25"
+            }
+        },
+        {
+            "d": "2026-10-16",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.90"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.21"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.32"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.54"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.61"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.84"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.18"
+            }
+        },
+        {
+            "d": "2026-10-15",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.89"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.20"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.31"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.53"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.61"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.83"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.17"
+            }
+        },
+        {
+            "d": "2026-10-14",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.89"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.21"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.32"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.55"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.64"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.85"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.19"
+            }
+        },
+        {
+            "d": "2026-10-13",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.92"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.19"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.30"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.55"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.63"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.87"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.22"
+            }
+        },
+        {
+            "d": "2026-10-09",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.93"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.18"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.29"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.54"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.62"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.86"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.23"
+            }
+        },
+        {
+            "d": "2026-10-08",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.98"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.24"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.35"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.60"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.69"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.93"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.29"
+            }
+        },
+        {
+            "d": "2026-10-07",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.98"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.23"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.34"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.60"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.69"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.94"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.30"
+            }
+        },
+        {
+            "d": "2026-10-06",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.97"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.23"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.34"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.59"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.67"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.92"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.28"
+            }
+        },
+        {
+            "d": "2026-10-05",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "2.00"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.26"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.37"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.63"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.72"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.96"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.31"
+            }
+        },
+        {
+            "d": "2026-10-02",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.97"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.25"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.35"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.60"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.69"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.93"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.28"
+            }
+        },
+        {
+            "d": "2026-10-01",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.97"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.27"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.37"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.62"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.70"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.94"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.28"
+            }
+        },
+        {
+            "d": "2026-09-29",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.98"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.37"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.47"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.69"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.77"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.99"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.30"
+            }
+        },
+        {
+            "d": "2026-09-28",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.93"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.37"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.46"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.68"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.75"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.96"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.25"
+            }
+        },
+        {
+            "d": "2026-09-25",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.91"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.35"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.44"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.65"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.73"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.94"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.24"
+            }
+        },
+        {
+            "d": "2026-09-24",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.95"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.39"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.49"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.69"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.76"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.97"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.27"
+            }
+        },
+        {
+            "d": "2026-09-23",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.93"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.40"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.49"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.69"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.76"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.96"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.25"
+            }
+        },
+        {
+            "d": "2026-09-22",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.25"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.34"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.54"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.62"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.83"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.15"
+            }
+        },
+        {
+            "d": "2026-09-21",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.29"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.37"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.57"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.64"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.84"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.16"
+            }
+        },
+        {
+            "d": "2026-09-18",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.88"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.32"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.41"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.59"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.68"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.87"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.19"
+            }
+        },
+        {
+            "d": "2026-09-17",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.85"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.27"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.36"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.54"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.63"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.83"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.17"
+            }
+        },
+        {
+            "d": "2026-09-16",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.92"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.35"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.44"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.64"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.73"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.92"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.25"
+            }
+        },
+        {
+            "d": "2026-09-15",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.96"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.35"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.44"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.65"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.74"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.95"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.29"
+            }
+        },
+        {
+            "d": "2026-09-14",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.94"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.37"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.46"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.65"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.73"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.94"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.27"
+            }
+        },
+        {
+            "d": "2026-09-11",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.94"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.35"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.44"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.65"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.74"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.95"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.28"
+            }
+        },
+        {
+            "d": "2026-09-10",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.94"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.31"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.40"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.63"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.72"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.94"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.28"
+            }
+        },
+        {
+            "d": "2026-09-09",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.87"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.16"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.25"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.48"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.61"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.84"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.21"
+            }
+        },
+        {
+            "d": "2026-09-08",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.85"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.13"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.44"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.57"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.81"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.19"
+            }
+        },
+        {
+            "d": "2026-09-04",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.82"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.17"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.40"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.53"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.77"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.15"
+            }
+        },
+        {
+            "d": "2026-09-03",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.10"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.19"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.41"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.54"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.79"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.16"
+            }
+        },
+        {
+            "d": "2026-09-02",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.86"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.11"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.21"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.42"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.56"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.80"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.18"
+            }
+        },
+        {
+            "d": "2026-09-01",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.85"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.01"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.11"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.35"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.49"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.75"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.15"
+            }
+        },
+        {
+            "d": "2026-08-31",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.94"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.01"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.10"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.33"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.47"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.73"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.14"
+            }
+        },
+        {
+            "d": "2026-08-28",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.98"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.01"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.11"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.34"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.47"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.73"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.14"
+            }
+        },
+        {
+            "d": "2026-08-27",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.98"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.06"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.30"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.44"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.70"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.13"
+            }
+        },
+        {
+            "d": "2026-08-26",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.94"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.93"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.03"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.26"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.40"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.66"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.09"
+            }
+        },
+        {
+            "d": "2026-08-25",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.93"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.90"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.99"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.36"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.62"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.06"
+            }
+        },
+        {
+            "d": "2026-08-24",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.98"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.05"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.28"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.42"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.68"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.11"
+            }
+        },
+        {
+            "d": "2026-08-21",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "2.05"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.03"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.13"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.36"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.50"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.76"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.17"
+            }
+        },
+        {
+            "d": "2026-08-20",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "2.03"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.02"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.11"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.35"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.48"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.75"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.15"
+            }
+        },
+        {
+            "d": "2026-08-19",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.98"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.98"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.07"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.30"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.43"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.69"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.09"
+            }
+        },
+        {
+            "d": "2026-08-18",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "2.01"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.05"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.29"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.43"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.70"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.13"
+            }
+        },
+        {
+            "d": "2026-08-17",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "2.02"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.97"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.06"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.31"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.44"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.72"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.14"
+            }
+        },
+        {
+            "d": "2026-08-14",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.98"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.04"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.28"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.41"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.68"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.09"
+            }
+        },
+        {
+            "d": "2026-08-13",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.93"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.92"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.01"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.23"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.36"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.62"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.04"
+            }
+        },
+        {
+            "d": "2026-08-12",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.98"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.98"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.07"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.30"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.43"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.69"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.09"
+            }
+        },
+        {
+            "d": "2026-08-11",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "2.00"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.01"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.10"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.32"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.46"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.70"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.10"
+            }
+        },
+        {
+            "d": "2026-08-10",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "2.00"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.02"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.11"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.34"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.47"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.72"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.10"
+            }
+        },
+        {
+            "d": "2026-08-07",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.95"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.04"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.26"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.39"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.64"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.04"
+            }
+        },
+        {
+            "d": "2026-08-06",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.93"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.92"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.01"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.36"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.61"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.02"
+            }
+        },
+        {
+            "d": "2026-08-05",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.88"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.82"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.95"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.17"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.30"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.55"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.97"
+            }
+        },
+        {
+            "d": "2026-08-04",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.87"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.83"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.17"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.30"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.55"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.96"
+            }
+        },
+        {
+            "d": "2026-07-31",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.95"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.04"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.27"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.40"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.65"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.04"
+            }
+        },
+        {
+            "d": "2026-07-30",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.90"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.85"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.97"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.19"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.32"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.59"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.99"
+            }
+        },
+        {
+            "d": "2026-07-29",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.91"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.85"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.97"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.19"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.33"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.58"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.99"
+            }
+        },
+        {
+            "d": "2026-07-28",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.83"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.84"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.97"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.16"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.29"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.53"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.91"
+            }
+        },
+        {
+            "d": "2026-07-27",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.87"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.99"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.19"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.32"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.56"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.94"
+            }
+        },
+        {
+            "d": "2026-07-24",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.87"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.90"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.02"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.36"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.60"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.98"
+            }
+        },
+        {
+            "d": "2026-07-23",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.93"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.28"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.41"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.65"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.02"
+            }
+        },
+        {
+            "d": "2026-07-22",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.92"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.89"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.01"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.35"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.60"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.00"
+            }
+        },
+        {
+            "d": "2026-07-21",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.90"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.82"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.16"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.30"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.56"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.98"
+            }
+        },
+        {
+            "d": "2026-07-20",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.90"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.84"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.18"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.31"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.57"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.98"
+            }
+        },
+        {
+            "d": "2026-07-17",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.88"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.86"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.98"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.18"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.32"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.56"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.96"
+            }
+        },
+        {
+            "d": "2026-07-16",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.86"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.83"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.15"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.28"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.53"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.94"
+            }
+        },
+        {
+            "d": "2026-07-15",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.87"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.82"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.93"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.14"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.28"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.53"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.95"
+            }
+        },
+        {
+            "d": "2026-07-14",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.90"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.86"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.98"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.18"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.31"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.57"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.97"
+            }
+        },
+        {
+            "d": "2026-07-13",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.89"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.88"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.00"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.19"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.32"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.56"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.95"
+            }
+        },
+        {
+            "d": "2026-07-10",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.85"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.82"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.93"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.13"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.26"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.51"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.92"
+            }
+        },
+        {
+            "d": "2026-07-09",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.86"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.80"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.12"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.26"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.52"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.93"
+            }
+        },
+        {
+            "d": "2026-07-08",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.88"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.85"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.97"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.18"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.31"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.56"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.95"
+            }
+        },
+        {
+            "d": "2026-07-07",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.83"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.80"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.11"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.24"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.49"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.90"
+            }
+        },
+        {
+            "d": "2026-07-06",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.77"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.72"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.83"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.03"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.16"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.42"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.84"
+            }
+        },
+        {
+            "d": "2026-07-03",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.79"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.75"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.86"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.06"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.19"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.45"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.86"
+            }
+        },
+        {
+            "d": "2026-07-02",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.79"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.76"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.87"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.06"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.20"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.45"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.86"
+            }
+        },
+        {
+            "d": "2026-06-30",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.71"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.74"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.84"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.01"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.14"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.38"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.77"
+            }
+        },
+        {
+            "d": "2026-06-29",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.71"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.73"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.83"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.00"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.13"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.37"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.77"
+            }
+        },
+        {
+            "d": "2026-06-26",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.74"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.75"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.85"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.02"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.15"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.39"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.80"
+            }
+        },
+        {
+            "d": "2026-06-25",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.73"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.75"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.85"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.02"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.16"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.39"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.79"
+            }
+        },
+        {
+            "d": "2026-06-24",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.72"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.73"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.83"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.99"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.13"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.36"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.76"
+            }
+        },
+        {
+            "d": "2026-06-23",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.78"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.78"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.88"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.06"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.19"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.44"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.83"
+            }
+        },
+        {
+            "d": "2026-06-22",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.80"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.81"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.09"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.43"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.85"
+            }
+        },
+        {
+            "d": "2026-06-19",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.77"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.78"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.88"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.04"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.18"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.39"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.81"
+            }
+        },
+        {
+            "d": "2026-06-18",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.75"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.78"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.88"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.04"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.17"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.38"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.80"
+            }
+        },
+        {
+            "d": "2026-06-17",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.77"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.82"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.92"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.42"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.82"
+            }
+        },
+        {
+            "d": "2026-06-16",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.77"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.75"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.85"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.03"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.17"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.38"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.81"
+            }
+        },
+        {
+            "d": "2026-06-15",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.78"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.76"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.86"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.04"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.18"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.41"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.84"
+            }
+        },
+        {
+            "d": "2026-06-12",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.77"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.76"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.86"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.04"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.18"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.40"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.82"
+            }
+        },
+        {
+            "d": "2026-06-11",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.76"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.77"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.87"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.05"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.19"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.41"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.81"
+            }
+        },
+        {
+            "d": "2026-06-10",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.81"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.83"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.13"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.27"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.49"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.88"
+            }
+        },
+        {
+            "d": "2026-06-09",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.82"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.85"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.95"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.15"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.28"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.49"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.88"
+            }
+        },
+        {
+            "d": "2026-06-08",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.85"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.87"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.97"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.18"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.32"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.53"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.92"
+            }
+        },
+        {
+            "d": "2026-06-05",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.77"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.87"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.14"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.28"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.48"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.83"
+            }
+        },
+        {
+            "d": "2026-06-04",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.73"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.80"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.89"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.43"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.80"
+            }
+        },
+        {
+            "d": "2026-06-03",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.73"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.81"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.23"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.43"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.80"
+            }
+        },
+        {
+            "d": "2026-06-02",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.71"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.80"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.89"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.07"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.21"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.41"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.79"
+            }
+        },
+        {
+            "d": "2026-06-01",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.73"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.81"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.90"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.43"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.81"
+            }
+        },
+        {
+            "d": "2026-05-29",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.74"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.77"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.86"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.05"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.19"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.41"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.79"
+            }
+        },
+        {
+            "d": "2026-05-28",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.73"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.84"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.93"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.10"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.24"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.44"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.80"
+            }
+        },
+        {
+            "d": "2026-05-27",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.77"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.86"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.95"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.14"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.27"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.47"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.83"
+            }
+        },
+        {
+            "d": "2026-05-26",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.77"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.84"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.93"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.12"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.26"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.47"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.84"
+            }
+        },
+        {
+            "d": "2026-05-25",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.77"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.84"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.93"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.11"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.25"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.46"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.84"
+            }
+        },
+        {
+            "d": "2026-05-22",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.83"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.92"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.01"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.20"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.34"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.53"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.90"
+            }
+        },
+        {
+            "d": "2026-05-21",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.00"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.19"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.33"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.54"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.91"
+            }
+        },
+        {
+            "d": "2026-05-20",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.87"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.93"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.03"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.23"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.37"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.58"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.94"
+            }
+        },
+        {
+            "d": "2026-05-19",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.96"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.04"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.14"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.35"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.50"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.70"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.04"
+            }
+        },
+        {
+            "d": "2026-05-15",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.93"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.07"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.15"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.36"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.49"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.70"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "4.02"
+            }
+        },
+        {
+            "d": "2026-05-14",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.04"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.36"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.56"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.91"
+            }
+        },
+        {
+            "d": "2026-05-13",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.85"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.05"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.23"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.37"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.58"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.93"
+            }
+        },
+        {
+            "d": "2026-05-12",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.87"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.97"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.05"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.24"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.39"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.59"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.94"
+            }
+        },
+        {
+            "d": "2026-05-11",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.93"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.01"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.19"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.33"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.54"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.90"
+            }
+        },
+        {
+            "d": "2026-05-08",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.78"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.86"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.12"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.26"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.47"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.85"
+            }
+        },
+        {
+            "d": "2026-05-07",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.02"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.18"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.33"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.53"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.90"
+            }
+        },
+        {
+            "d": "2026-05-06",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.83"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.99"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.15"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.30"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.51"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.89"
+            }
+        },
+        {
+            "d": "2026-05-05",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.87"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.01"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.09"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.26"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.40"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.60"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.95"
+            }
+        },
+        {
+            "d": "2026-05-04",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.88"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.05"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.13"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.27"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.41"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.62"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.96"
+            }
+        },
+        {
+            "d": "2026-05-01",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.82"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.02"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.18"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.33"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.53"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.90"
+            }
+        },
+        {
+            "d": "2026-04-30",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.86"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.04"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.20"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.35"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.56"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.93"
+            }
+        },
+        {
+            "d": "2026-04-29",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.89"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.03"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.11"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.26"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.40"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.60"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.96"
+            }
+        },
+        {
+            "d": "2026-04-28",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.88"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.14"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.29"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.51"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.91"
+            }
+        },
+        {
+            "d": "2026-04-27",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.86"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.83"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.92"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.11"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.27"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.50"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.91"
+            }
+        },
+        {
+            "d": "2026-04-24",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.82"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.82"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.90"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.07"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.23"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.46"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.87"
+            }
+        },
+        {
+            "d": "2026-04-23",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.85"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.85"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.93"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.11"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.27"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.48"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.90"
+            }
+        },
+        {
+            "d": "2026-04-22",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.86"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.83"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.10"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.26"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.48"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.90"
+            }
+        },
+        {
+            "d": "2026-04-21",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.87"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.84"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.92"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.10"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.27"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.50"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.91"
+            }
+        },
+        {
+            "d": "2026-04-20",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.83"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.76"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.85"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.04"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.20"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.44"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.88"
+            }
+        },
+        {
+            "d": "2026-04-17",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.83"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.77"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.86"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.04"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.20"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.44"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.88"
+            }
+        },
+        {
+            "d": "2026-04-16",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.87"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.80"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.92"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.10"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.26"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.50"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.93"
+            }
+        },
+        {
+            "d": "2026-04-15",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.79"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.25"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.47"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.90"
+            }
+        },
+        {
+            "d": "2026-04-14",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.82"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.76"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.88"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.04"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.20"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.43"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.87"
+            }
+        },
+        {
+            "d": "2026-04-13",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.79"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.07"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.24"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.46"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.90"
+            }
+        },
+        {
+            "d": "2026-04-10",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.86"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.78"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.24"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.47"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.91"
+            }
+        },
+        {
+            "d": "2026-04-09",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.79"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.92"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.07"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.23"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.46"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.89"
+            }
+        },
+        {
+            "d": "2026-04-08",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.83"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.79"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.06"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.44"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.88"
+            }
+        },
+        {
+            "d": "2026-04-07",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.85"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.86"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.98"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.12"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.28"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.49"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.91"
+            }
+        },
+        {
+            "d": "2026-04-06",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.82"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.83"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.09"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.25"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.47"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.88"
+            }
+        },
+        {
+            "d": "2026-04-02",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.86"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.82"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.93"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.10"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.26"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.49"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.92"
+            }
+        },
+        {
+            "d": "2026-04-01",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.88"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.82"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.11"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.27"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.50"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.93"
+            }
+        },
+        {
+            "d": "2026-03-31",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.83"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.82"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.87"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.09"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.24"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.46"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.88"
+            }
+        },
+        {
+            "d": "2026-03-30",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.88"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.14"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.29"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.51"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.90"
+            }
+        },
+        {
+            "d": "2026-03-27",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.88"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.95"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.01"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.21"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.36"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.58"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.94"
+            }
+        },
+        {
+            "d": "2026-03-26",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.85"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.98"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.03"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.37"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.57"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.92"
+            }
+        },
+        {
+            "d": "2026-03-25",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.83"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.89"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.95"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.12"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.27"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.47"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.88"
+            }
+        },
+        {
+            "d": "2026-03-24",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.91"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.99"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.05"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.23"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.39"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.59"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.97"
+            }
+        },
+        {
+            "d": "2026-03-23",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.86"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.95"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.00"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.17"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.33"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.53"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.92"
+            }
+        },
+        {
+            "d": "2026-03-20",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.88"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "3.07"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "3.11"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.23"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.38"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.56"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.95"
+            }
+        },
+        {
+            "d": "2026-03-19",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.80"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.84"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.89"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.05"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.23"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.44"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.85"
+            }
+        },
+        {
+            "d": "2026-03-18",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.82"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.75"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.81"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.01"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.23"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.45"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.89"
+            }
+        },
+        {
+            "d": "2026-03-17",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.79"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.67"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.74"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.95"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.17"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.39"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.85"
+            }
+        },
+        {
+            "d": "2026-03-16",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.82"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.71"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.78"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.99"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.21"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.43"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.88"
+            }
+        },
+        {
+            "d": "2026-03-13",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.88"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.79"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.86"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.07"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.29"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.51"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.94"
+            }
+        },
+        {
+            "d": "2026-03-12",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.89"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.82"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.88"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.09"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.31"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.52"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.96"
+            }
+        },
+        {
+            "d": "2026-03-11",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.87"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.72"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.79"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.03"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.25"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.48"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.93"
+            }
+        },
+        {
+            "d": "2026-03-10",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.79"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.65"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.71"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.95"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.17"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.39"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.85"
+            }
+        },
+        {
+            "d": "2026-03-09",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.75"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.63"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.69"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.14"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.36"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.81"
+            }
+        },
+        {
+            "d": "2026-03-06",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.80"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.63"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.70"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.95"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.17"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.40"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.86"
+            }
+        },
+        {
+            "d": "2026-03-05",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.75"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.58"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.65"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.89"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.11"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.34"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.79"
+            }
+        },
+        {
+            "d": "2026-03-04",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.70"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.52"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.58"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.81"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.03"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.26"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.74"
+            }
+        },
+        {
+            "d": "2026-03-03",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.68"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.51"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.45"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.79"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.92"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.24"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.72"
+            }
+        },
+        {
+            "d": "2026-03-02",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.66"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.49"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.43"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.76"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.89"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.70"
+            }
+        },
+        {
+            "d": "2026-02-27",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.60"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.39"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.34"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.67"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.80"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.13"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.63"
+            }
+        },
+        {
+            "d": "2026-02-26",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.63"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.43"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.37"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.71"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.84"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.17"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.66"
+            }
+        },
+        {
+            "d": "2026-02-25",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.66"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.46"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.39"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.74"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.87"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.20"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.69"
+            }
+        },
+        {
+            "d": "2026-02-24",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.65"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.44"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.38"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.72"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.86"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.18"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.68"
+            }
+        },
+        {
+            "d": "2026-02-23",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.65"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.43"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.37"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.72"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.86"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.18"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.68"
+            }
+        },
+        {
+            "d": "2026-02-20",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.67"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.44"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.37"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.74"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.88"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.70"
+            }
+        },
+        {
+            "d": "2026-02-19",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.68"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.44"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.37"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.75"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.89"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.71"
+            }
+        },
+        {
+            "d": "2026-02-18",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.68"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.44"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.37"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.76"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.90"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.23"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.71"
+            }
+        },
+        {
+            "d": "2026-02-17",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.68"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.45"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.38"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.76"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.90"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.23"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.71"
+            }
+        },
+        {
+            "d": "2026-02-13",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.69"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.47"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.40"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.79"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.93"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.25"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.72"
+            }
+        },
+        {
+            "d": "2026-02-12",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.71"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.49"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.41"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.82"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.28"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.74"
+            }
+        },
+        {
+            "d": "2026-02-11",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.75"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.52"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.45"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.87"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.01"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.34"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.79"
+            }
+        },
+        {
+            "d": "2026-02-10",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.77"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.53"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.46"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.89"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.03"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.36"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.81"
+            }
+        },
+        {
+            "d": "2026-02-09",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.81"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.54"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.46"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.90"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.05"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.39"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.85"
+            }
+        },
+        {
+            "d": "2026-02-06",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.80"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.55"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.47"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.06"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.40"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.85"
+            }
+        },
+        {
+            "d": "2026-02-05",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.81"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.55"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.47"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.06"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.40"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.86"
+            }
+        },
+        {
+            "d": "2026-02-04",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.85"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.58"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.49"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.43"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.88"
+            }
+        },
+        {
+            "d": "2026-02-03",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.58"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.49"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.95"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.09"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.44"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.88"
+            }
+        },
+        {
+            "d": "2026-02-02",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.57"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.48"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.43"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.88"
+            }
+        },
+        {
+            "d": "2026-01-30",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.56"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.47"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.93"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.07"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.42"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.88"
+            }
+        },
+        {
+            "d": "2026-01-29",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.57"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.48"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.93"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.41"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.86"
+            }
+        },
+        {
+            "d": "2026-01-28",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.58"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.50"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.42"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.86"
+            }
+        },
+        {
+            "d": "2026-01-27",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.83"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.58"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.50"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.41"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.85"
+            }
+        },
+        {
+            "d": "2026-01-26",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.79"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.57"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.47"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.05"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.37"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.80"
+            }
+        },
+        {
+            "d": "2026-01-23",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.83"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.60"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.51"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.95"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.09"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.41"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.84"
+            }
+        },
+        {
+            "d": "2026-01-22",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.81"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.56"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.52"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.40"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.83"
+            }
+        },
+        {
+            "d": "2026-01-21",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.56"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.54"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.95"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.09"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.42"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.85"
+            }
+        },
+        {
+            "d": "2026-01-20",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.86"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.55"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.53"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.09"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.42"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.87"
+            }
+        },
+        {
+            "d": "2026-01-19",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.81"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.54"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.51"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.05"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.39"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.82"
+            }
+        },
+        {
+            "d": "2026-01-16",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.79"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.54"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.52"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.92"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.06"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.37"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.80"
+            }
+        },
+        {
+            "d": "2026-01-15",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.78"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.53"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.50"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.89"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.03"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.35"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.79"
+            }
+        },
+        {
+            "d": "2026-01-14",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.80"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.53"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.50"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.90"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.04"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.36"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.81"
+            }
+        },
+        {
+            "d": "2026-01-13",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.85"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.55"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.53"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.93"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.07"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.41"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.86"
+            }
+        },
+        {
+            "d": "2026-01-12",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.83"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.56"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.54"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.93"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.40"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.84"
+            }
+        },
+        {
+            "d": "2026-01-09",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.82"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.55"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.53"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.92"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.07"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.38"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.82"
+            }
+        },
+        {
+            "d": "2026-01-08",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.84"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.57"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.55"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.40"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.85"
+            }
+        },
+        {
+            "d": "2026-01-07",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.83"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.56"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.54"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.93"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.07"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.39"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.84"
+            }
+        },
+        {
+            "d": "2026-01-06",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.90"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.59"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.57"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.10"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.43"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.89"
+            }
+        },
+        {
+            "d": "2026-01-05",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.89"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.57"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.56"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.42"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.88"
+            }
+        },
+        {
+            "d": "2026-01-02",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.93"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.61"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.60"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.00"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.14"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.47"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.92"
+            }
+        },
+        {
+            "d": "2025-12-31",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.87"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.58"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.57"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.11"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.42"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.85"
+            }
+        },
+        {
+            "d": "2025-12-30",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.86"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.58"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.57"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.95"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.09"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.41"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.84"
+            }
+        },
+        {
+            "d": "2025-12-29",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.83"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.56"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.55"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.92"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.06"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.39"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.81"
+            }
+        },
+        {
+            "d": "2025-12-24",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.83"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.57"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.56"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.93"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.07"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.40"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.81"
+            }
+        },
+        {
+            "d": "2025-12-23",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.85"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.57"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.56"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.09"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.42"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.83"
+            }
+        },
+        {
+            "d": "2025-12-22",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.90"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.60"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.59"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.98"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.13"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.46"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.88"
+            }
+        },
+        {
+            "d": "2025-12-19",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.91"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.61"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.60"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.99"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.13"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.47"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.89"
+            }
+        },
+        {
+            "d": "2025-12-18",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.88"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.59"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.57"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.11"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.40"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.86"
+            }
+        },
+        {
+            "d": "2025-12-17",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.89"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.60"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.59"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.98"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.12"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.42"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.87"
+            }
+        },
+        {
+            "d": "2025-12-16",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.85"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.58"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.57"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.10"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.40"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.84"
+            }
+        },
+        {
+            "d": "2025-12-15",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.87"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.58"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.58"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.98"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.12"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.41"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.85"
+            }
+        },
+        {
+            "d": "2025-12-12",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.89"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.62"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.61"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.01"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.15"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.44"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.88"
+            }
+        },
+        {
+            "d": "2025-12-11",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.86"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.62"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.61"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.00"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.14"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.42"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.85"
+            }
+        },
+        {
+            "d": "2025-12-10",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.85"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.63"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.62"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.01"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.15"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.42"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.85"
+            }
+        },
+        {
+            "d": "2025-12-09",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.88"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.69"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.68"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.07"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.20"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.46"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.87"
+            }
+        },
+        {
+            "d": "2025-12-08",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.85"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.64"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.63"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.01"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.15"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.42"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.84"
+            }
+        },
+        {
+            "d": "2025-12-05",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.87"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.64"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.63"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "3.01"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "3.15"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.42"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.85"
+            }
+        },
+        {
+            "d": "2025-12-04",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.76"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.46"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.45"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.81"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.26"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.74"
+            }
+        },
+        {
+            "d": "2025-12-03",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.72"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.43"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.43"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.77"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.92"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.70"
+            }
+        },
+        {
+            "d": "2025-12-02",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.71"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.46"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.45"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.81"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.95"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.24"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.70"
+            }
+        },
+        {
+            "d": "2025-12-01",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.70"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.48"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.47"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.81"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.95"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.24"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.69"
+            }
+        },
+        {
+            "d": "2025-11-28",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.62"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.41"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.40"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.72"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.86"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.14"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.59"
+            }
+        },
+        {
+            "d": "2025-11-27",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.60"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.40"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.39"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.71"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.84"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.12"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.58"
+            }
+        },
+        {
+            "d": "2025-11-26",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.62"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.40"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.39"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.72"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.85"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.13"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.59"
+            }
+        },
+        {
+            "d": "2025-11-25",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.64"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.40"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.40"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.73"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.87"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.15"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.61"
+            }
+        },
+        {
+            "d": "2025-11-24",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.66"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.43"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.42"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.76"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.90"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.18"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.64"
+            }
+        },
+        {
+            "d": "2025-11-21",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.69"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.44"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.44"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.77"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.20"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.66"
+            }
+        },
+        {
+            "d": "2025-11-20",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.70"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.47"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.47"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.80"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.67"
+            }
+        },
+        {
+            "d": "2025-11-19",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.73"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.49"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.49"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.82"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.25"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.70"
+            }
+        },
+        {
+            "d": "2025-11-18",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.73"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.49"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.48"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.82"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.96"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.25"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.70"
+            }
+        },
+        {
+            "d": "2025-11-17",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.70"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.49"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.49"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.81"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.94"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.23"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.67"
+            }
+        },
+        {
+            "d": "2025-11-14",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.68"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.48"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.48"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.80"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.93"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.65"
+            }
+        },
+        {
+            "d": "2025-11-13",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.65"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.47"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.47"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.77"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.90"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.18"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.62"
+            }
+        },
+        {
+            "d": "2025-11-12",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.62"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.45"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.44"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.74"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.87"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.14"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.58"
+            }
+        },
+        {
+            "d": "2025-11-10",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.66"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.45"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.45"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.75"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.89"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.17"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.62"
+            }
+        },
+        {
+            "d": "2025-11-07",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.65"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.44"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.44"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.74"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.89"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.17"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.61"
+            }
+        },
+        {
+            "d": "2025-11-06",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.61"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.39"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.39"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.67"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.82"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.10"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.56"
+            }
+        },
+        {
+            "d": "2025-11-05",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.65"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.42"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.42"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.73"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.87"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.16"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.61"
+            }
+        },
+        {
+            "d": "2025-11-04",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.66"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.43"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.43"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.73"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.87"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.15"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.61"
+            }
+        },
+        {
+            "d": "2025-11-03",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.66"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.42"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.42"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.72"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.86"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.15"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.61"
+            }
+        },
+        {
+            "d": "2025-10-31",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.63"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.40"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.40"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.70"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.84"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.12"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.58"
+            }
+        },
+        {
+            "d": "2025-10-30",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.63"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.42"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.43"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.71"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.86"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.13"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.58"
+            }
+        },
+        {
+            "d": "2025-10-29",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.64"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.43"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.44"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.73"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.88"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.15"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.59"
+            }
+        },
+        {
+            "d": "2025-10-28",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.57"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.36"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.36"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.62"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.76"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.04"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.51"
+            }
+        },
+        {
+            "d": "2025-10-27",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.58"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.36"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.36"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.62"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.77"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.05"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.53"
+            }
+        },
+        {
+            "d": "2025-10-24",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.63"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.37"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.38"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.65"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.80"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.58"
+            }
+        },
+        {
+            "d": "2025-10-23",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.63"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.39"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.40"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.66"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.81"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.09"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.58"
+            }
+        },
+        {
+            "d": "2025-10-22",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.61"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.38"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.39"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.64"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.78"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.07"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.56"
+            }
+        },
+        {
+            "d": "2025-10-21",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.61"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.39"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.40"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.65"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.80"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.56"
+            }
+        },
+        {
+            "d": "2025-10-20",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.61"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.36"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.36"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.62"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.76"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.05"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.56"
+            }
+        },
+        {
+            "d": "2025-10-17",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.64"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.37"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.38"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.65"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.79"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.09"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.58"
+            }
+        },
+        {
+            "d": "2025-10-16",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.64"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.38"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.39"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.65"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.79"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.08"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.59"
+            }
+        },
+        {
+            "d": "2025-10-15",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.66"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.42"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.42"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.69"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.83"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.12"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.62"
+            }
+        },
+        {
+            "d": "2025-10-14",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.68"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.43"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.44"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.71"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.85"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.14"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.63"
+            }
+        },
+        {
+            "d": "2025-10-10",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.72"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.47"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.48"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.74"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.89"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.18"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.68"
+            }
+        },
+        {
+            "d": "2025-10-09",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.76"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.47"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.48"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.76"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.90"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.20"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.72"
+            }
+        },
+        {
+            "d": "2025-10-08",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.76"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.46"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.47"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.74"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.89"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.19"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.72"
+            }
+        },
+        {
+            "d": "2025-10-07",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.74"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.45"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.46"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.73"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.88"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.19"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.70"
+            }
+        },
+        {
+            "d": "2025-10-06",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.76"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.47"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.47"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.75"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.21"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.71"
+            }
+        },
+        {
+            "d": "2025-10-03",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.72"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.45"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.45"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.73"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.88"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.19"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.67"
+            }
+        },
+        {
+            "d": "2025-10-02",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.71"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.45"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.46"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.72"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.87"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.18"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.66"
+            }
+        },
+        {
+            "d": "2025-10-01",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.72"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.46"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.47"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.73"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.88"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.19"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.67"
+            }
+        },
+        {
+            "d": "2025-09-29",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.66"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.47"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.47"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.74"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.87"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.17"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.61"
+            }
+        },
+        {
+            "d": "2025-09-26",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.71"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.50"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.51"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.78"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.93"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.23"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.67"
+            }
+        },
+        {
+            "d": "2025-09-25",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.71"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.49"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.49"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.77"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.91"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.22"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.67"
+            }
+        },
+        {
+            "d": "2025-09-24",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.71"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.45"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.46"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.73"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.88"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.20"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.67"
+            }
+        },
+        {
+            "d": "2025-09-23",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.70"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.45"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.45"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.73"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.87"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.19"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.66"
+            }
+        },
+        {
+            "d": "2025-09-22",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.69"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.45"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.46"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.73"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.88"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.19"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.66"
+            }
+        },
+        {
+            "d": "2025-09-19",
+            "BD.CDN.RRB.DQ.YLD": {
+                "v": "1.68"
+            },
+            "BD.CDN.2YR.DQ.YLD": {
+                "v": "2.46"
+            },
+            "BD.CDN.3YR.DQ.YLD": {
+                "v": "2.47"
+            },
+            "BD.CDN.5YR.DQ.YLD": {
+                "v": "2.74"
+            },
+            "BD.CDN.7YR.DQ.YLD": {
+                "v": "2.89"
+            },
+            "BD.CDN.10YR.DQ.YLD": {
+                "v": "3.20"
+            },
+            "BD.CDN.LONG.DQ.YLD": {
+                "v": "3.64"
+            }
+        }
+    ]
+}

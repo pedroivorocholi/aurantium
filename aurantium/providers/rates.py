@@ -7,18 +7,25 @@ function tested against recorded fixtures, plus a thin fetch_*() wrapper.
 
 from __future__ import annotations
 
+import concurrent.futures
 import csv
 import datetime
 import io
+import json
 import os
 import re
+import zipfile
+from pathlib import Path
 from typing import Any, Callable, NamedTuple, Optional
 
 import requests
 
 from .. import rates_allowlist
 from ..datahub import DataHub, Provider
-from ..rates_meta import UST, MOF, ECB, BIS, COUNTRIES, by_code
+from .. import rates_meta
+from ..rates_meta import (  # noqa: F401  (BOE_PERMITTED is re-exported)
+    UST, MOF, ECB, BIS, BOC, TESOURO, BOE, BOE_PERMITTED, COUNTRIES, by_code,
+)
 
 
 class PolicyPoint(NamedTuple):
@@ -293,6 +300,222 @@ def parse_mof_curve(text: str) -> Curve:
     return Curve("JP", tuple(points), len(points) >= 5, (MOF,), as_of=last[0].strip())
 
 
+# -- Bank of Canada -----------------------------------------------------------
+
+#: Valet series ids of the group ``bond_yields_benchmark`` (read from the live
+#: seriesDetail, 2026-11-05). LONG is the long-term benchmark, roughly 30y.
+#: BD.CDN.RRB.DQ.YLD is the real-return bond - not a nominal tenor, so it is
+#: deliberately absent.
+_BOC_SERIES = {
+    "BD.CDN.2YR.DQ.YLD": 2.0,
+    "BD.CDN.3YR.DQ.YLD": 3.0,
+    "BD.CDN.5YR.DQ.YLD": 5.0,
+    "BD.CDN.7YR.DQ.YLD": 7.0,
+    "BD.CDN.10YR.DQ.YLD": 10.0,
+    "BD.CDN.LONG.DQ.YLD": 30.0,
+}
+_EMPTY_CA = Curve("CA", (), False, (BOC,), "")
+
+
+def _boc_observations(text: str) -> list:
+    """Valet JSON -> observation dicts, oldest first. Never raises."""
+    try:
+        obs = json.loads(text or "").get("observations") or []
+    except (ValueError, AttributeError):
+        return []
+    obs = [o for o in obs if isinstance(o, dict) and _iso(str(o.get("d", "")))]
+    return sorted(obs, key=lambda o: o["d"])
+
+
+def _boc_point(obs: dict, series: str) -> Optional[float]:
+    cell = obs.get(series)
+    return _f(cell.get("v")) if isinstance(cell, dict) else None
+
+
+def parse_boc(text: str) -> Curve:
+    """Valet benchmark-yield JSON -> the latest Curve, using the most recent
+    observation OF EACH SERIES."""
+    latest: dict[float, tuple[str, float]] = {}
+    for obs in _boc_observations(text):          # ascending, later days overwrite
+        for series, years in _BOC_SERIES.items():
+            value = _boc_point(obs, series)
+            if value is not None:
+                latest[years] = (obs["d"], value)
+    if not latest:
+        return _EMPTY_CA
+    points = tuple(CurvePoint(y, v) for y, (_, v) in sorted(latest.items()))
+    as_of = max(d for d, _ in latest.values())
+    return Curve("CA", points, len(points) >= 5, (BOC,), as_of)
+
+
+def parse_boc_history(text: str) -> list:
+    """Every observation day of a Valet response -> oldest-first days."""
+    out = []
+    for obs in _boc_observations(text):
+        points = []
+        for series, years in _BOC_SERIES.items():
+            value = _boc_point(obs, series)
+            if value is not None:
+                points.append([years, value])
+        if points:
+            points.sort()
+            out.append((_iso(obs["d"]), points))
+    return out
+
+
+# -- Tesouro Nacional ---------------------------------------------------------
+
+
+class TesouroSchemaError(ValueError):
+    """The Tesouro CSV no longer has the columns we read."""
+
+
+#: nominal (fixed-rate) families, in priority order: when both list a maturity
+#: the zero-coupon LTN ("Tesouro Prefixado") wins over the coupon NTN-F
+_TESOURO_NOMINAL = ("Tesouro Prefixado", "Tesouro Prefixado com Juros Semestrais")
+_TESOURO_COLUMNS = ("Tipo Titulo", "Data Vencimento", "Data Base", "Taxa Compra Manha")
+
+
+def _iso_dmy(text: str) -> Optional[str]:
+    """Tesouro dd/mm/yyyy -> ISO (the shared _iso reads Treasury m/d/y)."""
+    try:
+        day, month, year = (int(x) for x in (text or "").strip().split("/"))
+        return datetime.date(year, month, day).isoformat()
+    except (ValueError, TypeError):
+        return None
+
+
+def _br_number(cell: str) -> Optional[float]:
+    """"15,38" -> 15.38. The file uses a decimal comma and no thousands mark in
+    the rate column."""
+    return _f((cell or "").replace(",", "."))
+
+
+def parse_tesouro_history(csv_text: str, since: str = "") -> list:
+    """Tesouro Direto price/rate CSV -> oldest-first nominal curves,
+    [(iso Data Base, [[years, rate], ...])], for every Data Base >= `since`
+    (an ISO date, "" = all).
+
+    The file is ';'-separated with decimal commas and dd/mm/yyyy dates. Only
+    the two nominal families are read and only (maturity, rate) pairs leave this
+    function: the raw rows are ODbL data we may cite but never re-export.
+    Raises TesouroSchemaError when a needed column is missing."""
+    text = (csv_text or "").lstrip("﻿")
+    if not text.strip():
+        raise TesouroSchemaError("Tesouro file is empty")
+    reader = csv.DictReader(io.StringIO(text), delimiter=";")
+    missing = [c for c in _TESOURO_COLUMNS if c not in (reader.fieldnames or [])]
+    if missing:
+        raise TesouroSchemaError(
+            "Tesouro file changed its columns; missing " + ", ".join(missing)
+        )
+    by_day: dict[str, dict[str, tuple[int, float]]] = {}
+    for row in reader:
+        kind = row["Tipo Titulo"]
+        if kind not in _TESOURO_NOMINAL:
+            continue
+        base = _iso_dmy(row["Data Base"])
+        if base is None or base < since:
+            continue
+        due = _iso_dmy(row["Data Vencimento"])
+        rate = _br_number(row["Taxa Compra Manha"])
+        if due is None or rate is None:
+            continue
+        rank = _TESOURO_NOMINAL.index(kind)
+        day = by_day.setdefault(base, {})
+        if due not in day or rank < day[due][0]:
+            day[due] = (rank, rate)
+    out = []
+    for base, bonds in sorted(by_day.items()):
+        origin = datetime.date.fromisoformat(base)
+        points = []
+        for due, (_, rate) in bonds.items():
+            years = (datetime.date.fromisoformat(due) - origin).days / 365.25
+            if years > 0:
+                points.append([years, rate])
+        if points:
+            points.sort()
+            out.append((base, points))
+    return out
+
+
+def _tesouro_curve(days: list) -> Curve:
+    if not days:
+        raise TesouroSchemaError("Tesouro file has no nominal curve rows")
+    as_of, points = days[-1]
+    return Curve("BR", tuple(CurvePoint(y, r) for y, r in points),
+                 len(points) >= 5, (TESOURO,), as_of)
+
+
+def parse_tesouro(csv_text: str) -> Curve:
+    """The latest Data Base's nominal curve: Prefixado + Prefixado com Juros
+    Semestrais, years = (vencimento - data base) / 365.25, rate = Taxa Compra
+    Manha."""
+    return _tesouro_curve(parse_tesouro_history(csv_text))
+
+
+# -- Bank of England (switched off, see rates_meta.BOE_PERMITTED) --------------
+
+
+def parse_boe(zip_bytes: bytes) -> Curve:
+    """The Bank of England "latest yield curve data" ZIP -> Curve, read from the
+    nominal workbook's spot-curve sheet (rows = dates, columns = maturity in
+    years, a header row of maturities above the data).
+
+    Built against a synthetic workbook, not a recorded one: nothing fetches BoE
+    while BOE_PERMITTED is False, so the real layout is unverified. Re-check
+    against the real file when permission arrives. Never raises; unreadable ->
+    an empty curve."""
+    empty = Curve("GB", (), False, (BOE,), "")
+    try:
+        import openpyxl
+
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
+            name = next(
+                n for n in z.namelist()
+                if "nominal" in n.lower() and n.lower().endswith((".xlsx", ".xlsm"))
+            )
+            book = openpyxl.load_workbook(
+                io.BytesIO(z.read(name)), read_only=True, data_only=True
+            )
+        title = next(
+            t for t in book.sheetnames
+            if "spot" in t.lower() and "real" not in t.lower()
+        )
+        rows = [list(r) for r in book[title].iter_rows(values_only=True)]
+    except Exception:
+        return empty
+
+    def num(cell) -> Optional[float]:
+        if isinstance(cell, (int, float)) and not isinstance(cell, bool):
+            return _f(cell)
+        return None
+
+    header, start = None, 0
+    for i, row in enumerate(rows):
+        years = [num(c) for c in row[1:]]
+        if sum(y is not None for y in years) >= 5:
+            header, start = years, i + 1
+            break
+    if header is None:
+        return empty
+    last = None
+    for row in rows[start:]:
+        if row and isinstance(row[0], datetime.date):
+            if any(num(c) is not None for c in row[1:]):
+                last = row
+    if last is None:
+        return empty
+    points = []
+    for col, years in enumerate(header, start=1):
+        value = num(last[col]) if col < len(last) else None
+        if years is not None and value is not None:
+            points.append(CurvePoint(years, value))
+    points.sort()
+    when = last[0].date() if isinstance(last[0], datetime.datetime) else last[0]
+    return Curve("GB", tuple(points), len(points) >= 5, (BOE,), when.isoformat())
+
+
 # -- curve history ---------------------------------------------------------
 
 
@@ -483,8 +706,29 @@ _ECB_BASE = "https://data-api.ecb.europa.eu/service/data/YC/B.U2.EUR.4F.G_N_A.SV
 _TIMEOUT = 20
 _UA = {"User-Agent": "aurantium/1.0"}
 
-#: url -> (iso date fetched, text); see RatesProvider._cached_text
-_HIST_CACHE: dict[str, tuple[str, str]] = {}
+#: key -> (iso date fetched, value): downloaded text keyed by URL, and parsed
+#: results keyed "parsed:..."; see RatesProvider._cached_text / _cached_parsed
+_HIST_CACHE: dict[str, tuple[str, Any]] = {}
+
+
+def _today() -> datetime.date:
+    return datetime.date.today()
+
+
+def _get_bytes(url: str, **kwargs) -> bytes:
+    resp = requests.get(url, timeout=_TIMEOUT, headers=_UA, **kwargs)
+    resp.raise_for_status()
+    return resp.content
+
+
+def _tesouro_cache_dir() -> Path:
+    """<app cache>/rates, next to cache.py's SQLite file. Tests replace this."""
+    from PySide6.QtCore import QStandardPaths
+
+    base = QStandardPaths.writableLocation(
+        QStandardPaths.StandardLocation.CacheLocation
+    ) or str(Path.home() / ".aurantium" / "cache")
+    return Path(base) / "rates"
 
 
 def _get_text(url: str, **kwargs) -> str:
@@ -521,6 +765,31 @@ class RatesProvider(Provider):
     )
     #: calendar days of history served: 13 months plus slack for weekends
     HISTORY_DAYS = 400
+    #: Valet ?recent=N counts observations (business days). ~280 covers the 13
+    #: months the panel compares over, and the SAME response feeds the latest
+    #: curve and the history, so Canada costs one request per day.
+    BOC_RECENT = 280
+    BOC_URL = (
+        "https://www.bankofcanada.ca/valet/observations/group/"
+        "bond_yields_benchmark/json?recent={n}"
+    )
+    # Found 2026-11-05 through the Tesouro Transparente CKAN API
+    # (https://www.tesourotransparente.gov.br/ckan/api/3/action/package_search
+    #  ?q=taxas+titulos+ofertados): dataset "taxas-dos-titulos-ofertados-pelo-
+    # tesouro-direto" (licence odc-odbl), its CSV resource. ~15 MB, every
+    # bond since 2004, newest Data Base first. Cite "Tesouro Nacional (ODbL)";
+    # never re-export the rows.
+    TESOURO_URL = (
+        "https://www.tesourotransparente.gov.br/ckan/dataset/"
+        "df56aa42-484a-4a59-8184-7676580c81e3/resource/"
+        "796d2059-14e9-44e3-80c9-2d9e30b405c1/download/precotaxatesourodireto.csv"
+    )
+    #: Bank of England "latest yield curve data" ZIP. NOT fetched while
+    #: rates_meta.BOE_PERMITTED is False; unverified until permission arrives.
+    BOE_URL = (
+        "https://www.bankofengland.co.uk/-/media/boe/files/statistics/"
+        "yield-curves/latest-yield-curve-data.zip"
+    )
 
     @staticmethod
     def ust_url(year: Optional[int] = None) -> str:
@@ -655,6 +924,12 @@ class RatesProvider(Provider):
             return parse_ust_curve(_get_text(self.ust_url()))
         if meta.curve_source == "mof":
             return parse_mof_curve(_get_text(self.MOF_URL))
+        if meta.curve_source == "boc":
+            return parse_boc(self._boc_text(_today()))
+        if meta.curve_source == "tesouro":
+            return _tesouro_curve(self._tesouro_days(_today()))
+        if meta.curve_source == "boe":
+            return self._boe_curve()
         if meta.curve_source == "ecb":
             rows = {}
             for years, suffix in _ECB_SERIES.items():
@@ -721,14 +996,101 @@ class RatesProvider(Provider):
             return self._ecb_history(meta, cutoff), (ECB,)
         if meta.curve_source == "mof":
             return self._mof_history(today, cutoff), (MOF,)
+        if meta.curve_source == "boc":
+            days = parse_boc_history(self._boc_text(today))
+            if not days:
+                raise RuntimeError("no Bank of Canada history")
+            return [d for d in days if d[0] >= cutoff], (BOC,)
+        if meta.curve_source == "tesouro":
+            days = self._tesouro_days(today)
+            return [d for d in days if d[0] >= cutoff], (TESOURO,)
         if meta.curve_source == "none":
             return [], (BIS,)
-        curve = self._curve_for(meta)      # "fred" and anything new: latest only
+        # "fred", "boe" and anything new: latest only (a switched-off "boe"
+        # raises inside _curve_for before any request)
+        curve = self._curve_for(meta)
         iso = _iso(curve.as_of)
         days = []
         if iso and curve.points:
             days = [(iso, [[p.years, p.rate] for p in curve.points])]
         return days, curve.sources
+
+    @staticmethod
+    def _cached_parsed(key: str, today: datetime.date, load: Callable[[], Any]) -> Any:
+        """Run `load` (download + parse) at most once a day and keep only the
+        parsed result in memory, never the multi-MB text."""
+        stamp = today.isoformat()
+        hit = _HIST_CACHE.get("parsed:" + key)
+        if hit is not None and hit[0] == stamp:
+            return hit[1]
+        value = load()
+        _HIST_CACHE["parsed:" + key] = (stamp, value)
+        return value
+
+    def _boc_text(self, today: datetime.date) -> str:
+        return self._cached_text(self.BOC_URL.format(n=self.BOC_RECENT), today)
+
+    def _boe_curve(self) -> Curve:
+        # read the flag at call time, through the module: this is the guard that
+        # keeps every code path off BoE until written permission exists
+        if not rates_meta.BOE_PERMITTED:
+            raise RuntimeError("Bank of England curve not permitted")
+        curve = parse_boe(_get_bytes(self.BOE_URL))
+        if not curve.points:
+            raise RuntimeError("Bank of England file had no spot curve")
+        return curve
+
+    # -- Tesouro: one ~15 MB file, downloaded at most once a day --------------
+
+    _TESOURO_PREFIX = "precotaxatesourodireto-"
+
+    def _tesouro_text(self, today: datetime.date) -> tuple:
+        """Today's CSV text from the on-disk copy, else downloaded. Offline,
+        the newest older copy serves. Returns (text, path_to_save_or_None)."""
+        folder = _tesouro_cache_dir()
+        todays = folder / f"{self._TESOURO_PREFIX}{today.isoformat()}.csv"
+        try:
+            return todays.read_text(encoding="utf-8"), None
+        except OSError:
+            pass
+        try:
+            return _get_text(self.TESOURO_URL), todays
+        except Exception:
+            older = (
+                sorted(folder.glob(f"{self._TESOURO_PREFIX}*.csv"))
+                if folder.is_dir() else []
+            )
+            if not older:
+                raise
+            return older[-1].read_text(encoding="utf-8"), None
+
+    def _tesouro_days(self, today: datetime.date) -> list:
+        """Nominal curves for the last HISTORY_DAYS (oldest first), parsed once
+        a day and shared by rates:curve:BR and rates:curvehist:BR."""
+
+        def load() -> list:
+            text, save_to = self._tesouro_text(today)
+            cutoff = (today - datetime.timedelta(days=self.HISTORY_DAYS)).isoformat()
+            days = parse_tesouro_history(text, since=cutoff)  # raises on drift
+            if not days:
+                days = parse_tesouro_history(text)[-1:]       # stale file: latest
+            if save_to is not None:                            # only a good file
+                self._save_tesouro(text, save_to)
+            return days
+
+        return self._cached_parsed("tesouro", today, load)
+
+    def _save_tesouro(self, text: str, path: Path) -> None:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(text, encoding="utf-8")
+            os.replace(tmp, path)
+            for old in path.parent.glob(f"{self._TESOURO_PREFIX}*.csv"):
+                if old != path:
+                    old.unlink(missing_ok=True)
+        except OSError:
+            pass                                    # a missing disk cache is fine
 
     @staticmethod
     def _cached_text(url: str, today: datetime.date) -> str:
@@ -756,16 +1118,20 @@ class RatesProvider(Provider):
         return [(i, p) for i, p in sorted(merged.items()) if i >= cutoff]
 
     def _ecb_history(self, meta, cutoff: str) -> list:
-        rows: dict[float, str] = {}
-        for years, suffix in _ECB_SERIES.items():
-            if years not in meta.tenors:
-                continue
+        wanted = [(y, s) for y, s in _ECB_SERIES.items() if y in meta.tenors]
+
+        def one(item):
+            years, suffix = item
             try:
-                rows[years] = _get_text(
+                return years, _get_text(
                     f"{_ECB_BASE}{suffix}?format=csvdata&startPeriod={cutoff}"
                 )
             except Exception:
-                continue
+                return years, None                  # skip this tenor, keep the rest
+
+        # ~11 independent series with a 20 s timeout each: fetch a few at a time
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+            rows = {y: t for y, t in pool.map(one, wanted) if t is not None}
         days = parse_ecb_history(rows)
         if not days:
             raise RuntimeError("no ECB history")
@@ -774,11 +1140,15 @@ class RatesProvider(Provider):
     def _mof_history(self, today: datetime.date, cutoff: str) -> list:
         merged: dict[str, list] = {}
         for fetch in (
-            lambda: self._cached_text(self.MOF_ARCHIVE_URL, today),
-            lambda: _get_text(self.MOF_URL),
+            # the 1.2 MB archive is parsed once a day, not on every refresh
+            lambda: self._cached_parsed(
+                "mof-archive", today,
+                lambda: parse_mof_history(_get_text(self.MOF_ARCHIVE_URL)),
+            ),
+            lambda: parse_mof_history(_get_text(self.MOF_URL)),
         ):
             try:
-                merged.update(parse_mof_history(fetch()))  # monthly file wins
+                merged.update(fetch())  # monthly file wins
             except Exception:
                 continue
         if not merged:

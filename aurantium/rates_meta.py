@@ -16,13 +16,25 @@ from __future__ import annotations
 from typing import NamedTuple, Optional
 
 #: valid curve_source router keys; "none" = policy rate only, no curve
-CURVE_SOURCES = frozenset({"ust", "ecb", "mof", "fred", "none"})
+CURVE_SOURCES = frozenset({"ust", "ecb", "mof", "boc", "tesouro", "boe", "fred", "none"})
+
+#: The Bank of England source is built and tested but SWITCHED OFF: its terms
+#: need written permission before aurantium may fetch or redistribute it.
+#: Flipping this to True is the whole switch, and it does exactly two things:
+#:   1. the United Kingdom row below changes curve_source "fred" -> "boe"
+#:      (full nominal spot curve instead of two sparse FRED points), and
+#:   2. providers/rates.py stops refusing "boe" (see RatesProvider._boe_curve).
+#: Nothing else moves. While False, no code path ever requests a BoE URL.
+BOE_PERMITTED = False
 
 BIS = "BIS"
 UST = "U.S. Treasury"
 ECB = "ECB"
 MOF = "Japan MOF"
 FRED = "FRED"
+BOC = "Bank of Canada"              # required attribution (Valet API terms)
+TESOURO = "Tesouro Nacional (ODbL)" # ODbL: cite; never re-export the raw database
+BOE = "Bank of England"
 
 
 class CountryMeta(NamedTuple):
@@ -41,31 +53,49 @@ _UST_TENORS = (0.0833, 0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 20.0, 30.0)
 _ECB_TENORS = (0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0)
 _MOF_TENORS = (1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 40.0)
 
-COUNTRIES: tuple[CountryMeta, ...] = (
-    CountryMeta("United States", "US", "US", "ust", _UST_TENORS,
-                None, None, f"{BIS} · {UST}", "free"),
-    CountryMeta("Euro area", "XM", "XM", "ecb", _ECB_TENORS,
-                None, None, f"{BIS} · {ECB}", "free"),
-    CountryMeta("Japan", "JP", "JP", "mof", _MOF_TENORS,
-                None, None, f"{BIS} · {MOF}", "free"),
-    CountryMeta("United Kingdom", "GB", "GB", "fred", (0.25, 10.0),
-                "IR3TIB01GBM156N", "IRLTLT01GBM156N", f"{BIS} · {FRED}", "free"),
-    CountryMeta("Canada", "CA", "CA", "fred", (0.25, 10.0),
-                "IR3TIB01CAM156N", "IRLTLT01CAM156N", f"{BIS} · {FRED}", "free"),
-    CountryMeta("Australia", "AU", "AU", "fred", (0.25, 10.0),
-                "IR3TIB01AUM156N", "IRLTLT01AUM156N", f"{BIS} · {FRED}", "free"),
-    CountryMeta("Switzerland", "CH", "CH", "fred", (0.25, 10.0),
-                "IR3TIB01CHM156N", "IRLTLT01CHM156N", f"{BIS} · {FRED}", "free"),
-    CountryMeta("Sweden", "SE", "SE", "none", (), None, None, BIS, "free"),
-    CountryMeta("Norway", "NO", "NO", "none", (), None, None, BIS, "free"),
-    CountryMeta("New Zealand", "NZ", "NZ", "none", (), None, None, BIS, "free"),
-    CountryMeta("Korea", "KR", "KR", "none", (), None, None, BIS, "free"),
-    CountryMeta("India", "IN", "IN", "none", (), None, None, BIS, "free"),
-    CountryMeta("Brazil", "BR", "BR", "none", (), None, None, BIS, "free"),
-    CountryMeta("Mexico", "MX", "MX", "none", (), None, None, BIS, "free"),
-    CountryMeta("South Africa", "ZA", "ZA", "none", (), None, None, BIS, "free"),
-    CountryMeta("China", "CN", "CN", "none", (), None, None, BIS, "free"),
-)
+_BOC_TENORS = (2.0, 3.0, 5.0, 7.0, 10.0, 30.0)   # 30 = the "long" benchmark
+#: Tesouro lists bonds by maturity date, so the real points roll with the
+#: calendar; these are the rounded horizons the Prefixado ladder spans
+_TESOURO_TENORS = (0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0)
+_BOE_TENORS = (0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 25.0)
+
+
+def _build_countries(boe_permitted: bool) -> tuple[CountryMeta, ...]:
+    """The country table. A function only so the BoE switch is testable."""
+    if boe_permitted:
+        uk = CountryMeta("United Kingdom", "GB", "GB", "boe", _BOE_TENORS,
+                         "IR3TIB01GBM156N", "IRLTLT01GBM156N", f"{BIS} · {BOE}", "free")
+    else:
+        uk = CountryMeta("United Kingdom", "GB", "GB", "fred", (0.25, 10.0),
+                         "IR3TIB01GBM156N", "IRLTLT01GBM156N", f"{BIS} · {FRED}", "free")
+    return (
+        CountryMeta("United States", "US", "US", "ust", _UST_TENORS,
+                    None, None, f"{BIS} · {UST}", "free"),
+        CountryMeta("Euro area", "XM", "XM", "ecb", _ECB_TENORS,
+                    None, None, f"{BIS} · {ECB}", "free"),
+        CountryMeta("Japan", "JP", "JP", "mof", _MOF_TENORS,
+                    None, None, f"{BIS} · {MOF}", "free"),
+        uk,
+        CountryMeta("Canada", "CA", "CA", "boc", _BOC_TENORS,
+                    "IR3TIB01CAM156N", "IRLTLT01CAM156N", f"{BIS} · {BOC}", "free"),
+        CountryMeta("Australia", "AU", "AU", "fred", (0.25, 10.0),
+                    "IR3TIB01AUM156N", "IRLTLT01AUM156N", f"{BIS} · {FRED}", "free"),
+        CountryMeta("Switzerland", "CH", "CH", "fred", (0.25, 10.0),
+                    "IR3TIB01CHM156N", "IRLTLT01CHM156N", f"{BIS} · {FRED}", "free"),
+        CountryMeta("Sweden", "SE", "SE", "none", (), None, None, BIS, "free"),
+        CountryMeta("Norway", "NO", "NO", "none", (), None, None, BIS, "free"),
+        CountryMeta("New Zealand", "NZ", "NZ", "none", (), None, None, BIS, "free"),
+        CountryMeta("Korea", "KR", "KR", "none", (), None, None, BIS, "free"),
+        CountryMeta("India", "IN", "IN", "none", (), None, None, BIS, "free"),
+        CountryMeta("Brazil", "BR", "BR", "tesouro", _TESOURO_TENORS,
+                    None, None, f"{BIS} · {TESOURO}", "free"),
+        CountryMeta("Mexico", "MX", "MX", "none", (), None, None, BIS, "free"),
+        CountryMeta("South Africa", "ZA", "ZA", "none", (), None, None, BIS, "free"),
+        CountryMeta("China", "CN", "CN", "none", (), None, None, BIS, "free"),
+    )
+
+
+COUNTRIES: tuple[CountryMeta, ...] = _build_countries(BOE_PERMITTED)
 
 _BY_CODE = {c.code: c for c in COUNTRIES}
 
