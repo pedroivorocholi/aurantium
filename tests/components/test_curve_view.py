@@ -224,8 +224,11 @@ def test_none_state_shows_policy_rate_message(view):
     QApplication.processEvents()
     assert view.state() == "none"
     assert view.message() == MSG_POLICY_ONLY
-    assert MSG_POLICY_ONLY == "Policy rate only — no free yield curve for this country"
     assert not view.plots_visible()
+    # what is painted: the title and hint the message splits into
+    assert view.empty_state.title == "Policy rate only"
+    assert view.empty_state.hint == "No free yield curve for this country"
+    assert not view.chip("1M").isVisible()
 
 
 def test_error_state_shows_message(view):
@@ -320,3 +323,52 @@ def test_switching_country_redraws_whole(view):
     assert list(xs) == pytest.approx([axis_x(y) for y, _ in jp])
     assert view.comparison_items == {}
     assert view.source_text() == "Japan MOF · 2026-11-05"
+
+
+def test_loading_state_shows_loading_message(view):
+    load_us(view)
+    view.set_state("loading")
+    QApplication.processEvents()
+    assert view.state() == "loading"
+    assert not view.plots_visible()
+    assert view.empty_state._loading  # paints "Loading…" in place of the title
+    assert view.source_text() == ""  # no date shown for a curve not yet here
+    # the curve arriving puts the plots back
+    view.set_curve(US_NOW, True, "2026-11-05", "U.S. Treasury")
+    assert view.plots_visible() and not view.empty_state._loading
+
+
+def test_partial_curve_prints_each_reading(view):
+    view.set_curve([[0.25, 4.71], [10.0, 4.45]], False, "2026-10-01", "FRED")
+    assert [t.toPlainText() for t in view.point_labels()] == ["4.71%", "4.45%"]
+    view.set_curve(US_NOW, True, "2026-11-05", "U.S. Treasury")
+    assert view.point_labels() == []
+
+
+def test_bars_carry_bp_figures_when_wide(view):
+    load_us(view, comparisons=("1M",))
+    figures = [t.toPlainText() for t in view.bar_figures()]
+    assert figures == [f"{bp:+.0f}" for _, bp in bp_changes(US_NOW, US_1M)]
+    view.resize(420, 360)
+    QApplication.processEvents()
+    assert view.bar_figures() == []  # too tight: the bars speak alone
+
+
+@pytest.mark.parametrize("raw", ["11/05/2026", "2026/8/3", "not a date"])
+def test_non_iso_as_of_never_crashes(view, raw):
+    view.set_comparisons(["1M"])
+    view.set_curve(US_NOW, True, raw, "U.S. Treasury")
+    view.set_history(US_DAYS)
+    assert view.state() == "curve"
+    assert view.comparison_items == {}  # no date to look back from
+    assert view.hover_text(10.0) == "10Y  4.220%"
+
+
+def test_set_countries_with_unknown_current_falls_back_to_first(qapp):
+    v = CurveView()
+    try:
+        v.set_countries([("US", "United States"), ("JP", "Japan")], "ZZ")
+        assert v.country() == "US"
+        assert v.country_button_text() == "United States"
+    finally:
+        v.deleteLater()

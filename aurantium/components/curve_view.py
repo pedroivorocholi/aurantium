@@ -107,6 +107,14 @@ def _tick_font() -> QFont:
     return f
 
 
+def _iso_or_empty(text: str) -> str:
+    """``text`` as an ISO date, or "" when it isn't one."""
+    try:
+        return date.fromisoformat(text.strip()[:10]).isoformat()
+    except (ValueError, AttributeError):
+        return ""
+
+
 def _alpha(color: str, a: float) -> QColor:
     c = QColor(color)
     c.setAlphaF(a)
@@ -199,7 +207,9 @@ class CurveView(QWidget):
         self._points: list[list[float]] = []
         self._complete = True
         self._as_of = ""
+        self._as_of_text = ""
         self._citation = ""
+        self._ticks: list[tuple[float, str]] = []
         self._days: list = []
         self._comparisons: list[str] = list(DEFAULT_COMPARISONS)
         self._state = "loading"
@@ -271,7 +281,7 @@ class CurveView(QWidget):
         self._body.addWidget(self._plots)
 
         self._message_page = QWidget(self._body)
-        self._empty = EmptyState(self._message_page)
+        self.empty_state = self._empty = EmptyState(self._message_page)
         self._message_page.installEventFilter(self)
         self._body.addWidget(self._message_page)
         root.addWidget(self._body, 1)
@@ -371,7 +381,10 @@ class CurveView(QWidget):
             key=lambda p: p[0],
         )
         self._complete = bool(complete)
-        self._as_of = str(as_of or "")
+        # comparisons look back from an ISO date; anything else still shows in
+        # the header but draws no comparison rather than raising in a slot
+        self._as_of_text = str(as_of or "")
+        self._as_of = _iso_or_empty(self._as_of_text)
         self._citation = str(citation or "")
         if not self._points:
             self.set_state("error", MSG_NO_POINTS)
@@ -446,8 +459,15 @@ class CurveView(QWidget):
     def tick_labels(self) -> list[tuple[float, str]]:
         """(x, label) for every tenor tick on the maturity axis, in x order;
         a tenor whose label didn't fit has ``""``."""
-        levels = self.strip_plot.getAxis("bottom")._tickLevels or []  # noqa: SLF001
-        return sorted((t for level in levels for t in level), key=lambda t: t[0])
+        return list(self._ticks)
+
+    def point_labels(self) -> list[pg.TextItem]:
+        """The printed readings of a partial curve (empty for a full one)."""
+        return list(self._point_labels)
+
+    def bar_figures(self) -> list[pg.TextItem]:
+        """The bp figures on the twist bars (empty when the bars are too tight)."""
+        return list(self._bar_figures)
 
     def pick_country(self, code: str) -> None:
         """Act as the user picking ``code`` in the switch (emits)."""
@@ -577,8 +597,10 @@ class CurveView(QWidget):
         return ""
 
     def _select_country(self, code: str) -> None:
-        self._country = code or ""
         i = self.country_combo.findData(code)
+        if i < 0 and self.country_combo.count():
+            i = 0  # an unknown code: the switch and the view agree on the first
+        self._country = self.country_combo.itemData(i) if i >= 0 else ""
         if i >= 0:
             self.country_combo.blockSignals(True)
             self.country_combo.setCurrentIndex(i)
@@ -588,6 +610,7 @@ class CurveView(QWidget):
         drawing = self._state in ("curve", "partial")
         self._hide_hover()
         if drawing:
+            self._empty.set_loading(False)
             self._empty.set_shown(False)
             self._body.setCurrentWidget(self._plots)
         else:
@@ -609,7 +632,7 @@ class CurveView(QWidget):
         drawing = self._state in ("curve", "partial")
         if drawing and self._citation:
             self.source_label.setText(
-                f"{self._citation} · {self._as_of}" if self._as_of else self._citation
+                f"{self._citation} · {self._as_of_text}" if self._as_of_text else self._citation
             )
         elif self._state == "none":
             meta = rates_meta.by_code(self._country)
@@ -791,6 +814,7 @@ class CurveView(QWidget):
 
     def _apply_ranges(self) -> None:
         if not self._tenors:
+            self._ticks = []
             self.strip_plot.getAxis("bottom").setTicks([[]])
             self.curve_plot.getAxis("bottom").setTicks([[]])
             return
@@ -810,6 +834,7 @@ class CurveView(QWidget):
         self.curve_plot.getViewBox().setYRange(lo - pad, hi + pad, padding=0)
 
         ticks = self._thin_ticks(1.0 / upp)
+        self._ticks = ticks
         self.curve_plot.getAxis("bottom").setTicks([ticks])
         self.strip_plot.getAxis("bottom").setTicks([ticks])
         self._place_bar_figures(1.0 / upp)

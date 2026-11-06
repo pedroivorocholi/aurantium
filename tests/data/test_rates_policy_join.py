@@ -70,3 +70,19 @@ def test_curve_payload_never_adds_points():
     sparse = Curve("GB", (CurvePoint(0.25, 4.0), CurvePoint(10.0, 4.6)),
                    False, ("FRED",), "2026-07-01")
     assert build_curve_payload(sparse)["points"] == [[0.25, 4.0], [10.0, 4.6]]
+
+
+@pytest.mark.parametrize(
+    "raw, iso",
+    [
+        ("11/05/2026", "2026-11-05"),  # Treasury CSV: m/d/Y
+        ("2026/8/3", "2026-08-03"),    # Japan MOF: Y/m/d, unpadded
+        ("2026-07-01", "2026-07-01"),  # ECB / FRED / BoC / Tesouro: already ISO
+        ("", ""),
+    ],
+)
+def test_curve_payload_as_of_is_iso(raw, iso):
+    """The hub contract is ISO whatever the source spells: the view compares
+    dates as strings and looks back 1W / 1M / 1Y from this one."""
+    curve = Curve("US", (CurvePoint(2.0, 4.0),), False, ("U.S. Treasury",), raw)
+    assert build_curve_payload(curve)["as_of"] == iso

@@ -693,7 +693,9 @@ def build_curve_payload(curve: Curve) -> dict:
         "complete": bool(curve.complete),
         "observed": len(curve.points),
         "sources": list(curve.sources),
-        "as_of": curve.as_of,
+        # ISO whatever the source spells (Treasury "11/05/2026", MOF
+        # "2026/8/3"): consumers compare dates and look back from this one
+        "as_of": _iso(curve.as_of) or "",
     }
 
 
