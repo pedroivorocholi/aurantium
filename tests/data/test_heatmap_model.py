@@ -32,10 +32,10 @@ def test_share_classes_merge():
             _row("AAPL", 1e12)]
     tiles = {t.symbol: t for t in hm.tiles_from_screen(rows, 10)}
     assert set(tiles) == {"GOOGL", "AAPL"}
-    assert tiles["GOOGL"].weight == 3e12
+    assert tiles["GOOGL"].weight == 2e12  # whole-company cap on each class: max, not sum
     assert tiles["GOOGL"].change_pct == 1.0
-    assert "100" in tiles["GOOGL"].tooltip
-    # alias alone is shown under the kept symbol; kept symbol present => alias keeps own row
+    assert "Market cap 2.0T" in tiles["GOOGL"].tooltip and "Price 100.00" in tiles["GOOGL"].tooltip
+    # an alias with no kept symbol present is shown under the kept symbol
     only = hm.tiles_from_screen([_row("GOOG", 1e12)], 10)
     assert [t.symbol for t in only] == ["GOOGL"]
 
@@ -72,6 +72,12 @@ def test_mixed_missing_equity_uses_quote():
     assert tiles[1].weight == 4e9 and tiles[1].change_pct == -1.5
 
 
+def test_mixed_alias_without_row_uses_its_own_quote():
+    tiles = hm.tiles_mixed(["GOOG"], [], {"GOOG": _quote("GOOG", 1.7)})
+    assert [t.symbol for t in tiles] == ["GOOGL"]
+    assert not tiles[0].loading and tiles[0].change_pct == 1.7
+
+
 def test_sectors_equal_until_caps_arrive():
     quotes = {"XLK": _quote("XLK", 1.2)}
     tiles = hm.tiles_sectors(quotes, {})
@@ -79,6 +85,7 @@ def test_sectors_equal_until_caps_arrive():
     tk = next(t for t in tiles if t.symbol == "XLK")
     assert tk.sector_key == "Technology" and tk.change_pct == 1.2
     assert next(t for t in tiles if t.symbol == "XLE").loading
+    assert hm.tiles_sectors({"XLK": {"price": 1.0}}, {})[9].loading  # quote without a change
     assert {t.weight for t in hm.tiles_sectors(quotes, {"Technology": 5e12})} == {1.0}
     full = {k: 1e12 for k, _l, _e in hu.SECTORS} | {"Technology": 5e12}
     sized = hm.tiles_sectors(quotes, full)

@@ -129,6 +129,8 @@ Only needed if you're releasing outside CI — e.g. testing a signing/appcast
 change locally, or a platform's CI runner is broken and you need to ship
 anyway. The automated flow above supersedes this for normal releases.
 
+Before tagging, refresh the Heatmap's index member lists: `.venv/Scripts/python.exe tools/data/refresh_index_members.py`.
+
 Say you're going from 1.0.0 → **1.1.0**.
 
 ### 1. Bump the version (two files, keep in sync)

@@ -43,8 +43,9 @@ def _tooltip(name, symbol, price, change_pct, extra_label, extra_value) -> str:
 
 def _merge_share_classes(rows: list[dict]) -> dict[str, dict]:
     """``{symbol: row}`` with share-class aliases folded into the kept symbol:
-    caps summed, the kept symbol's change and price used. An alias whose kept
-    symbol is absent is shown under the kept symbol."""
+    the larger cap used (Yahoo reports the WHOLE company's cap on every share
+    class, so summing would double-count), the kept symbol's change and price
+    used. An alias whose kept symbol is absent is shown under the kept symbol."""
     by: dict[str, dict] = {}
     for r in rows:
         sym = r.get("symbol")
@@ -60,7 +61,7 @@ def _merge_share_classes(rows: list[dict]) -> dict[str, dict]:
         else:
             caps = [c for c in (_num(k.get("market_cap")), _num(a.get("market_cap")))
                     if c is not None]
-            k["market_cap"] = sum(caps) if caps else None
+            k["market_cap"] = max(caps) if caps else None
         del by[alias]
     return by
 
@@ -95,11 +96,9 @@ def tiles_mixed(symbols: list[str], screen_rows: list[dict], quotes: dict[str, d
     1.0 each when there are no equities. A symbol with no data yet is kept as
     a ``loading`` tile rather than dropped."""
     merged = _merge_share_classes(screen_rows)
-    want: list[str] = []
+    want: dict[str, str] = {}  # kept symbol -> symbol as requested
     for s in symbols:
-        sym = SHARE_CLASSES.get(s, s)
-        if sym not in want:
-            want.append(sym)
+        want.setdefault(SHARE_CLASSES.get(s, s), s)
     caps = {
         s: c for s in want
         if s in merged and (c := _num(merged[s].get("market_cap"))) is not None and c > 0
@@ -110,7 +109,7 @@ def tiles_mixed(symbols: list[str], screen_rows: list[dict], quotes: dict[str, d
         if sym in caps:
             out.append(_equity_tile(merged[sym], caps[sym]))
             continue
-        q = quotes.get(sym)
+        q = quotes.get(sym) or quotes.get(want[sym])
         row = merged.get(sym) or {}
         if q is None and not row:
             out.append(Tile(sym, sym, median, None, f"{sym}\nLoading", loading=True))
@@ -138,7 +137,7 @@ def tiles_sectors(quotes: dict[str, dict], caps: dict[str, float]) -> list[Tile]
             etf, label, float(cap) if sized else 1.0, pct,
             _tooltip(label, etf, q.get("price") if q else None, pct,
                      "Sector cap", fmt.compact(cap)),
-            loading=q is None, sector_key=key,
+            loading=pct is None, sector_key=key,
         ))
     return out
 
