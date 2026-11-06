@@ -14,6 +14,7 @@ from PySide6.QtWidgets import QApplication
 
 from aurantium import theme
 from aurantium.components.curve_view import (
+    MSG_HISTORY_FAILED,
     MSG_NO_HISTORY,
     MSG_NO_HISTORY_THAT_FAR,
     MSG_POLICY_ONLY,
@@ -253,6 +254,14 @@ def test_chips_disabled_without_history(view):
         assert not view.chip(chip).isEnabled()
         assert view.chip(chip).toolTip() == MSG_NO_HISTORY
     assert view.comparison_items == {}
+
+
+def test_failed_history_says_so_not_that_none_exists(view):
+    view.set_curve(US_NOW, True, "2026-11-05", "ECB")
+    view.set_history([], failed=True)
+    assert view.chip("1M").toolTip() == MSG_HISTORY_FAILED
+    view.set_history([["2026-10-05", US_1M], ["2026-11-05", US_NOW]])
+    assert view.chip("1M").isEnabled()  # a later success clears it
 
 
 def test_chip_disabled_when_history_too_short(view):

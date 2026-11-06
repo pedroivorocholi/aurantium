@@ -709,7 +709,7 @@ class MacroPanel(Panel):
         # no history is not an error worth a banner: the chips say why
         self._hists.setdefault(cc, [])
         if cc == self._country:
-            self.curve_view.set_history(self._hists[cc])
+            self.curve_view.set_history(self._hists[cc], failed=True)
 
     def _on_quote(self, sym: str, data: Any) -> None:
         if isinstance(data, dict):

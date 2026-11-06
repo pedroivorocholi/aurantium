@@ -54,6 +54,8 @@ def market_symbol(market: str) -> Optional[str]:
     """The symbol a COT market stands for in linked panels, else None."""
     key = (market or "").strip().lower()
     return next((m.symbol for m in _COVERED if m.cftc_market == key), None)
+
+
 _CATEGORIES = CATEGORIES + ("Financials",)
 
 

@@ -78,6 +78,7 @@ STATES = ("curve", "partial", "none", "loading", "error")
 MSG_POLICY_ONLY = "Policy rate only — no free yield curve for this country"
 MSG_NO_HISTORY = "This source publishes only the latest curve"
 MSG_HISTORY_LOADING = "History loading…"
+MSG_HISTORY_FAILED = "History couldn't be loaded — it will retry"
 MSG_NO_HISTORY_THAT_FAR = "No history that far back for this source"
 MSG_NO_POINTS = "No curve points published"
 
@@ -213,6 +214,7 @@ class CurveView(QWidget):
         self._ticks: list[tuple[float, str]] = []
         self._days: list = []
         self._history_known = False  # until set_history: chips wait, unlit
+        self._history_failed = False
         self._comparisons: list[str] = list(DEFAULT_COMPARISONS)
         self._state = "loading"
         self._message = ""
@@ -397,10 +399,14 @@ class CurveView(QWidget):
         if new_country:
             transitions.fade_in_content(self._plots)
 
-    def set_history(self, days) -> None:
-        """``[[iso, points], ...]`` oldest → newest, from ``rates:curvehist``."""
+    def set_history(self, days, *, failed: bool = False) -> None:
+        """``[[iso, points], ...]`` oldest → newest, from ``rates:curvehist``.
+
+        ``failed``: the fetch errored, so an empty history means "not yet",
+        not "this source has none"."""
         self._days = [[str(d), pts] for d, pts in (days or []) if pts]
         self._history_known = True
+        self._history_failed = failed and not self._days
         self._sync_chips()
         self._redraw()
 
@@ -409,6 +415,7 @@ class CurveView(QWidget):
         disabled, until the new country's arrives. The choice is kept."""
         self._days = []
         self._history_known = False
+        self._history_failed = False
         self._sync_chips()
         self._redraw()
 
@@ -660,6 +667,8 @@ class CurveView(QWidget):
         """Why ``chip`` can't be drawn for this source, else None."""
         if not self._history_known:
             return MSG_HISTORY_LOADING
+        if self._history_failed:
+            return MSG_HISTORY_FAILED
         if len(self._days) <= 1:
             return MSG_NO_HISTORY
         if self._days and self._as_of:
