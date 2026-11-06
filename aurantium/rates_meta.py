@@ -57,7 +57,8 @@ _BOC_TENORS = (2.0, 3.0, 5.0, 7.0, 10.0, 30.0)   # 30 = the "long" benchmark
 #: Tesouro lists bonds by maturity date, so the real points roll with the
 #: calendar; these are the rounded horizons the Prefixado ladder spans
 _TESOURO_TENORS = (0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0)
-_BOE_TENORS = (0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 25.0)
+#: unverified against the real workbook until BoE permission arrives
+_BOE_TENORS = (0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0)
 
 
 def _build_countries(boe_permitted: bool) -> tuple[CountryMeta, ...]:

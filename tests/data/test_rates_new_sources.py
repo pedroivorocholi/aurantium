@@ -1,4 +1,4 @@
-﻿"""Bank of Canada, Tesouro Nacional and the (switched-off) Bank of England.
+"""Bank of Canada, Tesouro Nacional and the (switched-off) Bank of England.
 
 Fixtures in tests/fixtures/rates/ were recorded from the live upstreams on
 2026-11-05 (boc_benchmark.json: the real ?recent=280 response; and
@@ -75,7 +75,12 @@ def _stub(monkeypatch, routes: dict):
                 return body
         raise OSError(f"unexpected url {url}")
 
+    def fake_download(url, dest):
+        # the Tesouro file is streamed to disk; route it through the same stub
+        Path(dest).write_text(fake(url), encoding="utf-8")
+
     monkeypatch.setattr(rates, "_get_text", fake)
+    monkeypatch.setattr(rates, "_download", fake_download)
     return calls
 
 
@@ -181,7 +186,7 @@ def test_tesouro_schema_drift_degrades(hub, monkeypatch):
     assert "rates:curve:BR" not in hub.published
     # a drifted file must not be kept on disk as if it were good
     cache = rates._tesouro_cache_dir()
-    assert not cache.exists() or not list(cache.glob("*.csv"))
+    assert not cache.exists() or not list(cache.iterdir())   # no .csv, no .part
 
 
 def test_tesouro_history_is_nominal_only_and_windowed(hub, monkeypatch):
@@ -238,9 +243,14 @@ def test_tesouro_falls_back_to_an_older_copy_when_offline(hub, monkeypatch):
     cache.mkdir(parents=True)
     (cache / "precotaxatesourodireto-2026-11-01.csv").write_text(
         _read("tesouro_prefixado.csv"), encoding="utf-8")
-    _stub(monkeypatch, {"precotaxatesourodireto": OSError("offline")})
+    calls = _stub(monkeypatch, {"precotaxatesourodireto": OSError("offline")})
     _run_curve("BR")
     assert hub.published["rates:curve:BR"]["observed"] == 8
+    # a fallback is served but not remembered as today's: the next refresh retries
+    _run_curve("BR")
+    assert len(calls) == 2
+    assert [f.name for f in cache.iterdir()] == [
+        "precotaxatesourodireto-2026-11-01.csv"]
 
 
 def test_tesouro_cache_dir_is_a_rates_folder_of_the_app_cache():
@@ -297,7 +307,6 @@ def test_boe_garbage_is_an_empty_curve():
 
 def test_boe_disabled_until_permitted(hub, monkeypatch):
     assert rates_meta.BOE_PERMITTED is False
-    assert rates.BOE_PERMITTED is False
     assert rates_meta.by_code("GB").curve_source == "fred"
     # even a meta forced to "boe" cannot reach the network while the flag is off
     calls = _stub(monkeypatch, {})
@@ -391,3 +400,113 @@ def test_mof_archive_is_parsed_once_a_day(hub, monkeypatch):
     assert sum("historical/" in u for u in calls) == 1
     assert sum(t == archive for t in parsed) == 1   # parsed once, not per refresh
     assert hub.published["rates:curvehist:JP"]["as_of"] == "2026-11-05"
+
+
+# -- review fixes ------------------------------------------------------------
+
+
+def test_concurrent_curve_and_history_share_one_download(hub, monkeypatch):
+    """rates:curve:BR and rates:curvehist:BR run together on the hub's pool;
+    the second must wait for the first, not download and parse again."""
+    calls = []
+    body = _read("tesouro_prefixado.csv")
+    boc = _read("boc_benchmark.json")
+
+    def slow_download(url, dest):
+        calls.append(url)
+        time.sleep(0.2)
+        Path(dest).write_text(body, encoding="utf-8")
+
+    def slow_text(url, **kwargs):
+        calls.append(url)
+        time.sleep(0.2)
+        return boc
+
+    monkeypatch.setattr(rates, "_download", slow_download)
+    monkeypatch.setattr(rates, "_get_text", slow_text)
+    threads = [
+        threading.Thread(target=_run_curve, args=(c,)) for c in ("BR", "CA")
+    ] + [
+        threading.Thread(target=_run_hist, args=(c,)) for c in ("BR", "CA")
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sum("precotaxatesourodireto" in u for u in calls) == 1
+    assert sum(BOC_URL_NEEDLE in u for u in calls) == 1
+    assert not hub.errors
+    assert {"rates:curve:BR", "rates:curvehist:BR",
+            "rates:curve:CA", "rates:curvehist:CA"} <= set(hub.published)
+    cache = rates._tesouro_cache_dir()
+    assert [f.name for f in cache.iterdir()] == ["precotaxatesourodireto-2026-11-05.csv"]
+
+
+def test_a_good_save_sweeps_stale_part_files(hub, monkeypatch):
+    cache = rates._tesouro_cache_dir()
+    cache.mkdir(parents=True)
+    (cache / "abc123.part").write_text("x")
+    (cache / "precotaxatesourodireto-2026-10-01.tmp").write_text("x")
+    _stub(monkeypatch, {"precotaxatesourodireto": _read("tesouro_prefixado.csv")})
+    _run_curve("BR")
+    assert [f.name for f in cache.iterdir()] == ["precotaxatesourodireto-2026-11-05.csv"]
+
+
+def test_download_streams_to_the_file(monkeypatch, tmp_path):
+    chunks = [b"Tipo Titulo;", b"Data Base"]
+
+    class Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, chunk_size):
+            return iter(chunks)
+
+        @property
+        def content(self):
+            raise AssertionError("must not buffer the whole body")
+
+        text = content
+
+    seen = {}
+
+    def fake_get(url, **kwargs):
+        seen.update(kwargs)
+        return Resp()
+
+    monkeypatch.setattr(rates.requests, "get", fake_get)
+    dest = tmp_path / "x.part"
+    rates._download("http://example.test/f.csv", dest)
+    assert seen["stream"] is True
+    assert dest.read_bytes() == b"Tipo Titulo;Data Base"
+
+
+def test_boe_prefers_the_spot_curve_sheet_over_the_short_end_sheet():
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    wb.active.title = "1. Notes"
+    short = wb.create_sheet("4. spot curve short end")
+    spot = wb.create_sheet("4. spot curve")
+    for sheet, bump in ((short, 9.0), (spot, 0.0)):
+        for col, yrs in enumerate((0.5, 1, 2, 5, 10, 25), start=2):
+            sheet.cell(row=3, column=col, value=yrs)
+        sheet.cell(row=5, column=1, value=datetime.datetime(2026, 11, 4))
+        for col in range(2, 8):
+            sheet.cell(row=5, column=col, value=4.0 + bump)
+    buf = io.BytesIO()
+    wb.save(buf)
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as z:
+        z.writestr("GLC Nominal daily data.xlsx", buf.getvalue())
+    assert {p.rate for p in parse_boe(out.getvalue()).points} == {4.0}
+
+
+def test_boe_tenors_cover_the_published_range():
+    assert max(rates_meta._build_countries(True)[3].tenors) == 40.0

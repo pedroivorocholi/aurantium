@@ -14,6 +14,8 @@ import io
 import json
 import os
 import re
+import tempfile
+import threading
 import zipfile
 from pathlib import Path
 from typing import Any, Callable, NamedTuple, Optional
@@ -23,9 +25,7 @@ import requests
 from .. import rates_allowlist
 from ..datahub import DataHub, Provider
 from .. import rates_meta
-from ..rates_meta import (  # noqa: F401  (BOE_PERMITTED is re-exported)
-    UST, MOF, ECB, BIS, BOC, TESOURO, BOE, BOE_PERMITTED, COUNTRIES, by_code,
-)
+from ..rates_meta import UST, MOF, ECB, BIS, BOC, TESOURO, BOE, COUNTRIES, by_code
 
 
 class PolicyPoint(NamedTuple):
@@ -462,10 +462,10 @@ def parse_boe(zip_bytes: bytes) -> Curve:
     nominal workbook's spot-curve sheet (rows = dates, columns = maturity in
     years, a header row of maturities above the data).
 
-    Built against a synthetic workbook, not a recorded one: nothing fetches BoE
-    while BOE_PERMITTED is False, so the real layout is unverified. Re-check
-    against the real file when permission arrives. Never raises; unreadable ->
-    an empty curve."""
+    UNVERIFIED against the real workbook: built from a synthetic one, because
+    nothing fetches BoE while rates_meta.BOE_PERMITTED is False. Re-check the
+    sheet names and header layout against the real file when permission
+    arrives. Never raises; unreadable -> an empty curve."""
     empty = Curve("GB", (), False, (BOE,), "")
     try:
         import openpyxl
@@ -478,10 +478,12 @@ def parse_boe(zip_bytes: bytes) -> Curve:
             book = openpyxl.load_workbook(
                 io.BytesIO(z.read(name)), read_only=True, data_only=True
             )
-        title = next(
-            t for t in book.sheetnames
-            if "spot" in t.lower() and "real" not in t.lower()
-        )
+        # BoE ships both a "spot curve" and a "spot curve short end" sheet:
+        # take the full one, and only fall back to any non-short, non-real spot
+        names = [t for t in book.sheetnames
+                 if "spot" in t.lower() and "short" not in t.lower()
+                 and "real" not in t.lower()]
+        title = next((t for t in names if "spot curve" in t.lower()), names[0])
         rows = [list(r) for r in book[title].iter_rows(values_only=True)]
     except Exception:
         return empty
@@ -719,6 +721,33 @@ def _get_bytes(url: str, **kwargs) -> bytes:
     resp = requests.get(url, timeout=_TIMEOUT, headers=_UA, **kwargs)
     resp.raise_for_status()
     return resp.content
+
+
+#: one lock per cache key, held across check + load + store so concurrent topics
+#: (rates:curve:BR and rates:curvehist:BR share a pool) download and parse once
+_LOCKS: dict[str, threading.Lock] = {}
+_LOCKS_GUARD = threading.Lock()
+
+
+def _lock_for(key: str) -> threading.Lock:
+    with _LOCKS_GUARD:
+        return _LOCKS.setdefault(key, threading.Lock())
+
+
+class _Uncached:
+    """A load() result to serve now but not remember as today's."""
+
+    def __init__(self, value: Any):
+        self.value = value
+
+
+def _download(url: str, dest: Path) -> None:
+    """Stream a big file straight to `dest`; never hold the body in memory."""
+    with requests.get(url, timeout=_TIMEOUT, headers=_UA, stream=True) as resp:
+        resp.raise_for_status()
+        with open(dest, "wb") as fh:
+            for chunk in resp.iter_content(1 << 16):
+                fh.write(chunk)
 
 
 def _tesouro_cache_dir() -> Path:
@@ -1020,12 +1049,15 @@ class RatesProvider(Provider):
         """Run `load` (download + parse) at most once a day and keep only the
         parsed result in memory, never the multi-MB text."""
         stamp = today.isoformat()
-        hit = _HIST_CACHE.get("parsed:" + key)
-        if hit is not None and hit[0] == stamp:
-            return hit[1]
-        value = load()
-        _HIST_CACHE["parsed:" + key] = (stamp, value)
-        return value
+        with _lock_for("parsed:" + key):
+            hit = _HIST_CACHE.get("parsed:" + key)
+            if hit is not None and hit[0] == stamp:
+                return hit[1]
+            value = load()
+            if isinstance(value, _Uncached):
+                return value.value
+            _HIST_CACHE["parsed:" + key] = (stamp, value)
+            return value
 
     def _boc_text(self, today: datetime.date) -> str:
         return self._cached_text(self.BOC_URL.format(n=self.BOC_RECENT), today)
@@ -1044,65 +1076,85 @@ class RatesProvider(Provider):
 
     _TESOURO_PREFIX = "precotaxatesourodireto-"
 
-    def _tesouro_text(self, today: datetime.date) -> tuple:
-        """Today's CSV text from the on-disk copy, else downloaded. Offline,
-        the newest older copy serves. Returns (text, path_to_save_or_None)."""
-        folder = _tesouro_cache_dir()
-        todays = folder / f"{self._TESOURO_PREFIX}{today.isoformat()}.csv"
-        try:
-            return todays.read_text(encoding="utf-8"), None
-        except OSError:
-            pass
-        try:
-            return _get_text(self.TESOURO_URL), todays
-        except Exception:
-            older = (
-                sorted(folder.glob(f"{self._TESOURO_PREFIX}*.csv"))
-                if folder.is_dir() else []
-            )
-            if not older:
-                raise
-            return older[-1].read_text(encoding="utf-8"), None
-
     def _tesouro_days(self, today: datetime.date) -> list:
         """Nominal curves for the last HISTORY_DAYS (oldest first), parsed once
         a day and shared by rates:curve:BR and rates:curvehist:BR."""
 
-        def load() -> list:
-            text, save_to = self._tesouro_text(today)
-            cutoff = (today - datetime.timedelta(days=self.HISTORY_DAYS)).isoformat()
-            days = parse_tesouro_history(text, since=cutoff)  # raises on drift
-            if not days:
-                days = parse_tesouro_history(text)[-1:]       # stale file: latest
-            if save_to is not None:                            # only a good file
-                self._save_tesouro(text, save_to)
-            return days
+        def load() -> Any:
+            days, fresh = self._tesouro_load(today)
+            return days if fresh else _Uncached(days)
 
         return self._cached_parsed("tesouro", today, load)
 
-    def _save_tesouro(self, text: str, path: Path) -> None:
+    def _tesouro_load(self, today: datetime.date) -> tuple:
+        """(days, fresh). `fresh` is False when an older disk copy stood in
+        because the download failed: serve it, but do not remember it as
+        today's."""
+        cutoff = (today - datetime.timedelta(days=self.HISTORY_DAYS)).isoformat()
+        folder = _tesouro_cache_dir()
+        final = folder / f"{self._TESOURO_PREFIX}{today.isoformat()}.csv"
+
+        def days_of(path: Path) -> list:
+            # The file is pure ASCII (checked 2026-11-05: no byte above 0x7f);
+            # decode as UTF-8 so an accented title, if one ever appears, is kept
+            text = path.read_text(encoding="utf-8-sig", errors="replace")
+            days = parse_tesouro_history(text, since=cutoff)    # raises on drift
+            return days or parse_tesouro_history(text)[-1:]     # stale: latest
+
+        if final.is_file():
+            try:
+                return days_of(final), True
+            except OSError:
+                pass
         try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = path.with_suffix(".tmp")
-            tmp.write_text(text, encoding="utf-8")
-            os.replace(tmp, path)
-            for old in path.parent.glob(f"{self._TESOURO_PREFIX}*.csv"):
-                if old != path:
-                    old.unlink(missing_ok=True)
+            folder.mkdir(parents=True, exist_ok=True)
+            handle = tempfile.NamedTemporaryFile(
+                dir=folder, suffix=".part", delete=False)
+        except OSError:                       # no usable cache dir: still work
+            folder = None
+            handle = tempfile.NamedTemporaryFile(suffix=".part", delete=False)
+        handle.close()
+        part = Path(handle.name)
+        try:
+            _download(self.TESOURO_URL, part)
+        except Exception:
+            part.unlink(missing_ok=True)
+            older = (
+                sorted(folder.glob(f"{self._TESOURO_PREFIX}*.csv"))
+                if folder is not None and folder.is_dir() else []
+            )
+            if not older:
+                raise
+            return days_of(older[-1]), False
+        try:
+            days = days_of(part)              # a drifted file raises here, unsaved
+        except BaseException:
+            part.unlink(missing_ok=True)
+            raise
+        if folder is None:
+            part.unlink(missing_ok=True)
+            return days, True
+        try:
+            os.replace(part, final)
+            for stale in folder.iterdir():    # old days, abandoned .part/.tmp
+                if stale != final and stale.suffix in (".csv", ".part", ".tmp"):
+                    stale.unlink(missing_ok=True)
         except OSError:
-            pass                                    # a missing disk cache is fine
+            part.unlink(missing_ok=True)      # a missing disk cache is fine
+        return days, True
 
     @staticmethod
     def _cached_text(url: str, today: datetime.date) -> str:
         """Fetch once per day: big, slow-moving downloads (last year's Treasury
-        file never changes; MOF's archive grows monthly)."""
+        file never changes; MOF's archive grows monthly). Serialised per URL."""
         stamp = today.isoformat()
-        hit = _HIST_CACHE.get(url)
-        if hit is not None and hit[0] == stamp:
-            return hit[1]
-        text = _get_text(url)
-        _HIST_CACHE[url] = (stamp, text)
-        return text
+        with _lock_for("text:" + url):
+            hit = _HIST_CACHE.get(url)
+            if hit is not None and hit[0] == stamp:
+                return hit[1]
+            text = _get_text(url)
+            _HIST_CACHE[url] = (stamp, text)
+            return text
 
     def _ust_history(self, today: datetime.date, cutoff: str) -> list:
         current = parse_ust_history(_get_text(self.ust_url(today.year)))
