@@ -35,6 +35,7 @@ def hub(monkeypatch):
     monkeypatch.setattr(screen.DataHub, "instance", staticmethod(lambda: h))
     monkeypatch.setattr(_yf, "RATE_LIMIT_GATE", _yf._RateLimitGate())
     monkeypatch.setattr(screen, "RATE_LIMIT_GATE", _yf.RATE_LIMIT_GATE)
+    monkeypatch.setattr(screen, "_UNIVERSE", None)
     return h
 
 
@@ -108,4 +109,57 @@ def test_fetch_exception_publishes_error(hub, monkeypatch):
     monkeypatch.setattr(screen.yf, "screen", boom)
     ScreenProvider()._fetch("screen:sector:Technology:5")
     assert "down" in hub.errors["screen:sector:Technology:5"]
+    assert hub.published == {}
+
+
+def test_universe_is_cached_across_symbol_topics(hub, monkeypatch):
+    calls = []
+
+    def fake_screen(q, **kw):
+        calls.append(kw)
+        return {"quotes": [_q("AAPL", 3e12), _q("MSFT", 2e12), _q("XOM", 1e12)]}
+
+    monkeypatch.setattr(screen.yf, "screen", fake_screen)
+    p = ScreenProvider()
+    p._fetch("screen:symbols:AAPL")
+    p._fetch("screen:symbols:MSFT,XOM")
+    assert len(calls) == 1
+    assert [r["symbol"] for r in hub.published["screen:symbols:MSFT,XOM"]["rows"]] == ["MSFT", "XOM"]
+
+
+def test_universe_failure_is_not_cached(hub, monkeypatch):
+    state = {"n": 0}
+
+    def flaky(q, **kw):
+        state["n"] += 1
+        if state["n"] == 1:
+            raise RuntimeError("down")
+        return {"quotes": [_q("AAPL", 3e12)]}
+
+    monkeypatch.setattr(screen.yf, "screen", flaky)
+    p = ScreenProvider()
+    p._fetch("screen:symbols:AAPL")
+    assert "screen:symbols:AAPL" in hub.errors
+    p._fetch("screen:symbols:AAPL")
+    assert hub.published["screen:symbols:AAPL"]["rows"][0]["symbol"] == "AAPL"
+
+
+def test_sectorcap_partial_failure_publishes_error(hub, monkeypatch):
+    class FlakySector:
+        def __init__(self, key):
+            if key == "energy":
+                raise RuntimeError("boom")
+            self.overview = {"market_cap": 1.0}
+
+    monkeypatch.setattr(screen.yf, "Sector", FlakySector)
+    ScreenProvider()._fetch("sectorcap:all")
+    assert "sectorcap:all" not in hub.published
+    assert "boom" in hub.errors["sectorcap:all"]
+
+
+@pytest.mark.parametrize("bad", [None, [], {"quotes": None}, {"nope": 1}])
+def test_malformed_screen_result_publishes_error(hub, monkeypatch, bad):
+    monkeypatch.setattr(screen.yf, "screen", lambda *a, **k: bad)
+    ScreenProvider()._fetch("screen:sector:Technology:5")
+    assert "screen:sector:Technology:5" in hub.errors
     assert hub.published == {}

@@ -34,6 +34,8 @@ Live findings (yfinance 1.5.1, 2026-11-05)
 
 from __future__ import annotations
 
+import threading
+import time
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -63,6 +65,11 @@ SECTORS = (
 )
 #: the screener's hard page limit
 MAX_SCREEN_SIZE = 250
+#: seconds the 250-row US universe is reused across ``screen:symbols:*`` topics
+UNIVERSE_TTL_S = 55.0
+#: (monotonic ts, quotes); only ever set from a successful fetch
+_UNIVERSE: Optional[tuple[float, list]] = None
+_universe_lock = threading.Lock()
 
 
 def yahoo_sector_key(sector: str) -> str:
@@ -138,7 +145,10 @@ class ScreenProvider(Provider):
                 query, sortField="intradaymarketcap", sortAsc=False, size=size
             )
         )
-        return list((res or {}).get("quotes") or [])
+        quotes = res.get("quotes") if isinstance(res, dict) else None
+        if not isinstance(quotes, list):
+            raise ValueError("screener returned no quotes list")
+        return quotes
 
     def _sector(self, sector: str, n: int) -> dict:
         n = max(1, min(n, MAX_SCREEN_SIZE))
@@ -154,26 +164,33 @@ class ScreenProvider(Provider):
 
     def _symbols(self, csv: str) -> dict:
         want = {s for s in csv.split(",") if s}
-        quotes = self._screen(
-            yf.EquityQuery("eq", ["region", "us"]), MAX_SCREEN_SIZE
-        )
+        quotes = self._universe()
         rows = [_row(x) for x in quotes if x.get("symbol") in want]
         return {"rows": rows, "as_of": _now_iso()}
 
+    def _universe(self) -> list[dict]:
+        """The largest US caps, shared by every symbols topic for a minute.
+        The lock is held across the fetch so concurrent topics make one call;
+        a failure raises before anything is stored."""
+        global _UNIVERSE
+        with _universe_lock:
+            hit = _UNIVERSE
+            if hit and (time.monotonic() - hit[0]) < UNIVERSE_TTL_S:
+                return hit[1]
+            quotes = self._screen(
+                yf.EquityQuery("eq", ["region", "us"]), MAX_SCREEN_SIZE
+            )
+            _UNIVERSE = (time.monotonic(), quotes)
+            return quotes
+
     def _sectorcap(self) -> dict:
+        """All 11 sectors or nothing: a partial dict would be cached for a
+        day and skew the panel, so any miss raises and the hub retries."""
         out: dict[str, float] = {}
-        last_exc: Optional[Exception] = None
         for sector in SECTORS:
-            try:
-                ov = with_retry(lambda s=sector: yf.Sector(yahoo_sector_key(s)).overview)
-                cap = _num((ov or {}).get("market_cap"))
-            except Exception as exc:
-                last_exc = exc
-                if RATE_LIMIT_GATE.blocked():
-                    raise  # throttled: stop hammering, surface the calm message
-                continue
-            if cap is not None:
-                out[sector] = cap
-        if not out:
-            raise last_exc or RuntimeError("no sector data returned")
+            ov = with_retry(lambda s=sector: yf.Sector(yahoo_sector_key(s)).overview)
+            cap = _num((ov or {}).get("market_cap"))
+            if cap is None:
+                raise ValueError(f"no market cap for sector {sector}")
+            out[sector] = cap
         return out
