@@ -628,14 +628,20 @@ def test_a_tab_sinks(qapp, filt):
 
 
 def test_a_heatmap_tile_sinks(qapp, filt):
-    from aurantium.panels.sector_heatmap import _Tile
+    """The map is one painted widget, so the sink covers just the pressed tile."""
+    from aurantium.heatmap_model import Tile
+    from aurantium.panels.sector_heatmap import _Map
 
-    tile = _Tile("Energy", "XLE")
-    tile.resize(120, 70)
-    assert press.corner_radius(tile) == _Tile.RADIUS
-    _click(qapp, tile, QEvent.Type.MouseButtonPress)
-    _settle(qapp, press.scrim_of(tile)._anim)
-    assert press.press_level(tile) > 0.0
+    m = _Map()
+    m.set_tiles([Tile("XLK", "Technology", 3.0, 1.0, ""), Tile("XLE", "Energy", 1.0, -1.0, "")])
+    m.resize(300, 200)
+    m.show()
+    qapp.processEvents()
+    tile = m.tile_rect("XLE")
+    _press_at(qapp, m, tile.center())
+    scrim = _settled_region(qapp, m)
+    assert scrim.geometry() == tile
+    assert press.press_level(m) > 0.0
 
 
 def test_an_editable_combo_is_a_text_field(qapp):

@@ -84,7 +84,7 @@ as you like (e.g. two News panels on different topics):
 | Options Chain | Calls/puts around ATM with IV, volume, OI | Expiry dropdown |
 | World Indices | Americas/Europe/Asia index monitor (WEI-style) | Edit… dialog per region |
 | FX Monitor | Major/other currency pairs + DXY + crypto | Edit… dialog per section |
-| Sector Heatmap | 11 S&P sector ETFs as color-coded tiles | Editable tile list |
+| Heatmap | Market map: tiles sized by market cap (or position value), coloured by today's move. Sectors (double-click to drill), S&P 500 / Nasdaq 100 / Dow, Portfolio, the group's Watchlist, or a custom list | View menu |
 | Performance | Relative % return chart: linked symbol vs SPY/QQQ/… | Comparison list + period buttons |
 | Portfolio | Your positions with live P&L and totals | Add/remove positions; persists |
 | Market Movers | Top gainers / losers / most active | Category buttons |

@@ -115,6 +115,11 @@ RADIUS_ROUND = 8   # the radio indicator, which is a circle — not a fourth siz
 #: pixmap and a pixel-snapped glyph goes soft again.
 ICON_PX = 16
 
+#: The shortest side a Heatmap tile can have and still carry a label. Below it
+#: the tile is colour and tooltip only: a figure squeezed into a sliver reads
+#: as noise, and the treemap's small tiles are exactly where that happens.
+TILE_LABEL_MIN_PX = 22
+
 
 # -- palettes --------------------------------------------------------------
 # Dark is the original, byte-for-byte. Light is a clean paper variant that

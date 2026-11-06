@@ -87,6 +87,8 @@ hiddenimports += [
     "aurantium.components.responsive_row",
     "aurantium.components.action_bar",
     "aurantium.components.fmt",
+    # Squarified treemap layout behind the Heatmap panel.
+    "aurantium.components.treemap",
     # Pure-maths colour module: OKLab, CVD and contrast. Imported normally by
     # theme.py and several panels, so static analysis should find it — listed
     # anyway, because everything else in this block is.
