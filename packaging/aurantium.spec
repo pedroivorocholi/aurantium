@@ -71,6 +71,11 @@ hiddenimports += [
     # metrics fetch, so static analysis never sees it.
     "aurantium.valuation",
     "aurantium.glossary",
+    # Heatmap panel data: sectors, index members, share classes. Imported by
+    # the screen provider and the panel, listed on the same rule as the rest.
+    "aurantium.heatmap_universes",
+    # Heatmap panel tile model (pure). Imported by the panel only.
+    "aurantium.heatmap_model",
 ]
 # Shared UI components (imported by panels) and the onboarding dialog (imported
 # lazily inside app.py). Listed explicitly so the frozen build never misses them.

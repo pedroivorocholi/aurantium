@@ -14,6 +14,7 @@ e.g. `.venv/Scripts/python.exe tools/release/sign_update.py <file>`.
 | `data/` | `verify_rates.py` | Checks the rates sources live and regenerates `aurantium/rates_allowlist.py`. |
 | | `probe_rates.py` | Records upstream rates responses into `tests/fixtures/rates/`. |
 | | `verify_markets.py` | Before adding a commodity: checks its Yahoo contract symbols quote and its CFTC market name matches exactly one family. |
+| | `refresh_index_members.py` | **Release step.** Regenerates the S&P 500 / Nasdaq-100 / Dow 30 member lists in `aurantium/heatmap_universes.py` from public constituents lists. |
 | `design/` | | Local design-audit tooling (kept out of git). |
 
 Release steps: `docs/guides/RELEASING.md`.

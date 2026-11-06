@@ -65,6 +65,8 @@ appcast.xml       live auto-update feed. Installed apps fetch it from this exact
 logs/             dev-run logs (gitignored; a frozen build writes them next to the exe)
 ```
 
+**Release checklist addition:** run `.venv/Scripts/python.exe tools/data/refresh_index_members.py` before tagging, so the Heatmap's index member lists are current (see `docs/guides/RELEASING.md` for the rest).
+
 ## Design lineage
 
 The architecture adapts the best ideas found in

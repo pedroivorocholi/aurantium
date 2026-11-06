@@ -1,0 +1,105 @@
+"""Heatmap universes and the pure tile model: rows/quotes in, sized tiles out."""
+
+from aurantium import heatmap_model as hm
+from aurantium import heatmap_universes as hu
+from aurantium.components.symbol_catalog import SECTOR_ETF_ENTRIES
+from aurantium.providers import screen
+
+
+def _row(sym, cap, pct=1.0, price=10.0, name=None):
+    return {"symbol": sym, "name": name or f"{sym} Inc", "market_cap": cap,
+            "price": price, "change_pct": pct, "currency": "USD"}
+
+
+def _quote(sym, pct=2.0, price=5.0):
+    return {"symbol": sym, "name": f"{sym} Fund", "price": price, "change": 0.1,
+            "change_pct": pct, "prev_close": 4.9, "volume": 1, "currency": "USD"}
+
+
+def test_universes_are_consistent():
+    assert tuple(k for k, _l, _e in hu.SECTORS) == screen.SECTORS
+    assert {e for _k, _l, e in hu.SECTORS} == {c.code for c in SECTOR_ETF_ENTRIES}
+    assert len(hu.INDEXES["dow"][2]) == 30 and len(hu.INDEXES["sp500"][2]) > 450
+    assert hu.MEMBERS_AS_OF
+    assert hu.view_label("sp500") == "S&P 500 · largest 40"
+    assert hu.view_label("Technology") == "Technology"
+    assert [hu.view_label(v) for v in ("sectors", "portfolio", "watchlist", "custom")] == [
+        "Sectors", "Portfolio", "Watchlist", "Custom"]
+
+
+def test_share_classes_merge():
+    rows = [_row("GOOGL", 2e12, pct=1.0, price=100), _row("GOOG", 1e12, pct=9.0, price=101),
+            _row("AAPL", 1e12)]
+    tiles = {t.symbol: t for t in hm.tiles_from_screen(rows, 10)}
+    assert set(tiles) == {"GOOGL", "AAPL"}
+    assert tiles["GOOGL"].weight == 3e12
+    assert tiles["GOOGL"].change_pct == 1.0
+    assert "100" in tiles["GOOGL"].tooltip
+    # alias alone is shown under the kept symbol; kept symbol present => alias keeps own row
+    only = hm.tiles_from_screen([_row("GOOG", 1e12)], 10)
+    assert [t.symbol for t in only] == ["GOOGL"]
+
+
+def test_missing_members_are_skipped():
+    rows = [_row("A", 5e9), _row("B", None), {"symbol": "C", "market_cap": 0}]
+    assert [t.symbol for t in hm.tiles_from_screen(rows, 10)] == ["A"]
+
+
+def test_limit_keeps_largest():
+    rows = [_row("S", 1e9), _row("L", 9e9), _row("M", 5e9)]
+    assert [t.symbol for t in hm.tiles_from_screen(rows, 2)] == ["L", "M"]
+
+
+def test_non_equities_take_median_cap():
+    rows = [_row("A", 1e9), _row("B", 3e9), _row("C", 9e9)]
+    tiles = hm.tiles_mixed(["C", "SPY", "A", "B", "NEW"], rows, {"SPY": _quote("SPY", 0.5)})
+    assert [t.symbol for t in tiles] == ["C", "SPY", "A", "B", "NEW"]
+    by = {t.symbol: t for t in tiles}
+    assert by["SPY"].weight == 3e9 and by["SPY"].change_pct == 0.5 and not by["SPY"].loading
+    assert by["C"].weight == 9e9
+    # Ruling E: missing from rows and from quotes -> kept, loading, median weight
+    assert by["NEW"].loading and by["NEW"].weight == 3e9 and by["NEW"].change_pct is None
+
+
+def test_all_non_equities_are_equal():
+    tiles = hm.tiles_mixed(["SPY", "QQQ"], [], {"SPY": _quote("SPY")})
+    assert [t.weight for t in tiles] == [1.0, 1.0]
+    assert tiles[1].loading
+
+
+def test_mixed_missing_equity_uses_quote():
+    tiles = hm.tiles_mixed(["A", "SMALL"], [_row("A", 4e9)], {"SMALL": _quote("SMALL", -1.5)})
+    assert tiles[1].weight == 4e9 and tiles[1].change_pct == -1.5
+
+
+def test_sectors_equal_until_caps_arrive():
+    quotes = {"XLK": _quote("XLK", 1.2)}
+    tiles = hm.tiles_sectors(quotes, {})
+    assert len(tiles) == 11 and {t.weight for t in tiles} == {1.0}
+    tk = next(t for t in tiles if t.symbol == "XLK")
+    assert tk.sector_key == "Technology" and tk.change_pct == 1.2
+    assert next(t for t in tiles if t.symbol == "XLE").loading
+    assert {t.weight for t in hm.tiles_sectors(quotes, {"Technology": 5e12})} == {1.0}
+    full = {k: 1e12 for k, _l, _e in hu.SECTORS} | {"Technology": 5e12}
+    sized = hm.tiles_sectors(quotes, full)
+    w = {t.sector_key: t.weight for t in sized}
+    assert w["Technology"] == 5e12 and w["Energy"] == 1e12
+
+
+def test_portfolio_tiles_convert_and_flag_loading():
+    positions = [
+        {"symbol": "AAA", "qty": 10, "sell_date": None},
+        {"symbol": "AAA", "qty": 5, "sell_date": None},
+        {"symbol": "BBB", "qty": -2, "sell_date": None},
+        {"symbol": "CCC", "qty": 1, "sell_date": None},
+        {"symbol": "DDD", "qty": 1, "sell_date": None},
+        {"symbol": "OLD", "qty": 9, "sell_date": "2026-01-01"},
+    ]
+    quotes = {"AAA": _quote("AAA", 1.0, 2.0), "BBB": _quote("BBB", -3.0, 10.0),
+              "CCC": _quote("CCC", 0.0, 1.0)}
+    tiles = {t.symbol: t for t in hm.tiles_portfolio(
+        positions, quotes, lambda s, v: None if s == "CCC" else v * 2)}
+    assert set(tiles) == {"AAA", "BBB", "CCC", "DDD"}
+    assert tiles["AAA"].weight == 15 * 2.0 * 2 and tiles["BBB"].weight == 2 * 10.0 * 2
+    assert tiles["CCC"].loading and tiles["CCC"].weight == 0
+    assert tiles["DDD"].loading and tiles["DDD"].weight == 0

@@ -42,6 +42,7 @@ from typing import Any, Optional
 import yfinance as yf
 
 from ..datahub import DataHub, Provider
+from ..heatmap_universes import SECTOR_KEYS as SECTORS  # the 11 screener sector values
 from ._yf import (
     RATE_LIMIT_GATE,
     RATE_LIMIT_MESSAGE,
@@ -49,20 +50,6 @@ from ._yf import (
     with_retry,
 )
 
-#: screener sector values, the 11 GICS-style sectors Yahoo uses
-SECTORS = (
-    "Basic Materials",
-    "Communication Services",
-    "Consumer Cyclical",
-    "Consumer Defensive",
-    "Energy",
-    "Financial Services",
-    "Healthcare",
-    "Industrials",
-    "Real Estate",
-    "Technology",
-    "Utilities",
-)
 #: the screener's hard page limit
 MAX_SCREEN_SIZE = 250
 #: seconds the 250-row US universe is reused across ``screen:symbols:*`` topics
