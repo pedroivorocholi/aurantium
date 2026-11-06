@@ -65,6 +65,8 @@ hiddenimports += [
     "aurantium.providers.market",
     "aurantium.providers.news",
     "aurantium.providers.dayinfo",
+    # Yahoo-screener universes for the Heatmap panel; registered in providers/__init__.
+    "aurantium.providers.screen",
     # Key-metrics maths. Imported lazily inside FundamentalsProvider's
     # metrics fetch, so static analysis never sees it.
     "aurantium.valuation",

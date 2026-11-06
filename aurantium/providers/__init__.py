@@ -11,6 +11,7 @@ from .fundamentals import FundamentalsProvider
 from .market import MarketProvider
 from .news import NewsProvider
 from .rates import RatesProvider
+from .screen import ScreenProvider
 
 
 def register_all_providers() -> None:
@@ -28,6 +29,7 @@ def register_all_providers() -> None:
     hub.register_provider(EconProvider())
     hub.register_provider(FundamentalsProvider())
     hub.register_provider(RatesProvider())
+    hub.register_provider(ScreenProvider())
 
     hub.set_policy("quote:*", TopicPolicy(ttl_s=30, min_interval_s=5))
     hub.set_policy("history:*", TopicPolicy(ttl_s=1800, min_interval_s=60))
@@ -64,3 +66,6 @@ def register_all_providers() -> None:
     # SQLite topic cache mean a returning user sees yesterday's world instantly
     # and offline while the refresh runs behind it.
     hub.set_policy("rates:*", TopicPolicy(ttl_s=21600, min_interval_s=300))
+    # Heatmap universes: prices move all day, sector caps barely at all.
+    hub.set_policy("screen:*", TopicPolicy(ttl_s=60, min_interval_s=30))
+    hub.set_policy("sectorcap:*", TopicPolicy(ttl_s=86400, min_interval_s=3600))
