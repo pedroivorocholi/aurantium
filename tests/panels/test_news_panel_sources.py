@@ -322,6 +322,17 @@ def test_portfolio_peeked_price_stands_in_for_missing_cost(store, make_panel):
     assert book[0]["symbol"] == "NVDA" and book[0]["weight"] == 0.75
 
 
+def test_portfolio_with_no_resolvable_currency_still_shows_news(store, make_panel):
+    """A listing currency that never resolves must not leave it loading forever."""
+    store.add("ZZZ.QQ", 10, 100.0, "2026-01-02")
+    p = make_panel()
+    p.set_source("portfolio")
+    [topic] = p._hub.newsp()
+    assert "ZZZ.QQ" in topic
+    p._hub.subs[topic](_portfolio_items())
+    assert _rows(p) == 3
+
+
 def test_portfolio_resolved_empty_is_not_yet(store, make_panel):
     store.add("NVDA", 10, 100.0, "2026-01-02")
     p = make_panel()

@@ -305,6 +305,10 @@ class NewsPanel(NewsPanelBase):
             if isinstance(quote, dict):
                 fx.note_quote(sym, quote)
         book = build_book(positions, prices, self._sectors, to_pref=fx.value)
+        if positions and not book and all(fx.currency_of(s) is None for s in symbols):
+            # no listing currency will ever resolve (no quote): weigh in the
+            # positions' own units rather than wait on a rate forever
+            book = build_book(positions, prices, self._sectors)
         if positions and not book:
             # every position is still waiting on its rate: hold the current
             # list rather than flash "empty"; FxService.changed re-runs this

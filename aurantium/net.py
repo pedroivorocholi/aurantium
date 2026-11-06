@@ -8,9 +8,10 @@ fires dozens at once — enough back-to-back GIL holds to starve the UI thread
 for minutes. Here the bundle is parsed once into a shared context and requests'
 adapter is taught to use it, so a connection costs a handshake, not a parse.
 
-Verification is unchanged: same bundle, CERT_REQUIRED, hostname checked. A call
-that passes its own ``verify=<path>`` or ``verify=False`` keeps requests' own
-handling.
+Only ``verify=True`` (the default) is touched, direct or through a proxy:
+same bundle, CERT_REQUIRED, hostname checked. ``verify=False`` and
+``verify=<path>`` get no shared context and keep requests' own handling, so the
+shared trust store is never written to.
 """
 from __future__ import annotations
 
@@ -34,6 +35,10 @@ def shared_context() -> ssl.SSLContext:
         return _ctx
 
 
+def _default_verify(url: str, verify: Any) -> bool:
+    return verify is True and url.lower().startswith("https")
+
+
 def install() -> None:
     """Patch requests' HTTPAdapter to use :func:`shared_context`. Idempotent."""
     global _installed
@@ -44,20 +49,23 @@ def install() -> None:
 
     from requests.adapters import HTTPAdapter
 
-    orig_init_pool = HTTPAdapter.init_poolmanager
+    orig_key_attrs = HTTPAdapter.build_connection_pool_key_attributes
     orig_cert_verify = HTTPAdapter.cert_verify
 
-    def init_poolmanager(self, *args: Any, **pool_kwargs: Any) -> None:
-        pool_kwargs.setdefault("ssl_context", shared_context())
-        orig_init_pool(self, *args, **pool_kwargs)
+    def build_connection_pool_key_attributes(self, request: Any, verify: Any, cert: Any = None):
+        # the one place both direct and proxied pools take their TLS settings
+        host_params, pool_kwargs = orig_key_attrs(self, request, verify, cert)
+        if _default_verify(request.url, verify):
+            pool_kwargs["ssl_context"] = shared_context()
+        return host_params, pool_kwargs
 
     def cert_verify(self, conn: Any, url: str, verify: Any, cert: Any) -> None:
         orig_cert_verify(self, conn, url, verify, cert)
-        if verify is True and url.lower().startswith("https"):
+        if _default_verify(url, verify):
             # the shared context already trusts the bundle; naming it again
             # is what makes urllib3 re-parse it per connection
             conn.ca_certs = None
             conn.ca_cert_dir = None
 
-    HTTPAdapter.init_poolmanager = init_poolmanager
+    HTTPAdapter.build_connection_pool_key_attributes = build_connection_pool_key_attributes
     HTTPAdapter.cert_verify = cert_verify

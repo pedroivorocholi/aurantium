@@ -633,6 +633,8 @@ def test_old_curve_reading_names_its_date(make):
     _flush()
     r = p.gauge_strip.reading(_index(p, "curve", "*:10"))
     assert r.value == "5.24%" and r.note == "as of 1 Sep"
+    assert p.spreads[1].name() == "Gilt 3m10y · as of 1 Sep"
+    assert p.spreads[1].value_text() == "+153 bp"
 
 
 def test_fresh_curve_reading_has_no_date_note(make):

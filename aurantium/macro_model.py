@@ -49,7 +49,7 @@ def rate_at(points, years: float) -> Optional[float]:
     best = None
     for p in points or []:
         d = abs(p[0] - years)
-        if d <= tol and (best is None or d < best[0]):
+        if d < tol and (best is None or d < best[0]):  # strict: 9Y is not 10Y
             best = (d, p[1])
     return None if best is None else float(best[1])
 

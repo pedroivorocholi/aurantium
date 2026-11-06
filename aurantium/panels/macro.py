@@ -1064,7 +1064,8 @@ class MacroPanel(Panel):
                 w.set_spread(name, None, "", (), spread_reason(points, a, b) or "")
                 continue
             series = [v for _d, v in self._curve_series(cc, lambda pts: spread_bp(pts, a, b))]
-            w.set_spread(name, now, spread_state(series), series)
+            stale = _stale_note(str(cur.get("as_of") or ""))  # a monthly source
+            w.set_spread(f"{name} · {stale}" if stale else name, now, spread_state(series), series)
 
     # -- positioning ----------------------------------------------------------------
 
@@ -1168,7 +1169,7 @@ class MacroPanel(Panel):
         return list(out.items())
 
     def status_text(self) -> str:
-        return " · ".join(f"{name} {_short_date(iso)}" for name, iso in self._source_dates())
+        return " · ".join(f"{name} {_short_date(iso, _today())}" for name, iso in self._source_dates())
 
     def _update_status(self) -> None:
         self.set_status(self.status_text())
