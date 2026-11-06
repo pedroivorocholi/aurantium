@@ -47,5 +47,10 @@ def test_picking_currency_sets_preference(host, svc):
 
 def test_menu_follows_preference_changed_elsewhere(host, svc):
     svc.set_preferred(CURRENCIES[2])
-    QTest.qWait(250)  # the service coalesces ``changed`` over 150 ms
+    # the service coalesces ``changed`` over 150 ms; a busy event loop (windows
+    # left by earlier tests) can push that past a second, so wait on the result
+    for _ in range(60):
+        if _checked(host) == [CURRENCIES[2]]:
+            break
+        QTest.qWait(50)
     assert _checked(host) == [CURRENCIES[2]]
