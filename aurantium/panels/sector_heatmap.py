@@ -13,9 +13,10 @@ layouts open it unchanged.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any, Optional
 
-from PySide6.QtCore import QEvent, QRect, QSize, Qt, QTimer, Signal
+from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QActionGroup, QColor, QFont, QFontMetrics, QPainter, QPen
 from PySide6.QtWidgets import (
     QLabel,
@@ -29,11 +30,18 @@ from shiboken6 import isValid
 
 from ..transitions import fade_in_content
 from ..color import mix_oklab, readable_on
-from ..components import treemap
+from ..components import (
+    SECTOR_ETF_ENTRIES,
+    EditorColumn,
+    EditorSection,
+    open_add_picker,
+    open_list_editor,
+    treemap,
+)
 from ..components.empty_state import EmptyState
 from ..components.responsive_row import ResponsiveRow
 from ..fx import FxService
-from ..guide import PanelGuide
+from ..guide import LIST_EDITOR, PanelGuide
 from ..heatmap_model import (
     Tile,
     tiles_from_screen,
@@ -41,7 +49,7 @@ from ..heatmap_model import (
     tiles_portfolio,
     tiles_sectors,
 )
-from ..heatmap_universes import INDEXES, SECTOR_KEYS, SECTORS, view_label
+from ..heatmap_universes import INDEXES, SECTOR_KEYS, SECTORS, SHARE_CLASSES, view_label
 from ..panel import NULL_GLYPH, UNLINKED, WARN_GLYPH, Panel, register_panel
 from ..portfolio_store import PortfolioStore
 from ..providers.screen import symbols_topic
@@ -71,6 +79,7 @@ from ..theme import (
     UP,
     WEIGHT_BOLD,
 )
+from ..undo import UndoStack
 from .watchlist import WatchlistPanel
 
 PCT_CLAMP = 2.0  # +/- 2% maps to full saturation
@@ -511,6 +520,40 @@ def clean_view(view: Any) -> Optional[str]:
     return None
 
 
+#: The old Sector Heatmap's eleven default tiles, by symbol. A saved layout
+#: holding exactly these (in any order) opens on the Sectors view; any other
+#: list was the user's own and opens as the Custom view. Fixed history, so
+#: spelled out rather than derived from ``SECTORS``.
+LEGACY_DEFAULT_SYMBOLS = (
+    "XLK", "XLF", "XLV", "XLY", "XLP", "XLE", "XLI", "XLB", "XLRE", "XLU", "XLC",
+)
+
+
+def clean_tiles(rows: Any) -> list[tuple[str, str]]:
+    """``(label, symbol)`` rows from saved or edited ``[[label, symbol], ...]``.
+
+    A row needs a non-empty string symbol (upper-cased); a missing or blank
+    label becomes the symbol. Anything else, and a repeat of a symbol already
+    kept, is dropped. Never raises."""
+    if not isinstance(rows, (list, tuple)):
+        return []
+    out: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for row in rows:
+        if not isinstance(row, (list, tuple)) or len(row) < 2:
+            continue
+        label, sym = row[0], row[1]
+        if not isinstance(sym, str) or not sym.strip():
+            continue
+        sym = sym.strip().upper()
+        if sym in seen:
+            continue
+        seen.add(sym)
+        label = label.strip() if isinstance(label, str) else ""
+        out.append((label or sym, sym))
+    return out
+
+
 @register_panel(id="sectors", title="Heatmap", category="Markets")
 class HeatmapPanel(Panel):
     SKELETON = "plot"
@@ -530,6 +573,11 @@ class HeatmapPanel(Panel):
             "price, change and size.",
             "Double-click a sector to open its 30 largest companies; **◂ Back** "
             "or Backspace returns to the sectors.",
+            "In **Custom**, right-click a tile to **Remove** it, or anywhere on "
+            "the map for **Add tile…** and **Edit panel…**; any Yahoo Finance "
+            "symbol can be a tile. Ctrl+Z undoes each edit.",
+            "In any other view, right-click and **Show in Custom** to copy the "
+            "map's tiles into your Custom list and edit them there.",
             "A dark tile is still loading; a dashed one has no reading.",
         ),
         fields=(
@@ -542,11 +590,13 @@ class HeatmapPanel(Panel):
             "heat map", "heatmap", "market map", "treemap", "sectors", "S&P 500",
             "Nasdaq", "Dow", "portfolio map", "finviz",
         ),
+        sections=(LIST_EDITOR,),
     )
 
     def build(self) -> None:
         self._view = "sectors"
-        #: (label, symbol) tiles of the Custom view; Task 6 brings the editing
+        #: (label, symbol) tiles of the Custom view, edited in place from the
+        #: map's right-click menu
         self._custom: list[tuple[str, str]] = []
         self._quotes: dict[str, dict] = {}
         self._screens: dict[str, list] = {}  # screen topic -> its last good rows
@@ -640,6 +690,17 @@ class HeatmapPanel(Panel):
         if self._view.startswith("sector:"):
             self.set_view("sectors")
 
+    def _choose_view(self, view: str) -> None:
+        """A view picked from a menu: the map takes the keys, so Backspace
+        goes back without a click on it first."""
+        self.set_view(view)
+        self._focus_map()
+
+    def _focus_map(self) -> None:
+        # only inside the window already in use: never pull focus from another
+        if self.window().isActiveWindow():
+            self.map.setFocus(Qt.FocusReason.OtherFocusReason)
+
     def _build_view_menu(self) -> QMenu:
         menu = QMenu(self)
         group = QActionGroup(menu)
@@ -649,7 +710,7 @@ class HeatmapPanel(Panel):
             act = target.addAction(text)
             act.setCheckable(True)
             group.addAction(act)
-            act.triggered.connect(lambda _=False, v=view: self.set_view(v))
+            act.triggered.connect(lambda _=False, v=view: self._choose_view(v))
             self._view_actions[view] = act
 
         add(menu, "Sectors", "sectors")
@@ -868,7 +929,12 @@ class HeatmapPanel(Panel):
         if rows is None:
             wanted = set(syms)
             rows = [r for r in self._last_mixed_rows if r.get("symbol") in wanted]
-        return tiles_mixed(syms, rows, self._quotes)
+        tiles = tiles_mixed(syms, rows, self._quotes)
+        if v != "custom":
+            return tiles
+        # the user's own names lead their tiles ("Technology" over "XLK")
+        names = {SHARE_CLASSES.get(s, s): label for label, s in self._custom if label != s}
+        return [replace(t, label=names[t.symbol]) if t.symbol in names else t for t in tiles]
 
     def _empty_message(self) -> tuple[str, str, bool]:
         """``(title, hint, loading)`` for a map with no tiles."""
@@ -884,7 +950,7 @@ class HeatmapPanel(Panel):
             return ("Watchlist is empty",
                     f"add symbols to the Watchlist in group {self.link_group}", False)
         if v == "custom":
-            return "No tiles yet", "right-click to add", False
+            return "No tiles yet", "right-click to add a tile", False
         if v == "portfolio":
             return "No open positions", "add one in the Portfolio panel", False
         if self._errors:
@@ -923,11 +989,141 @@ class HeatmapPanel(Panel):
         e = self.map.empty
         return f"{e.title} — {e.hint}" if e.hint else e.title
 
+    # -- the Custom list: right-click editing ----------------------------------
+
+    def contextMenuEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        menu = self._context_menu(self.map.mapFromGlobal(event.globalPos()))
+        menu.exec(event.globalPos())
+        menu.deleteLater()
+
+    def _context_menu(self, pos: QPoint) -> QMenu:
+        """The right-click menu for a point in the map's coordinates. Custom
+        edits its list in place; every other view offers to become one."""
+        menu = QMenu(self)
+        if self._view == "custom":
+            i = self.map.index_at(pos)
+            if i >= 0:
+                sym = self.map.tiles()[i].symbol
+                act = menu.addAction(f'Remove "{self._custom_label(sym)}"')
+                act.triggered.connect(lambda _=False, s=sym: self._remove_tile(s))
+            menu.addAction("Add tile…").triggered.connect(lambda _=False: self._add_tile())
+            menu.addAction("Edit panel…").triggered.connect(lambda _=False: self._edit_tiles())
+        else:
+            act = menu.addAction("Show in Custom")
+            act.setEnabled(bool(self.map.tiles()))
+            act.triggered.connect(lambda _=False: self._show_in_custom())
+        self.add_guide_action(menu)
+        return menu
+
+    def _custom_rows_for(self, tile_symbol: str) -> list[tuple[str, str]]:
+        """The Custom rows a tile stands for: a merged share class (GOOG under
+        GOOGL) is one tile but may be two rows."""
+        return [r for r in self._custom if SHARE_CLASSES.get(r[1], r[1]) == tile_symbol]
+
+    def _custom_label(self, tile_symbol: str) -> str:
+        rows = self._custom_rows_for(tile_symbol)
+        return rows[0][0] if rows else tile_symbol
+
+    def _set_custom(self, tiles: list[tuple[str, str]], label: str) -> None:
+        """Swap in a new Custom list behind one undo entry. The map redraws in
+        place: the subscriptions are diffed, so the other tiles keep their
+        colour and size."""
+        tiles = list(tiles)
+        if tiles == self._custom:
+            return
+        before = list(self._custom)
+
+        def _undo() -> None:
+            self._custom = list(before)
+            if self._view == "custom":
+                self._refresh()
+            self.set_status(f"undo · {label}")
+
+        UndoStack.instance().push(label, _undo)
+        self._custom = tiles
+        if self._view == "custom":
+            self._refresh()
+
+    def _remove_tile(self, tile_symbol: str) -> None:
+        gone = set(self._custom_rows_for(tile_symbol))
+        self._set_custom([r for r in self._custom if r not in gone],
+                         f"Remove {tile_symbol} from heatmap")
+
+    def _add_tile(self) -> None:
+        entry = open_add_picker(self, SECTOR_ETF_ENTRIES, title="Add Tile")
+        if entry is None:
+            return
+        added = clean_tiles([[entry.label, entry.code]])
+        if not added:
+            return
+        label, sym = added[0]
+        if any(s == sym for _l, s in self._custom):
+            return  # already on the map: nothing to do, nothing to say
+        self._set_custom(self._custom + [(label, sym)], f"Add {sym} to heatmap")
+
+    def _edit_tiles(self) -> None:
+        result = open_list_editor(
+            self,
+            "Edit Heatmap",
+            [
+                EditorSection(
+                    "tiles",
+                    "Tiles",
+                    [EditorColumn("Label"), EditorColumn("Symbol", kind="symbol")],
+                    [list(r) for r in self._custom],
+                    description="One tile per row on the Custom map — any Yahoo "
+                    "Finance symbol works.",
+                    catalog=SECTOR_ETF_ENTRIES,
+                    presets=[
+                        ("All 11 sectors", [[e.label, e.code] for e in SECTOR_ETF_ENTRIES]),
+                    ],
+                )
+            ],
+        )
+        if result is None:
+            return
+        self._set_custom(clean_tiles(result.get("tiles")), "Edit heatmap")
+
+    def _show_in_custom(self) -> None:
+        """Copy the map as it stands into the Custom list, in display order,
+        and switch to it — one undo puts back both the list and the view."""
+        tiles = clean_tiles([[t.label, t.symbol] for t in self.map.tiles()])
+        if not tiles:
+            return
+        before_view, before = self._view, list(self._custom)
+
+        def _undo() -> None:
+            self._custom = list(before)
+            if self._view == before_view:
+                self._refresh()
+            else:
+                self.set_view(before_view)
+            self.set_status("undo · Show in Custom")
+
+        UndoStack.instance().push("Show in Custom", _undo)
+        self._custom = tiles
+        self._choose_view("custom")
+
     # -- persistence ----------------------------------------------------------
 
     def settings(self) -> dict:
-        return {"view": self._view}
+        return {"view": self._view, "custom": [[label, sym] for label, sym in self._custom]}
 
     def restore(self, settings: dict) -> None:
-        view = settings.get("view") if isinstance(settings, dict) else None
-        self.set_view(clean_view(view) or "sectors")
+        """New layouts save ``{"view", "custom"}``. An old Sector Heatmap
+        layout saved ``{"tiles"}``: its eleven defaults open the Sectors view,
+        an edited list the Custom view. Anything malformed opens Sectors."""
+        view, custom = "sectors", []
+        if isinstance(settings, dict):
+            if "view" in settings or "custom" in settings:
+                view = clean_view(settings.get("view")) or "sectors"
+                custom = clean_tiles(settings.get("custom"))
+            elif "tiles" in settings:
+                tiles = clean_tiles(settings.get("tiles"))
+                if tiles and sorted(s for _l, s in tiles) != sorted(LEGACY_DEFAULT_SYMBOLS):
+                    view, custom = "custom", tiles
+        self._custom = custom
+        if view == self._view:
+            self._refresh()
+        else:
+            self.set_view(view)

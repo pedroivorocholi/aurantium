@@ -404,7 +404,7 @@ def test_tile_press_sinks_only_that_tile(qapp):
 def test_view_persists_in_settings(make, view):
     p = make()
     p.set_view(view)
-    assert p.settings() == {"view": view}
+    assert p.settings() == {"view": view, "custom": []}
     q = make(view=p.settings()["view"])
     assert q.view == view
     assert q.back_btn.isVisibleTo(q) == view.startswith("sector:")
@@ -412,7 +412,7 @@ def test_view_persists_in_settings(make, view):
 
 @pytest.mark.parametrize("bad", [
     {"view": "bogus"}, {"view": 5}, {"view": None}, {"view": "sector:Nope"},
-    {"view": "index:zzz"}, {}, None, "sectors", {"tiles": [["Energy", "XLE"]]},
+    {"view": "index:zzz"}, {}, None, "sectors", {"tiles": "XLE"},
 ])
 def test_unknown_view_falls_back_to_sectors(make, bad):
     p = make()
