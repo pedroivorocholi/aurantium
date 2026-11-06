@@ -318,6 +318,14 @@ WARN_GLYPH = "⚠"
 EMPTY_NO_SYMBOL = "No symbol selected"
 EMPTY_NO_SYMBOL_HINT = "Click a ticker in any linked panel"
 
+#: Opens (or focuses) another panel from inside a panel:
+#: ``open_panel_hook(panel_id, link_group, settings)``. The main window sets
+#: it; a panel of ``panel_id`` already in ``link_group`` is brought forward and
+#: given ``settings``, otherwise a new one opens floating with them, the way
+#: the Panels menu opens one. ``None`` outside the app (tests, a bare panel),
+#: so callers check it first.
+open_panel_hook: Optional[Callable[[str, str, dict], None]] = None
+
 
 # --------------------------------------------------------------------------
 # Panel header strip

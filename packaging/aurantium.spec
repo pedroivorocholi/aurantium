@@ -96,6 +96,8 @@ hiddenimports += [
     "aurantium.components.gauge_strip",
     # Macro / Rates yield curve: comparisons, twist strip, country switch.
     "aurantium.components.curve_view",
+    # Macro / Rates CFTC positioning: diverging bars edited in place.
+    "aurantium.components.positioning_bars",
     # Pure-maths colour module: OKLab, CVD and contrast. Imported normally by
     # theme.py and several panels, so static analysis should find it — listed
     # anyway, because everything else in this block is.

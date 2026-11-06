@@ -16,6 +16,7 @@ from .market_table import (
     parse_numeric,
 )
 from .plot_utils import attach_hover, clamp_view, view_limits
+from .positioning_bars import PositionRow, PositioningBars
 from .symbol_catalog import (
     FRED_ENTRIES,
     FX_ENTRIES,
@@ -49,6 +50,8 @@ __all__ = [
     "ListEditorDialog",
     "MarketTable",
     "NumericTableWidgetItem",
+    "PositionRow",
+    "PositioningBars",
     "RATES_ENTRIES",
     "SECTOR_ETF_ENTRIES",
     "SuggestField",

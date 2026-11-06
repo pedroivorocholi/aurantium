@@ -133,6 +133,39 @@ def _no_sideways_scroll(dock, content: QWidget) -> None:
         wrapper = wrapper.parentWidget()
 
 
+def open_linked_panel(window, panel_id: str, link_group: str, settings: dict) -> None:
+    """``panel.open_panel_hook``: bring forward the ``panel_id`` panel in
+    ``link_group`` and give it ``settings``; open one floating if there is none.
+
+    A click that opens nothing visible would read as broken, so there is
+    always a panel at the end of it. Only ``window._docks``,
+    ``window._unbuilt``, ``window.add_panel`` and ``window.focus_dock`` are
+    touched (the tests drive it through a fake with just those)."""
+    panel_id, _alias = PanelRegistry.resolve(panel_id)
+    settings = dict(settings or {})
+    for instance_id, dock in list(window._docks.items()):
+        content = dock.widget()
+        if (getattr(content, "panel_id", None) == panel_id
+                and getattr(content, "link_group", None) == link_group):
+            if settings:
+                try:
+                    content.restore(settings)
+                except Exception:  # a panel's restore must not break the click
+                    import traceback
+
+                    traceback.print_exc()
+            window.focus_dock(dock)
+            return
+        pending = window._unbuilt.get(instance_id)
+        if pending is not None and pending[0].id == panel_id and pending[1] == link_group:
+            # still a loading outline: it is built with these settings
+            meta, group, old = pending
+            window._unbuilt[instance_id] = (meta, group, {**(old or {}), **settings})
+            window.focus_dock(dock)
+            return
+    window.add_panel(panel_id, link_group=link_group, settings=settings, floating=True)
+
+
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -255,6 +288,12 @@ class MainWindow(QMainWindow):
         from . import guide
 
         guide.open_guide_hook = self.show_guide  # every panel's ? opens here
+        from . import panel as panel_module
+
+        # Macro's positioning bars open the CFTC history in their link group
+        panel_module.open_panel_hook = (
+            lambda pid, group, settings: open_linked_panel(self, pid, group, settings)
+        )
         self._install_panel_maximize()
         self._install_refresh_all()
         self._install_search_shortcut()
@@ -662,6 +701,22 @@ class MainWindow(QMainWindow):
         self.notify(
             "Panel maximized — press F11 or Esc to restore.", 4000
         )
+
+    def focus_dock(self, dock) -> None:
+        """Bring ``dock`` to the front: out from behind a maximized panel, as
+        the current tab of its area, and its window raised and active."""
+        if self._maximized_instance and self._maximized_instance != dock.objectName():
+            self._exit_maximize()  # it may be one of the panels hidden for it
+        dock.toggleView(True)
+        dock.setAsCurrentTab()
+        window = dock.window()
+        if window.isMinimized():
+            window.showNormal()
+        window.raise_()
+        window.activateWindow()
+        content = dock.widget()
+        if content is not None:
+            content.setFocus(Qt.FocusReason.OtherFocusReason)
 
     @staticmethod
     def _lone_panel_window(dock):
