@@ -112,6 +112,10 @@ _COL_GAP = SPACE_LG
 _PCT_W = 4 * SPACE_XL           # the 2-year range track
 _BAR_MIN_W = 6 * SPACE_XL       # below this a bar says nothing
 _LABEL_MIN_W = 4 * SPACE_XL
+#: on a narrow panel, once W/W and the range have gone, the name and the bar
+#: shrink this far before anything would clip
+_LABEL_COMPACT_W = 2 * SPACE_XL + SPACE_MD
+_BAR_COMPACT_W = 2 * SPACE_XL + SPACE_MD
 _WIDEST_FIGURE = "-888.8K"      # sizes the net and W/W columns
 _MARKER_W = 2 * SPACE_XS
 _EDIT_HINT = "Click for its weekly chart · drag to reorder · right-click to remove"
@@ -413,23 +417,48 @@ class PositioningBars(QWidget):
         """Everything but the label and the bar: padding, figures, range."""
         return 2 * _PAD_X + self._net_w + self._wow_w + _PCT_W + 4 * _COL_GAP
 
+    def _optional(self, width: int) -> list[tuple[str, int]]:
+        """The droppable columns that fit at ``width``: the range marker
+        goes first, then W/W (both stay in the tooltip)."""
+        keep = [("wow", self._wow_w), ("pct", _PCT_W)]
+        while keep:
+            need = (2 * _PAD_X + _LABEL_MIN_W + _BAR_MIN_W + self._net_w
+                    + sum(w for _n, w in keep) + (2 + len(keep)) * _COL_GAP)
+            if need <= width:
+                break
+            keep.pop()
+        return keep
+
+    def columns(self, width: int | None = None) -> dict[str, tuple[int, int]]:
+        """``(left, width)`` of each column shown at ``width`` (default: now)."""
+        return self._columns(self.width() if width is None else width)
+
     def _columns(self, width: int) -> dict[str, tuple[int, int]]:
-        """``(left, width)`` of each column at ``width``. The name column takes
-        its widest label up to a third of the row; the bar takes the rest."""
-        label_w = max(_LABEL_MIN_W, min(self._widest_label(), width // 3))
-        bar_w = max(_BAR_MIN_W, width - self._fixed_w() - label_w)
+        """``(left, width)`` of each column shown at ``width``. The name column
+        takes its widest label up to a third of the row; the bar takes the
+        rest. Narrow rows drop the range, then W/W, then shrink the name and
+        the bar — never painting past the right edge."""
+        optional = self._optional(width)
+        fixed = (2 * _PAD_X + self._net_w + sum(w for _n, w in optional)
+                 + (2 + len(optional)) * _COL_GAP)
+        label_min, bar_min = _LABEL_MIN_W, _BAR_MIN_W
+        if not optional:
+            label_min, bar_min = _LABEL_COMPACT_W, _BAR_COMPACT_W
+        label_w = max(label_min, min(self._widest_label(), width // 3))
+        label_w = max(label_min, min(label_w, width - fixed - bar_min))
+        bar_w = max(bar_min, width - fixed - label_w)
         x = _PAD_X
         cols = {}
-        for name, w in (("label", label_w), ("bar", bar_w), ("net", self._net_w),
-                        ("wow", self._wow_w), ("pct", _PCT_W)):
+        for name, w in [("label", label_w), ("bar", bar_w), ("net", self._net_w)] + optional:
             cols[name] = (x, w)
             x += w + _COL_GAP
         return cols
 
     def _track(self, row: QRect | QRectF, column: str) -> QRectF:
-        if row.isNull():
+        cols = self._columns(self.width())
+        if row.isNull() or column not in cols:
             return QRectF()
-        left, w = self._columns(self.width())[column]
+        left, w = cols[column]
         cy = QRectF(row).center().y()
         return QRectF(row.left() + left, cy - self._bar_h / 2, w, self._bar_h)
 
@@ -453,6 +482,8 @@ class PositioningBars(QWidget):
         if data.pct is None or data.net is None:
             return QRectF()
         track = self._track(row, "pct")
+        if track.isNull():
+            return QRectF()
         x = track.left() + track.width() * data.pct / 100.0
         return QRectF(x - _MARKER_W / 2, track.top(), _MARKER_W, track.height())
 
@@ -464,7 +495,8 @@ class PositioningBars(QWidget):
         return QSize(w, self._height_for(len(self._rows)))
 
     def minimumSizeHint(self) -> QSize:  # noqa: N802 (Qt override)
-        w = self._fixed_w() + _LABEL_MIN_W + _BAR_MIN_W
+        # the compact row: name, bar and net figure only
+        w = 2 * _PAD_X + _LABEL_COMPACT_W + _BAR_COMPACT_W + self._net_w + 2 * _COL_GAP
         return QSize(w, self._height_for(len(self._rows)))
 
     def resizeEvent(self, event) -> None:  # noqa: N802 (Qt override)
@@ -753,12 +785,14 @@ class PositioningBars(QWidget):
 
         self._text(p, self._f_net, LABEL, cell("net"), _signed(data.net),
                    Qt.AlignmentFlag.AlignRight)
-        if data.wow is not None:
+        if data.wow is not None and "wow" in cols:
             ink = FG_DIM if not data.wow else (UP if data.wow > 0 else DOWN)
             self._text(p, self._f_wow, ink, cell("wow"), _signed(data.wow),
                        Qt.AlignmentFlag.AlignRight)
 
         pct_box = self._track(rect, "pct")
+        if pct_box.isNull():
+            return  # dropped on a narrow row; the tooltip still says it
         if data.pct is None:
             # no range to place it in: a quiet dash, no marker
             self._text(p, self._f_wow, FG_MUTED, pct_box, "—", Qt.AlignmentFlag.AlignHCenter)

@@ -45,6 +45,7 @@ from PySide6.QtWidgets import (
 
 from .. import rates_meta
 from ..commodities_meta import COMMODITIES, by_cftc_market
+from .cot_history import market_symbol
 from ..components import (
     FRED_ENTRIES,
     FX_ENTRIES,
@@ -59,6 +60,7 @@ from ..components import (
     PositioningBars,
     open_add_picker,
 )
+from ..components.curve_view import CHIPS
 from ..components.fmt import NULL_GLYPH, num, signed_pct
 from ..components.symbol_catalog import commodity_entries
 from ..guide import PanelGuide
@@ -80,7 +82,7 @@ from ..theme import (
     DOWN,
     FG_DIM,
     FG_MUTED,
-    FONT_MD,
+    FONT_LG,
     FONT_SM,
     LABEL,
     MONO_FONT,
@@ -149,6 +151,11 @@ _HERE_ENTRIES = [
     CatalogEntry("3m10y spread (panel's country)", "*:0.25-10", "curve", "Rates",
                  "curve slope inversion bill 3 month 10"),
 ]
+#: the plain name a country-relative gauge keeps (the tile shows it as
+#: "US 10Y", "JGB 2s10s", "Fed rate" — never the picker's description)
+_HERE_LABELS = {"*": "Policy rate", "*:10": tenor_label(10), "*:2-10": "2s10s",
+                "*:0.25-10": "3m10y"}
+
 #: market gauges the shared catalog lacks
 _EXTRA_QUOTES = [
     CatalogEntry("MOVE (bond volatility)", "^MOVE", "quote", "Rates",
@@ -270,7 +277,7 @@ class _SpreadReadout(QWidget):
         self._f_name = QFont(UI_FONT)
         self._f_name.setPixelSize(FONT_SM)
         self._f_value = QFont(MONO_FONT)
-        self._f_value.setPixelSize(FONT_MD + 2)
+        self._f_value.setPixelSize(FONT_LG)
         self._f_value.setWeight(QFont.Weight(WEIGHT_MEDIUM))
         self._f_state = QFont(UI_FONT)
         self._f_state.setPixelSize(FONT_SM)
@@ -455,8 +462,9 @@ class MacroPanel(Panel):
         "whole government yield curve (the US Treasury curve by default) against "
         "its past, the curve's spreads and CFTC speculator positioning.",
         links="Click a market gauge (dollar, VIX, oil, gold…) to send its symbol to "
-        "this link group. Click a positioning market to open Speculator Positioning "
-        "on it in the same group — it opens floating if the group has none.",
+        "this link group. Click a positioning market to send its symbol too (gold's "
+        "futures, the S&P 500 E-mini, Bitcoin, EUR/USD) and open Speculator "
+        "Positioning on it in the same group — floating if the group has none.",
         interactions=(
             "**Country** (on the curve) sets the panel's country: the curve, the "
             "policy-rate, 10Y and 2s10s gauges and the spreads follow it; market "
@@ -470,9 +478,17 @@ class MacroPanel(Panel):
             "**Remove**, drag to reorder.",
             "Positioning: **+** adds a market, right-click → **Remove**, drag to "
             "reorder. Every edit and country switch undoes with Ctrl+Z.",
+            "Adding a gauge that is already on the strip outlines the one there "
+            "instead of adding a twin.",
+            "The header gives each source's own latest date (BIS, the curve's "
+            "publisher, CFTC, FRED) — they publish on different days — and cites "
+            "BIS for the policy rates.",
         ),
         fields=(
             ("Policy rate", "The central bank's rate (BIS), with its last move"),
+            ("FRED gauge", "The latest release, the period it covers and its change "
+             "versus the previous release — not a daily move; the line is the last 12 "
+             "releases"),
             ("2s10s / 3m10y", "10-year yield minus the 2-year / 3-month, in basis points"),
             ("Spread state", SPREAD_STATE_RULES),
             ("MOVE", "Expected Treasury volatility from options — the bond market's VIX"),
@@ -510,6 +526,9 @@ class MacroPanel(Panel):
         self._fred: dict[str, dict] = {}
         self._fred_errors: dict[str, str] = {}
         self._cot: dict[str, dict] = {}
+        #: topics wait for restore() or the first show, so a layout restored
+        #: to another country never fetches the default one first
+        self._live = False
 
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
@@ -561,9 +580,6 @@ class MacroPanel(Panel):
         cot_title.setMinimumWidth(1)
         col.addWidget(cot_title)
         self.positioning = PositioningBars(body)
-        # the bars have no compact layout yet: on a very narrow panel their
-        # right-hand columns clip rather than scroll the panel sideways
-        self.positioning.setMinimumWidth(10 * SPACE_XL)
         self.positioning.market_clicked.connect(self._on_market_clicked)
         self.positioning.markets_changed.connect(self._on_markets_edited)
         self.positioning.add_requested.connect(self._on_add_market)
@@ -584,8 +600,19 @@ class MacroPanel(Panel):
         self.curve_view.set_countries([(c.code, c.label) for c in rates_meta.COUNTRIES],
                                       self._country)
         self.curve_view.set_comparisons(self._comparisons)
-        self._sync_topics()
+        if self._live:
+            self._sync_topics()
         self._render()
+
+    def _go_live(self) -> None:
+        if not self._live:
+            self._live = True
+            self._sync_topics()
+            self._render()
+
+    def showEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        super().showEvent(event)
+        self._go_live()
 
     def _render(self) -> None:
         self._render_gauges()
@@ -635,8 +662,7 @@ class MacroPanel(Panel):
         want = self._wanted_topics()
         for topic in list(self._topics):
             if topic not in want:
-                self._hub.unsubscribe(self, topic)
-                self._topics.discard(topic)
+                self.unsubscribe(topic)
         for topic, (cb, err) in want.items():
             if topic not in self._topics:
                 self.subscribe(topic, cb, on_error=err)
@@ -682,6 +708,8 @@ class MacroPanel(Panel):
     def _on_hist_error(self, cc: str, _error: str) -> None:
         # no history is not an error worth a banner: the chips say why
         self._hists.setdefault(cc, [])
+        if cc == self._country:
+            self.curve_view.set_history(self._hists[cc])
 
     def _on_quote(self, sym: str, data: Any) -> None:
         if isinstance(data, dict):
@@ -739,7 +767,11 @@ class MacroPanel(Panel):
         for i, g in enumerate(self._gauges):
             strip.set_label(i, self._display_label(g))
             reading = self._reading(g)
-            if reading is not None:
+            if reading is None:
+                # nothing for it yet: never leave a previous reading standing
+                # (another country's 10Y under this country's name)
+                strip.clear_reading(i)
+            else:
                 strip.set_reading(i, *reading)
 
     def _reading(self, g: Gauge):
@@ -799,7 +831,7 @@ class MacroPanel(Panel):
             return (NULL_GLYPH, "", 0, (), "no BIS policy rate", "")
         note = "BIS"
         prev, when = _f(row.get("prev")), row.get("last_change")
-        if prev is not None and when:
+        if prev is not None and when and round(abs(rate - prev) * 100) >= 1:
             verb = "cut" if rate < prev else "hiked"
             note = f"{verb} {abs(rate - prev) * 100:.0f}bp in {_month_after(when)}"
         return (f"{rate:.2f}%", "", 0, (), note, "")
@@ -882,30 +914,54 @@ class MacroPanel(Panel):
         if entry is None:
             return None
         kind = entry.kind if entry.kind in ("quote", "fred", "curve", "policy") else "quote"
-        return Gauge(kind, entry.code, entry.label)
+        return Gauge(kind, entry.code, _HERE_LABELS.get(entry.code, entry.label))
 
-    def _has_gauge(self, g: Gauge, skip: int = -1) -> bool:
-        return any((x.kind, x.code) == (g.kind, g.code)
-                   for i, x in enumerate(self._gauges) if i != skip)
+    def _resolved(self, g: Gauge) -> tuple[str, str]:
+        """What a gauge reads at the panel's current country: "*:10" on a US
+        panel and "US:10" are the same tile."""
+        if g.kind == "policy":
+            return g.kind, self._resolve_cc(g.code or "*")
+        if g.kind == "curve" and g.code.startswith("*:"):
+            return g.kind, f"{self._country}:{g.code[2:]}"
+        return g.kind, g.code
+
+    def _same_as(self, g: Gauge, skip: int = -1) -> int:
+        """Index of a tile already reading what ``g`` would, else -1."""
+        key = self._resolved(g)
+        return next((i for i, x in enumerate(self._gauges)
+                     if i != skip and self._resolved(x) == key), -1)
+
+    def _reveal(self, index: int) -> None:
+        """Point at a tile that is already there instead of adding a twin."""
+        self.gauge_strip.reveal(index)
+        r = self.gauge_strip.tile_rect(index)
+        body = self._scroll.widget()
+        c = self.gauge_strip.mapTo(body, r.center())
+        self._scroll.ensureVisible(c.x(), c.y(), 0, r.height() // 2 + SPACE_LG)
+
+    def _pick_gauge(self, title: str) -> Optional[Gauge]:
+        return self._gauge_from_entry(
+            open_add_picker(self, self._picker_catalog(), title=title, show_codes=False))
 
     def _on_add_gauge(self) -> None:
-        g = self._gauge_from_entry(open_add_picker(self, self._picker_catalog(), title="Add Gauge"))
+        g = self._pick_gauge("Add Gauge")
         if g is None:
             return
-        if self._has_gauge(g):
-            self.set_status(f"{g.label} is already on the strip")
+        same = self._same_as(g)
+        if same >= 0:
+            self._reveal(same)
             return
         self.gauge_strip.add_gauge(g)
 
     def _on_replace_gauge(self, index: int) -> None:
         if not 0 <= index < len(self._gauges):
             return
-        g = self._gauge_from_entry(
-            open_add_picker(self, self._picker_catalog(), title="Replace Gauge"))
+        g = self._pick_gauge("Replace Gauge")
         if g is None:
             return
-        if self._has_gauge(g, skip=index):
-            self.set_status(f"{g.label} is already on the strip")
+        same = self._same_as(g, skip=index)
+        if same >= 0:
+            self._reveal(same)
             return
         self.gauge_strip.replace_gauge(index, g)
 
@@ -941,6 +997,7 @@ class MacroPanel(Panel):
             return
         cur = self._curves.get(cc)
         if cur is None:
+            self._feed_history()
             if cc in self._curve_errors:
                 view.set_state("error", "The source could not be reached; it retries on its own")
             else:
@@ -953,9 +1010,17 @@ class MacroPanel(Panel):
         # the view adds the as-of itself; the curve's own source, not BIS
         # (BIS is cited where its policy rates appear: the header)
         citation = " · ".join(str(s) for s in (cur.get("sources") or []) if s != rates_meta.BIS)
-        view.set_history(self._hists.get(cc) or [])
+        self._feed_history()
         view.set_curve(points, bool(cur.get("complete")), str(cur.get("as_of") or ""),
                        citation or (meta.citation if meta else ""))
+
+    def _feed_history(self) -> None:
+        """The view gets this country's history, or waits for it with the
+        chips unlit: never another country's."""
+        if self._country in self._hists:
+            self.curve_view.set_history(self._hists[self._country])
+        else:
+            self.curve_view.clear_history()
 
     # -- spreads --------------------------------------------------------------------
 
@@ -1010,8 +1075,11 @@ class MacroPanel(Panel):
         key = meta.cftc_market if meta is not None else market
         if meta is None and key not in _MARKET_LABELS:
             return  # nothing the positioning panel could show
-        if meta is not None:
-            self.set_symbol(meta.symbol)
+        # every market has a symbol the rest of the app knows: send it, so a
+        # chart in the group follows the click like any other
+        symbol = meta.symbol if meta is not None else market_symbol(key)
+        if symbol:
+            self.set_symbol(symbol)
         from .. import panel as panel_module
 
         hook = panel_module.open_panel_hook
@@ -1021,7 +1089,8 @@ class MacroPanel(Panel):
     def _on_add_market(self) -> None:
         taken = {m for _l, m in self._cftc}
         entries = [e for e in _MARKET_ENTRIES if e.code not in taken]
-        entry = open_add_picker(self, entries, allow_free_text=False, title="Add Market")
+        entry = open_add_picker(self, entries, allow_free_text=False, title="Add Market",
+                                show_codes=False)
         if entry is None or entry.code in taken:
             return
         self.positioning.add_row(entry.code, entry.label)
@@ -1115,6 +1184,7 @@ class MacroPanel(Panel):
             import traceback
 
             traceback.print_exc()
+        self._live = True  # the country is known now: fetch exactly its topics
         self._apply_all()
 
     def _restore(self, s: dict) -> None:
@@ -1123,7 +1193,7 @@ class MacroPanel(Panel):
             self._country = rates_meta.by_code(country).code
         comparisons = s.get("comparisons")
         if isinstance(comparisons, list):
-            self._comparisons = [c for c in comparisons if isinstance(c, str)]
+            self._comparisons = [c for c in CHIPS if c in comparisons]
         gauges = s.get("gauges")
         if isinstance(gauges, list):
             cleaned = []
@@ -1134,7 +1204,8 @@ class MacroPanel(Panel):
                     g = Gauge(r[0], r[1], r[2])
                     if not any((x.kind, x.code) == (g.kind, g.code) for x in cleaned):
                         cleaned.append(g)
-            self._gauges = cleaned
+            # an empty list is a choice; a list of nothing readable is not
+            self._gauges = cleaned if (cleaned or not gauges) else list(DEFAULT_GAUGES)
         elif isinstance(s.get("instruments"), list):
             self._gauges = self._migrate_instruments(s["instruments"])
         # legacy "tenors" is ignored on purpose: the curve comes from its source

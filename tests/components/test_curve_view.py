@@ -372,3 +372,22 @@ def test_set_countries_with_unknown_current_falls_back_to_first(qapp):
         assert v.country_button_text() == "United States"
     finally:
         v.deleteLater()
+
+
+# -- chips before history arrives ----------------------------------------------------
+
+
+def test_chips_wait_unlit_until_history_arrives(view):
+    from aurantium.components.curve_view import MSG_HISTORY_LOADING
+
+    view.set_comparisons(["1M"])
+    view.set_curve(US_NOW, True, "2026-11-05", "U.S. Treasury")
+    QApplication.processEvents()
+    chip = view.chip("1M")
+    assert not chip.isEnabled() and not chip.isChecked()
+    assert chip.toolTip() == MSG_HISTORY_LOADING
+    assert view.comparisons() == ["1M"]       # the choice is kept
+    view.set_history(US_DAYS)
+    assert chip.isEnabled() and chip.isChecked()
+    view.clear_history()                      # a country switch
+    assert not chip.isChecked() and chip.toolTip() == MSG_HISTORY_LOADING

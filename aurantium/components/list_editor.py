@@ -144,8 +144,10 @@ class _AddPickerDialog(QDialog):
         allow_free_text: bool,
         title: str,
         parent=None,
+        show_codes: bool = True,
     ) -> None:
         super().__init__(parent)
+        self._show_codes = show_codes
         self.setWindowTitle(title)
         self.resize(420, 360)
         self._catalog = catalog
@@ -175,7 +177,7 @@ class _AddPickerDialog(QDialog):
         for entry in search_catalog(self._catalog, text, limit=40):
             # a curve point or policy rate has an internal code ("US:10", "*"),
             # not one a user would recognise: its plain name says it all
-            plain = entry.kind in ("curve", "policy")
+            plain = not self._show_codes or entry.kind in ("curve", "policy")
             item = QListWidgetItem(entry.label if plain else f"{entry.label}   ·   {entry.code}")
             item.setToolTip(entry.category if plain else f"{entry.category} — {entry.code}")
             item.setData(Qt.ItemDataRole.UserRole, entry)
@@ -207,9 +209,11 @@ def open_add_picker(
     *,
     allow_free_text: bool = True,
     title: str = "Add…",
+    show_codes: bool = True,
 ) -> Optional[CatalogEntry]:
-    """Run the type-ahead picker modally; the picked entry, or None."""
-    dlg = _AddPickerDialog(catalog, allow_free_text, title, parent)
+    """Run the type-ahead picker modally; the picked entry, or None.
+    ``show_codes=False`` lists entries by plain name only (Macro / Rates)."""
+    dlg = _AddPickerDialog(catalog, allow_free_text, title, parent, show_codes=show_codes)
     if dlg.exec() == QDialog.DialogCode.Accepted:
         return dlg.chosen
     return None

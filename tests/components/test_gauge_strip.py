@@ -402,3 +402,23 @@ def test_note_tone_colours_state_notes(strip):
     assert strip.note_ink(1) == theme.FG_DIM
     strip.set_reading(3, "99", "+0.1", 1, [1, 2], note="x", note_tone="loud")
     assert strip.reading(3).note_tone == ""  # unknown tones fall back to plain
+
+
+# -- clearing and finding a tile ---------------------------------------------------
+
+
+def test_clear_reading_puts_a_tile_back_to_its_skeleton(strip):
+    strip.set_reading(1, "4.22%", "+1bp", 1, [4.1, 4.22])
+    assert not strip.is_loading(1)
+    strip.clear_reading(1)
+    assert strip.is_loading(1)
+    assert strip.reading(1) is None
+    strip.clear_reading(99)  # out of range: ignored
+
+
+def test_reveal_highlights_a_tile_then_lets_go(strip):
+    assert strip.highlighted() == -1
+    strip.reveal(2)
+    assert strip.highlighted() == 2
+    QTest.qWait(strip.REVEAL_HOLD_MS + 100)
+    assert strip.highlighted() == -1

@@ -46,6 +46,7 @@ from PySide6.QtCore import (
     QRectF,
     QSize,
     Qt,
+    QTimer,
     QVariantAnimation,
     Signal,
 )
@@ -182,6 +183,10 @@ def _lerp_rect(a: QRectF, b: QRectF, t: float) -> QRectF:
 
 
 class GaugeStrip(QWidget):
+    #: how long ``reveal`` keeps a tile outlined: long enough to find it,
+    #: not motion (it does not move or fade), so the same with animations off
+    REVEAL_HOLD_MS = 1200
+
     gauge_clicked = Signal(object)    # Gauge
     gauges_changed = Signal(list)     # list[Gauge], after every user edit
     add_requested = Signal()
@@ -236,6 +241,11 @@ class GaugeStrip(QWidget):
         self._anim.valueChanged.connect(self._on_anim_value)
         self._anim.finished.connect(self._settle)
 
+        self._revealed = -1
+        self._reveal_timer = QTimer(self)
+        self._reveal_timer.setSingleShot(True)
+        self._reveal_timer.timeout.connect(self._end_reveal)
+
         # press feedback sinks just the pressed tile (see press.py)
         self.__dict__["press_region"] = self._press_region
 
@@ -279,6 +289,29 @@ class GaugeStrip(QWidget):
         tone = note_tone if note_tone in NOTE_TONES else ""
         self._tiles[index].reading = Reading(str(value), str(change or ""), sign, tuple(clean),
                                               str(note or ""), tone)
+        self.update()
+
+    def clear_reading(self, index: int) -> None:
+        """Put tile ``index`` back to its skeleton: what it showed no longer
+        stands (the panel switched country and the new data is on its way)."""
+        if 0 <= index < len(self._tiles) and self._tiles[index].reading is not None:
+            self._tiles[index].reading = None
+            self.update()
+
+    def reveal(self, index: int) -> None:
+        """Outline tile ``index`` for a moment: "it's already here"."""
+        if not 0 <= index < len(self._tiles):
+            return
+        self._revealed = index
+        self._reveal_timer.start(self.REVEAL_HOLD_MS)
+        self.update()
+
+    def highlighted(self) -> int:
+        """The tile ``reveal`` is outlining, else -1."""
+        return self._revealed
+
+    def _end_reveal(self) -> None:
+        self._revealed = -1
         self.update()
 
     def set_label(self, index: int, text: str) -> None:
@@ -511,6 +544,8 @@ class GaugeStrip(QWidget):
 
     def _after_edit(self, before: dict[int, QRectF], gone: list[_Tile],
                     animate: bool = True) -> None:
+        self._revealed = -1  # the outlined index may now be another tile
+        self._reveal_timer.stop()
         self._relayout()
         if self._hover >= len(self._tiles):
             self._hover = -1
@@ -714,7 +749,8 @@ class GaugeStrip(QWidget):
                     self._paint_placeholder(p, QRectF(target))
                     continue
                 p.setOpacity(t if tile.uid in self._fade_in else 1.0)
-                self._paint_tile(p, tile, self._painted(tile.uid, target), hover=i == self._hover)
+                self._paint_tile(p, tile, self._painted(tile.uid, target), hover=i == self._hover,
+                                 lifted=i == self._revealed)
             p.setOpacity(1.0)
             self._paint_plus(p, self._painted(_PLUS, self._plus), hover=self._hover == -2)
             if self._drag >= 0:

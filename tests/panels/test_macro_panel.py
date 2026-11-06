@@ -476,3 +476,147 @@ def test_no_codes_in_visible_text(make):
     texts.append(p.curve_view.country_button_text())
     bad = [t for t in texts if _CODE.search(t)]
     assert not bad, bad
+
+
+# -- fix round 1 ------------------------------------------------------------------
+
+
+def test_country_switch_never_shows_the_old_countrys_numbers(make):
+    p = make()
+    _feed_us()
+    strip = p.gauge_strip
+    p.curve_view.pick_country("JP")          # nothing published for Japan yet
+    for code in ("*", "*:10", "*:2-10"):
+        i = _index(p, "policy" if code == "*" else "curve", code)
+        if code != "*":                       # BIS carries JP already: that one may read
+            assert strip.is_loading(i), code
+    pol = strip.reading(_index(p, "policy", "*"))
+    assert pol is None or pol.value == "0.50%"
+    us_numbers = {"4.22%", "-9 bp", "-26 bp", "+1bp"}
+    shown = [strip.reading(i) for i in range(len(strip.gauges()))]
+    assert not any(r and r.value in us_numbers for r in shown)
+    assert all(w.value_text() == "…" for w in p.spreads)
+    assert p.curve_view.state() == "loading"
+    assert "U.S. Treasury" not in p.status_text()
+
+
+def test_restore_unreadable_gauges_and_comparisons_fall_back(make):
+    p = make(settings={"gauges": [["quote", 5, "x"], "junk"], "comparisons": ["5Y", "1W"]})
+    s = p.settings()
+    assert [tuple(g) for g in s["gauges"]] == [(g.kind, g.code, g.label) for g in DEFAULT_GAUGES]
+    assert s["comparisons"] == ["1W"]
+
+
+def test_picker_shows_no_codes(make, monkeypatch):
+    from aurantium.components import list_editor
+    from aurantium.panels import macro as macro_mod
+
+    monkeypatch.setenv("FRED_API_KEY", "x")
+    p = make()
+    seen = []
+
+    def fake(parent, catalog, **kw):
+        dlg = list_editor._AddPickerDialog(catalog, kw.get("allow_free_text", True),
+                                           kw.get("title", ""), parent,
+                                           show_codes=kw.get("show_codes", True))
+        for text in ("", "move", "real", "dollar", "gold"):
+            dlg._refresh(text)
+            for i in range(dlg.results.count()):
+                seen.append(dlg.results.item(i).text())
+                seen.append(dlg.results.item(i).toolTip())
+        dlg.deleteLater()
+        return None
+
+    monkeypatch.setattr(macro_mod, "open_add_picker", fake)
+    p.gauge_strip.add_requested.emit()
+    p.positioning.add_requested.emit()
+    assert seen
+    bad = [t for t in seen if _CODE.search(t)]
+    assert not bad, bad
+
+
+@pytest.mark.parametrize("market, symbol", [
+    ("gold", "GC=F"), ("sp500", "ES=F"), ("bitcoin", "BTC-USD"), ("euro_fx", "EURUSD=X"),
+])
+def test_every_positioning_click_broadcasts_a_symbol(make, monkeypatch, market, symbol):
+    monkeypatch.setattr(panel_module, "open_panel_hook", lambda *a: None)
+    p = make()
+    p.positioning.market_clicked.emit(market)
+    assert p.current_symbol == symbol
+
+
+def test_restore_to_another_country_never_asks_for_the_us_curve(svc, qapp):
+    from aurantium.panels.macro import MacroPanel
+
+    asked = []
+    hub = DataHub.instance()
+    real = hub.subscribe
+
+    def spy(owner, topic, *a, **k):
+        asked.append(topic)
+        return real(owner, topic, *a, **k)
+
+    hub.subscribe = spy
+    try:
+        p = MacroPanel()
+        p.build()
+        p.restore({"country": "JP"})
+        p.show()
+        _flush()
+        assert "rates:curve:JP" in asked
+        assert not any(t.endswith(":US") for t in asked), asked
+        q = MacroPanel()
+        q.build()
+        assert not [t for t in asked if t.endswith(":US")]
+        q.show()                               # no restore: the first show subscribes
+        _flush()
+        assert "rates:curve:US" in asked
+    finally:
+        hub.subscribe = real
+        for w in (p, q):
+            w.close()
+            w.deleteLater()
+
+
+def test_panel_unsubscribe_drops_one_topic(make):
+    p = make()
+    assert "cftc:gold" in p._topics
+    p.unsubscribe("cftc:gold")
+    assert "cftc:gold" not in p._topics
+    assert "cftc:gold" not in DataHub.instance().subscribed_topics()
+
+
+def test_adding_a_gauge_already_shown_reveals_it(make, monkeypatch):
+    from aurantium.components.symbol_catalog import CatalogEntry
+    from aurantium.panels import macro as macro_mod
+
+    p = make()
+    before = p.settings()["gauges"]
+    # "US 10Y" on a US panel is the country 10Y tile already on the strip
+    monkeypatch.setattr(macro_mod, "open_add_picker",
+                        lambda *a, **k: CatalogEntry("US 10Y", "US:10", "curve", "Rates"))
+    p.gauge_strip.add_requested.emit()
+    assert p.settings()["gauges"] == before
+    assert p.gauge_strip.highlighted() == _index(p, "curve", "*:10")
+    assert not UndoStack.instance().can_undo()
+
+
+def test_country_entries_add_plainly_named_gauges(make, monkeypatch):
+    from aurantium.panels import macro as macro_mod
+
+    p = make(settings={"gauges": [["quote", "^VIX", "VIX"]]})
+    entry = next(e for e in p._picker_catalog() if e.code == "*:0.25-10")
+    monkeypatch.setattr(macro_mod, "open_add_picker", lambda *a, **k: entry)
+    p.gauge_strip.add_requested.emit()
+    g = p.gauge_strip.gauges()[-1]
+    assert (g.kind, g.code, g.label) == ("curve", "*:0.25-10", "3m10y")
+    tip = p.gauge_strip.tooltip_at(p.gauge_strip.tile_rect(1).center())
+    assert tip.splitlines()[0] == "US 3m10y"
+
+
+def test_policy_note_never_says_zero_bp(make):
+    p = make()
+    flat = {**POLICY, "countries": [{**POLICY["countries"][0], "prev": 4.00}]}
+    _publish("rates:policy", flat)
+    note = p.gauge_strip.reading(_index(p, "policy", "*")).note
+    assert "0bp" not in note

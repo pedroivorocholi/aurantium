@@ -1073,6 +1073,11 @@ class Panel(QWidget):
         self._topics.add(topic)
         self._hub.subscribe(self, topic, callback, on_error or self._show_error)
 
+    def unsubscribe(self, topic: str) -> None:
+        """Drop one topic, leaving the panel's other subscriptions alone."""
+        self._hub.unsubscribe(self, topic)
+        self._topics.discard(topic)
+
     def unsubscribe_all(self) -> None:
         self._hub.unsubscribe_all(self)
         self._topics.clear()

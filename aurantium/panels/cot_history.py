@@ -31,11 +31,12 @@ from ..components.responsive_row import ResponsiveRow
 _RANGES = [("6M", 183), ("1Y", 365), ("All", None)]
 
 #: the financial COT markets the provider serves beside the commodities
-#: (Macro / Rates lists them too, so its clicks must land on them here)
+#: (Macro / Rates lists them too, so its clicks must land on them here). The
+#: symbol is the one the rest of the app quotes them by (Watchlist, FX).
 FINANCIALS: tuple[CommodityMeta, ...] = (
     CommodityMeta("S&P 500 (E-mini)", "ES=F", "sp500", "ES", "CME", "HMUZ", "Financials"),
-    CommodityMeta("Bitcoin", "BTC=F", "bitcoin", "BTC", "CME", MONTH_CODES, "Financials"),
-    CommodityMeta("Euro FX", "6E=F", "euro_fx", "6E", "CME", "HMUZ", "Financials"),
+    CommodityMeta("Bitcoin", "BTC-USD", "bitcoin", "BTC", "CME", MONTH_CODES, "Financials"),
+    CommodityMeta("Euro FX", "EURUSD=X", "euro_fx", "6E", "CME", "HMUZ", "Financials"),
 )
 
 #: other symbols a linked panel may send for a financial market
@@ -47,6 +48,12 @@ _FINANCIAL_ALIASES = {
 
 #: every market with a wired COT series appears in this panel
 _COVERED = tuple(m for m in COMMODITIES if m.cftc_market) + FINANCIALS
+
+
+def market_symbol(market: str) -> Optional[str]:
+    """The symbol a COT market stands for in linked panels, else None."""
+    key = (market or "").strip().lower()
+    return next((m.symbol for m in _COVERED if m.cftc_market == key), None)
 _CATEGORIES = CATEGORIES + ("Financials",)
 
 

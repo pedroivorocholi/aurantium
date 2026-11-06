@@ -250,3 +250,29 @@ def test_edits_animate_when_animations_on(bars, monkeypatch):
     assert not bars.is_animating()
     for i in range(len(bars.markets())):
         assert bars.painted_rect(i) == bars.row_rect(i)
+
+
+# -- narrow widths ------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("width", [180, 260, 320, 420])
+def test_narrow_rows_drop_columns_instead_of_clipping(bars, width):
+    """The range marker goes first, then W/W; nothing is ever painted past the
+    right edge, and the bars' minimum fits a 200px panel."""
+    assert bars.minimumSizeHint().width() <= 180
+    bars.resize(width, bars.height())
+    QApplication.processEvents()
+    for name, (left, w) in bars.columns().items():
+        assert left + w <= width, (name, left, w)
+    shown = set(bars.columns())
+    assert {"label", "bar", "net"} <= shown
+    if "pct" in shown:
+        assert "wow" in shown  # W/W outlives the range marker
+    if "pct" not in shown:
+        assert bars.marker_rect(0).isNull()
+
+
+def test_full_width_keeps_every_column(bars):
+    bars.resize(560, bars.height())
+    QApplication.processEvents()
+    assert set(bars.columns()) == {"label", "bar", "net", "wow", "pct"}

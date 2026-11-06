@@ -77,6 +77,7 @@ STATES = ("curve", "partial", "none", "loading", "error")
 
 MSG_POLICY_ONLY = "Policy rate only — no free yield curve for this country"
 MSG_NO_HISTORY = "This source publishes only the latest curve"
+MSG_HISTORY_LOADING = "History loading…"
 MSG_NO_HISTORY_THAT_FAR = "No history that far back for this source"
 MSG_NO_POINTS = "No curve points published"
 
@@ -211,6 +212,7 @@ class CurveView(QWidget):
         self._citation = ""
         self._ticks: list[tuple[float, str]] = []
         self._days: list = []
+        self._history_known = False  # until set_history: chips wait, unlit
         self._comparisons: list[str] = list(DEFAULT_COMPARISONS)
         self._state = "loading"
         self._message = ""
@@ -398,6 +400,15 @@ class CurveView(QWidget):
     def set_history(self, days) -> None:
         """``[[iso, points], ...]`` oldest → newest, from ``rates:curvehist``."""
         self._days = [[str(d), pts] for d, pts in (days or []) if pts]
+        self._history_known = True
+        self._sync_chips()
+        self._redraw()
+
+    def clear_history(self) -> None:
+        """Forget the history (a country switch): the chips wait, unlit and
+        disabled, until the new country's arrives. The choice is kept."""
+        self._days = []
+        self._history_known = False
         self._sync_chips()
         self._redraw()
 
@@ -647,7 +658,9 @@ class CurveView(QWidget):
 
     def _chip_reason(self, chip: str) -> Optional[str]:
         """Why ``chip`` can't be drawn for this source, else None."""
-        if len(self._days) == 1:
+        if not self._history_known:
+            return MSG_HISTORY_LOADING
+        if len(self._days) <= 1:
             return MSG_NO_HISTORY
         if self._days and self._as_of:
             if comparison_date(self._as_of, chip) < self._days[0][0]:
