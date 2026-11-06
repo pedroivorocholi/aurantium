@@ -8,6 +8,9 @@ behavior — the editor turns a picked entry into a row.
 ``kind``:
   - ``"quote"`` — a Yahoo Finance symbol (feeds ``quote:`` topics)
   - ``"fred"``  — a FRED series id (feeds ``fred:`` topics; needs a key)
+  - ``"curve"`` — a point or spread read off a country's yield curve
+    (``rates:curve:<CC>``): ``"<CC>:<years>"`` for a tenor, ``"<CC>:<short>-<long>"``
+    for a spread. ``*`` as the country means "the panel's current country".
 """
 
 from __future__ import annotations
@@ -15,12 +18,13 @@ from __future__ import annotations
 from typing import NamedTuple, Sequence
 
 from ..commodities_meta import COMMODITIES
+from ..macro_model import tenor_label
 
 
 class CatalogEntry(NamedTuple):
     label: str      # plain-English display name
     code: str       # Yahoo symbol or FRED series id
-    kind: str       # "quote" | "fred"
+    kind: str       # "quote" | "fred" | "curve"
     category: str   # picker group tag ("Rates", "FX", "Metals", …)
     keywords: str = ""  # extra search terms, lowercase
 
@@ -60,6 +64,34 @@ TENOR_ENTRIES: list[CatalogEntry] = [
     CatalogEntry("5Y Treasury Yield", "^FVX", "quote", "Rates", "5 year note"),
     CatalogEntry("10Y Treasury Yield", "^TNX", "quote", "Rates", "10 year note benchmark"),
     CatalogEntry("30Y Treasury Yield", "^TYX", "quote", "Rates", "30 year long bond"),
+]
+
+def _us_tenor(years: float, words: str) -> CatalogEntry:
+    return CatalogEntry(f"US {tenor_label(years)}", f"US:{years:g}", "curve", "Rates",
+                        f"treasury yield us government bond {words}")
+
+
+#: Points and spreads read off the yield curves (``kind="curve"``), named the
+#: way a desk says them. The label never shows a code: "Bund 10Y", not XM:10.
+RATES_ENTRIES: list[CatalogEntry] = [
+    _us_tenor(2, "2 year note short end"),
+    _us_tenor(5, "5 year note belly"),
+    _us_tenor(10, "10 year note benchmark"),
+    _us_tenor(30, "30 year long bond"),
+    CatalogEntry("2s10s spread", "US:2-10", "curve", "Rates",
+                 "treasury yield curve spread slope inversion recession 2 10"),
+    CatalogEntry("3m10y spread", "US:0.25-10", "curve", "Rates",
+                 "treasury yield curve spread bill inversion recession 3 month 10"),
+    CatalogEntry("5s30s spread", "US:5-30", "curve", "Rates",
+                 "treasury yield curve spread long end 5 30"),
+    CatalogEntry("Bund 10Y", "XM:10", "curve", "Rates",
+                 "germany euro area government bond yield sovereign gilt"),
+    CatalogEntry("JGB 10Y", "JP:10", "curve", "Rates",
+                 "japan government bond yield sovereign gilt"),
+    CatalogEntry("Canada 10Y", "CA:10", "curve", "Rates",
+                 "canada government bond yield sovereign gilt"),
+    CatalogEntry("Brazil 10Y", "BR:10", "curve", "Rates",
+                 "brazil tesouro government bond yield sovereign gilt"),
 ]
 
 INDEX_ENTRIES: list[CatalogEntry] = [

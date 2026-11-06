@@ -91,6 +91,9 @@ hiddenimports += [
     "aurantium.components.fmt",
     # Squarified treemap layout behind the Heatmap panel.
     "aurantium.components.treemap",
+    # Macro / Rates gauge strip: painted tiles edited in place (add, replace,
+    # remove, drag to reorder).
+    "aurantium.components.gauge_strip",
     # Pure-maths colour module: OKLab, CVD and contrast. Imported normally by
     # theme.py and several panels, so static analysis should find it — listed
     # anyway, because everything else in this block is.

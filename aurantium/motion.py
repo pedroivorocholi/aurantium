@@ -171,6 +171,11 @@ SKELETON_MAX_MS = 8000
 INDICATOR_IN_MS = 240
 INDICATOR_OUT_MS = 160
 
+#: Gauge-strip tiles gliding to their new slots after a reorder, add or
+#: remove; an added tile fading in and a removed one fading out over the same
+#: beat, so the row settles as one movement.
+TILE_TRAVEL_MS = 180
+
 
 class PacedAnimation(QVariantAnimation):
     """A QVariantAnimation whose clock never jumps more than ``MAX_STEP_MS``.

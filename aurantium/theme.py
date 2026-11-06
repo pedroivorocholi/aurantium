@@ -120,6 +120,12 @@ ICON_PX = 16
 #: as noise, and the treemap's small tiles are exactly where that happens.
 TILE_LABEL_MIN_PX = 22
 
+#: The narrowest a Macro gauge tile gets before the strip wraps onto another
+#: row: room for a five-figure value at FONT_TITLE beside a signed change (a
+#: wider value moves its change up beside the name). Small enough that a
+#: ~420px panel still holds three across; tiles share any width beyond it.
+GAUGE_TILE_MIN_PX = 112
+
 
 # -- palettes --------------------------------------------------------------
 # Dark is the original, byte-for-byte. Light is a clean paper variant that

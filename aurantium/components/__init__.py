@@ -1,5 +1,6 @@
 """Reusable UI building blocks shared across aurantium panels."""
 
+from .gauge_strip import DEFAULT_GAUGES, Gauge, GaugeStrip
 from .list_editor import (
     EditorColumn,
     EditorSection,
@@ -18,6 +19,7 @@ from .symbol_catalog import (
     FRED_ENTRIES,
     FX_ENTRIES,
     INDEX_ENTRIES,
+    RATES_ENTRIES,
     SECTOR_ETF_ENTRIES,
     TENOR_ENTRIES,
     CatalogEntry,
@@ -34,14 +36,18 @@ from .symbol_search import (
 
 __all__ = [
     "CatalogEntry",
+    "DEFAULT_GAUGES",
     "EditorColumn",
     "EditorSection",
     "FRED_ENTRIES",
     "FX_ENTRIES",
+    "Gauge",
+    "GaugeStrip",
     "INDEX_ENTRIES",
     "ListEditorDialog",
     "MarketTable",
     "NumericTableWidgetItem",
+    "RATES_ENTRIES",
     "SECTOR_ETF_ENTRIES",
     "SuggestField",
     "SuggestionEngine",
