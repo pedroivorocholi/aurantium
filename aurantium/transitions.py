@@ -287,7 +287,14 @@ def fade_in_page(bar: QTabBar, index: int) -> None:
     tabs = bar.parentWidget()
     if not isinstance(tabs, QTabWidget) or tabs.tabBar() is not bar:
         return
-    page = tabs.widget(index)
+    fade_in_content(tabs.widget(index))
+
+
+def fade_in_content(page: QWidget | None) -> None:
+    """Fade content that just replaced what was in its place (a tab's page, a
+    panel's new view) up from ``PAGE_IN_FROM``. Opacity only — the content is
+    laid out at its final size from the first frame. Nothing at all with
+    animations off or while the widget is hidden."""
     if page is None or not motion.animations_enabled() or not page.isVisible():
         return
     motion.fade_animation(page)  # make sure the effect exists to seed it

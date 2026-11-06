@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
 )
 from shiboken6 import isValid
 
-from .. import motion
+from ..transitions import fade_in_content
 from ..color import mix_oklab, readable_on
 from ..components import treemap
 from ..components.empty_state import EmptyState
@@ -170,6 +170,19 @@ def _font(family: str, px: int, bold: bool = False) -> QFont:
     return f
 
 
+#: (family, px, bold) -> metrics. Fitting a 40-tile map tries up to five sizes
+#: per tile on every relayout; building a QFontMetrics each time was the cost.
+_METRICS: dict[tuple[str, int, bool], QFontMetrics] = {}
+
+
+def _metrics(family: str, px: int, bold: bool = False) -> QFontMetrics:
+    key = (family, px, bold)
+    fm = _METRICS.get(key)
+    if fm is None:
+        fm = _METRICS[key] = QFontMetrics(_font(family, px, bold))
+    return fm
+
+
 def _ordered(tiles: list[Tile]) -> list[Tile]:
     """Largest first (the layout's quality depends on it); zero-weight loading
     tiles after every sized one, in the order they came."""
@@ -201,8 +214,8 @@ def _label_for(tile: Tile, rect: QRect) -> tuple[int, tuple[str, ...]]:
         for name in names:
             for i, px in enumerate(_LABEL_STEPS):
                 small = _LABEL_STEPS[min(i + 1, len(_LABEL_STEPS) - 1)]
-                top = QFontMetrics(_font(UI_FONT, px, bold=True))
-                low = QFontMetrics(_font(MONO_FONT, small))
+                top = _metrics(UI_FONT, px, bold=True)
+                low = _metrics(MONO_FONT, small)
                 if (
                     max(top.horizontalAdvance(name), low.horizontalAdvance(figure)) <= avail_w
                     and top.height() + low.height() <= avail_h
@@ -210,7 +223,7 @@ def _label_for(tile: Tile, rect: QRect) -> tuple[int, tuple[str, ...]]:
                     return px, (name, figure)
     for name in names:
         for px in _LABEL_STEPS:
-            fm = QFontMetrics(_font(UI_FONT, px, bold=True))
+            fm = _metrics(UI_FONT, px, bold=True)
             if fm.horizontalAdvance(name) <= avail_w and fm.height() <= avail_h:
                 return px, (name,)
     return 0, ()
@@ -228,6 +241,10 @@ class _Map(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setMouseTracking(True)
+        # Focus on click, so a key the map does not handle (Backspace, to go
+        # back) bubbles to this panel rather than going to whatever had focus
+        # before — a Watchlist table deletes its selected rows on Backspace.
+        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumSize(1, 1)
@@ -363,7 +380,8 @@ class _Map(QWidget):
         top = _font(UI_FONT, px, bold=True)
         idx = _LABEL_STEPS.index(px)
         low = _font(MONO_FONT, _LABEL_STEPS[min(idx + 1, len(_LABEL_STEPS) - 1)])
-        fm_top, fm_low = QFontMetrics(top), QFontMetrics(low)
+        fm_top = _metrics(UI_FONT, px, bold=True)
+        fm_low = _metrics(MONO_FONT, _LABEL_STEPS[min(idx + 1, len(_LABEL_STEPS) - 1)])
         block = fm_top.height() + (fm_low.height() if len(lines) > 1 else 0)
         y = body.top() + (body.height() - block) // 2
         p.setPen(QColor(ink))
@@ -532,6 +550,10 @@ class HeatmapPanel(Panel):
         self._custom: list[tuple[str, str]] = []
         self._quotes: dict[str, dict] = {}
         self._screens: dict[str, list] = {}  # screen topic -> its last good rows
+        #: the last rows of the Watchlist/Custom screen. A list edit changes the
+        #: topic, and until the new one lands its symbols keep these caps, so
+        #: the map does not collapse to median-sized tiles and back
+        self._last_mixed_rows: list = []
         self._caps: dict[str, float] = {}
         self._errors: dict[str, str] = {}  # topic -> the provider's message
         self._watchlist: Optional[WatchlistPanel] = None
@@ -571,6 +593,13 @@ class HeatmapPanel(Panel):
         self.legend = _Legend(self)
         self.content_layout.addWidget(self.legend)
 
+        # Data arrives in bursts (eleven sector quotes, a watchlist's worth);
+        # draw once per burst rather than once per payload.
+        self._render_timer = QTimer(self)
+        self._render_timer.setSingleShot(True)
+        self._render_timer.setInterval(0)
+        self._render_timer.timeout.connect(self._render_now)
+
         self._watch_timer = QTimer(self)
         self._watch_timer.setInterval(WATCH_RECHECK_MS)
         self._watch_timer.timeout.connect(self._resolve_watchlist)
@@ -582,6 +611,7 @@ class HeatmapPanel(Panel):
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt override)
         # a closed panel awaiting deleteLater must not redraw or resubscribe
         self._watch_timer.stop()
+        self._render_timer.stop()
         self._set_watchlist(None)
         try:
             PortfolioStore.instance().changed.disconnect(self._on_store_changed)
@@ -663,19 +693,14 @@ class HeatmapPanel(Panel):
             self._fade_in_map()
 
     def _fade_in_map(self) -> None:
-        """The new map rises from ``PAGE_IN_FROM``, as a tab's page does.
-        Opacity only: the tiles are laid out at their final size at once."""
-        if not motion.animations_enabled() or not self.map.isVisible():
-            return
-        motion.fade_animation(self.map)  # make sure the effect exists to seed it
-        self.map._aurantium_fade_effect.setOpacity(
-            min(motion.fade_opacity(self.map), motion.PAGE_IN_FROM)
-        )
-        motion.fade(self.map, 1.0, ms=motion.OVERLAY_MS)
+        """The new map rises from ``PAGE_IN_FROM``, as a tab's page does."""
+        fade_in_content(self.map)
 
     def _on_tile_activated(self, tile: Tile) -> None:
         if self._view == "sectors" and tile.sector_key:
             self.set_view(f"sector:{tile.sector_key}")
+            # Backspace, to come back, must land here
+            self.map.setFocus(Qt.FocusReason.MouseFocusReason)
 
     def keyPressEvent(self, event) -> None:  # noqa: N802 (Qt override)
         if event.key() == Qt.Key.Key_Backspace and self._view.startswith("sector:"):
@@ -765,6 +790,7 @@ class HeatmapPanel(Panel):
                 self._hub.unsubscribe(self, topic)
                 self._topics.discard(topic)
                 self._errors.pop(topic, None)
+                self._screens.pop(topic, None)
             for topic in wanted:
                 if topic not in self._topics:
                     self.subscribe(
@@ -774,7 +800,7 @@ class HeatmapPanel(Panel):
                     )
         finally:
             self._syncing = False
-        self._render()
+        self._render_now()  # a view change draws at once, not a frame later
 
     def _on_data(self, topic: str, data: Any) -> None:
         if not isinstance(data, dict):
@@ -790,6 +816,8 @@ class HeatmapPanel(Panel):
             if not isinstance(rows, list):
                 return
             self._screens[topic] = rows
+            if self._view in ("watchlist", "custom"):
+                self._last_mixed_rows = rows
         self._errors.pop(topic, None)
         if not self._syncing:
             self._render()
@@ -836,7 +864,10 @@ class HeatmapPanel(Panel):
         syms = self._mixed_symbols()
         if not syms:
             return []
-        rows = self._screens.get(symbols_topic(syms)) or []
+        rows = self._screens.get(symbols_topic(syms))
+        if rows is None:
+            wanted = set(syms)
+            rows = [r for r in self._last_mixed_rows if r.get("symbol") in wanted]
         return tiles_mixed(syms, rows, self._quotes)
 
     def _empty_message(self) -> tuple[str, str, bool]:
@@ -845,7 +876,7 @@ class HeatmapPanel(Panel):
         if v == "watchlist":
             w = self._watchlist
             if self.link_group == UNLINKED:
-                return ("No Watchlist — this panel is unlinked",
+                return ("This panel is unlinked",
                         "link it to a group that has a Watchlist", False)
             if w is None or not isValid(w):
                 return (f"No Watchlist in group {self.link_group}",
@@ -861,6 +892,11 @@ class HeatmapPanel(Panel):
         return "", "", True
 
     def _render(self) -> None:
+        """Redraw on the next turn of the event loop; repeat calls fold into one."""
+        self._render_timer.start()
+
+    def _render_now(self) -> None:
+        self._render_timer.stop()
         tiles = self._tiles()
         self._show_note(bool(tiles))
         self.map.set_tiles(tiles)

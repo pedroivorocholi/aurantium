@@ -42,6 +42,12 @@ SECTORS: tuple[tuple[str, str, str], ...] = (
     ("Utilities", "Utilities", "XLU"),
 )
 
+#: sector value -> the name its tile shows when the full one is too long to
+#: fit a mid-size tile (the tooltip and breadcrumb keep the full name)
+SHORT_LABELS: dict[str, str] = {
+    "Communication Services": "Comm Services",
+}
+
 #: alias -> kept symbol; one company listed under two share classes
 SHARE_CLASSES: dict[str, str] = {
     "GOOG": "GOOGL",

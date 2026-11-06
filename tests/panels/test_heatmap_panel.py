@@ -9,6 +9,7 @@ import importlib
 import pytest
 from PySide6.QtCore import QCoreApplication, QEvent, QSettings, Qt
 from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication, QHBoxLayout, QWidget
 from shiboken6 import isValid
 
 from aurantium.datahub import DataHub
@@ -56,8 +57,20 @@ def make(svc, qapp):
     PortfolioStore.reset_instance(None)
 
 
+def _flush():
+    """Let the panel's coalesced redraw (a 0 ms single-shot) run."""
+    QTest.qWait(0)
+    QCoreApplication.processEvents()
+
+
 def _publish(topic, payload):
     DataHub.instance().publish(topic, payload)
+    _flush()
+
+
+def _publish_error(topic, message):
+    DataHub.instance().publish_error(topic, message)
+    _flush()
 
 
 def _quote(pct, price=100.0, **kw):
@@ -69,11 +82,22 @@ def _row(sym, cap, pct=0.5):
             "change_pct": pct, "currency": "USD"}
 
 
+def _tiles(p):
+    _flush()
+    return p.map.tiles()
+
+
 def _syms(p):
-    return [t.symbol for t in p.map.tiles()]
+    return [t.symbol for t in _tiles(p)]
+
+
+def _empty(p):
+    _flush()
+    return p.empty_text()
 
 
 def _centre(p, symbol):
+    _flush()
     return p.map.tile_rect(symbol).center()
 
 
@@ -88,9 +112,9 @@ def test_default_view_is_sectors(make):
         assert f"quote:{etf}" in p._topics
     assert "sectorcap:all" in p._topics
     # skeletons until a reading lands, then coloured
-    assert all(t.loading for t in p.map.tiles())
+    assert all(t.loading for t in _tiles(p))
     _publish("quote:XLK", _quote(1.5))
-    xlk = next(t for t in p.map.tiles() if t.symbol == "XLK")
+    xlk = next(t for t in _tiles(p) if t.symbol == "XLK")
     assert xlk.change_pct == 1.5 and not xlk.loading
     assert p.crumb.text() == "Sectors"
     assert not p.back_btn.isVisibleTo(p)
@@ -131,7 +155,7 @@ def test_double_click_drills_and_back_returns(make):
     assert "quote:XLK" not in p._topics  # the sectors topics were let go
     rows = [_row(f"T{i}", 1e9 * (40 - i)) for i in range(35)]
     _publish("screen:sector:Technology:30", {"rows": rows, "as_of": "x"})
-    assert len(p.map.tiles()) == 30
+    assert len(_tiles(p)) == 30
     QTest.mouseClick(p.back_btn, Qt.MouseButton.LeftButton)
     assert p.view == "sectors"
     assert not p.back_btn.isVisibleTo(p)
@@ -147,14 +171,48 @@ def test_double_click_outside_sectors_does_not_drill(make):
     assert p.view == "index:dow"
 
 
-def test_backspace_goes_back(make):
-    p = make(view="sector:Energy")
-    assert p.back_btn.isVisibleTo(p)
-    QTest.keyClick(p.map, Qt.Key.Key_Backspace)
+def test_backspace_goes_back(make, qapp):
+    """Backspace reaches the map that was clicked, not whatever had focus
+    before: a Watchlist's table deletes its selected rows on Backspace."""
+    host = QWidget()
+    row = QHBoxLayout(host)
+    w = _watchlist("A", ["AAPL", "MSFT", "SPY"])
+    p = make()
+    row.addWidget(w)
+    row.addWidget(p)
+    host.resize(1100, 460)
+    host.show()
+    host.activateWindow()
+    qapp.processEvents()
+    w.table.setFocus()
+    w.table.selectRow(0)
+    qapp.processEvents()
+    assert QApplication.focusWidget() is w.table
+
+    centre = _centre(p, "XLK")
+    QTest.mouseClick(p.map, Qt.MouseButton.LeftButton, pos=centre)
+    QTest.mouseDClick(p.map, Qt.MouseButton.LeftButton, pos=centre)
+    assert p.view == "sector:Technology"
+    assert QApplication.focusWidget() is p.map
+
+    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_Backspace)
     assert p.view == "sectors"
+    assert sorted(w.symbols()) == ["AAPL", "MSFT", "SPY"]  # the Watchlist kept its rows
     # nowhere further back to go: a second Backspace is a no-op, not an error
-    QTest.keyClick(p.map, Qt.Key.Key_Backspace)
+    QTest.keyClick(QApplication.focusWidget(), Qt.Key.Key_Backspace)
     assert p.view == "sectors"
+    assert sorted(w.symbols()) == ["AAPL", "MSFT", "SPY"]
+    row.removeWidget(w)
+    w.setParent(None)
+    w.close()
+    w.deleteLater()
+    host.deleteLater()
+
+
+def test_the_map_takes_focus_on_click(make):
+    # so a key the map ignores bubbles to this panel, never to another one
+    p = make()
+    assert p.map.focusPolicy() == Qt.FocusPolicy.ClickFocus
 
 
 # -- index views ------------------------------------------------------------
@@ -167,7 +225,7 @@ def test_index_view_shows_the_largest_n(make):
     assert topic in p._topics
     rows = [_row(s, 1e9 * (600 - i)) for i, s in enumerate(members[:120])]
     _publish(topic, {"rows": rows, "as_of": "x"})
-    assert len(p.map.tiles()) == n == 40
+    assert len(_tiles(p)) == n == 40
     assert p.crumb.text() == f"{label} · largest {n}"
 
 
@@ -177,7 +235,7 @@ def test_error_keeps_the_last_good_tiles(make):
     topic = symbols_topic(members)
     _publish(topic, {"rows": [_row(s, 1e9) for s in members], "as_of": "x"})
     before = _syms(p)
-    DataHub.instance().publish_error(topic, "Yahoo rate limit — retrying shortly")
+    _publish_error(topic, "Yahoo rate limit — retrying shortly")
     assert _syms(p) == before  # never blank the map
     assert "rate limit" in p.note.text()
     _publish(topic, {"rows": [_row(s, 1e9) for s in members], "as_of": "y"})
@@ -186,8 +244,8 @@ def test_error_keeps_the_last_good_tiles(make):
 
 def test_error_before_any_data_shows_in_the_map(make):
     p = make(view="sector:Energy")
-    DataHub.instance().publish_error("screen:sector:Energy:30", "Yahoo rate limit")
-    assert "Yahoo rate limit" in p.empty_text()
+    _publish_error("screen:sector:Energy:30", "Yahoo rate limit")
+    assert "Yahoo rate limit" in _empty(p)
     assert p.note.text() == ""  # said once, not twice
 
 
@@ -214,7 +272,7 @@ def test_watchlist_view_follows_group(make):
     assert "quote:AAPL" not in p._topics
 
     p.set_link_group("B")  # nothing in B
-    assert p.empty_text() == NO_WATCHLIST.format(g="B")
+    assert _empty(p) == NO_WATCHLIST.format(g="B")
     assert not p._topics
 
     other = _watchlist("B", ["NVDA"])  # opened later: picked up on the recheck
@@ -231,12 +289,30 @@ def test_watchlist_view_follows_group(make):
         x.deleteLater()
 
 
+def test_mixed_tiles_keep_their_size_while_a_new_list_loads(make):
+    """Adding a symbol changes the screen topic; until it publishes, the
+    tiles already on the map keep their market-cap weight instead of all
+    collapsing to the median."""
+    w = _watchlist("A", ["AAPL", "MSFT"])
+    p = make(view="watchlist")
+    _publish(symbols_topic(["AAPL", "MSFT"]),
+             {"rows": [_row("AAPL", 3e12), _row("MSFT", 1e12)], "as_of": "x"})
+    before = {t.symbol: t.weight for t in _tiles(p)}
+    assert before == {"AAPL": 3e12, "MSFT": 1e12}
+    w.restore({"symbols": ["AAPL", "MSFT", "NVDA"]})
+    after = {t.symbol: t.weight for t in _tiles(p)}
+    assert after["AAPL"] == 3e12 and after["MSFT"] == 1e12
+    assert symbols_topic(["AAPL", "MSFT"]) not in p._screens  # pruned with its subscription
+    w.close()
+    w.deleteLater()
+
+
 def test_watchlist_empty_state_text(make):
     p = make(view="watchlist")
-    assert p.map.tiles() == []
-    assert p.empty_text() == NO_WATCHLIST.format(g="A")
+    assert _tiles(p) == []
+    assert _empty(p) == NO_WATCHLIST.format(g="A")
     p.set_link_group(UNLINKED)
-    assert "unlinked" in p.empty_text()
+    assert _empty(p) == "This panel is unlinked — link it to a group that has a Watchlist"
 
 
 def test_watchlist_symbol_outside_the_screener_is_quote_coloured(make):
@@ -244,7 +320,7 @@ def test_watchlist_symbol_outside_the_screener_is_quote_coloured(make):
     p = make(view="watchlist")
     _publish(symbols_topic(["AAPL", "BTC-USD"]), {"rows": [_row("AAPL", 3e12)], "as_of": "x"})
     _publish("quote:BTC-USD", _quote(2.4))
-    btc = next(t for t in p.map.tiles() if t.symbol == "BTC-USD")
+    btc = next(t for t in _tiles(p) if t.symbol == "BTC-USD")
     assert btc.change_pct == 2.4 and not btc.loading
     w.close()
     w.deleteLater()
@@ -261,7 +337,7 @@ def test_portfolio_view_sizes_by_converted_value(make):
     assert {"quote:AAPL", "quote:VOD.L"} <= p._topics
     _publish("quote:AAPL", _quote(1.0, price=200.0))
     _publish("quote:VOD.L", _quote(-0.5, price=80.0, currency="GBp"))
-    tiles = {t.symbol: t for t in p.map.tiles()}
+    tiles = {t.symbol: t for t in _tiles(p)}
     assert tiles["AAPL"].weight == 2000.0 and not tiles["AAPL"].loading
     assert tiles["VOD.L"].loading  # the GBP rate has not landed
     assert not p.map.tile_rect("VOD.L").isEmpty()  # still visible, as a skeleton
@@ -271,13 +347,13 @@ def test_portfolio_view_sizes_by_converted_value(make):
 
 def test_portfolio_empty_state(make):
     p = make(view="portfolio")
-    assert p.empty_text().startswith("No open positions")
+    assert _empty(p).startswith("No open positions")
 
 
 def test_custom_view_starts_empty(make):
     p = make(view="custom")
-    assert p.map.tiles() == []
-    assert p.empty_text().startswith("No tiles yet")
+    assert _tiles(p) == []
+    assert _empty(p).startswith("No tiles yet")
 
 
 # -- painting ---------------------------------------------------------------

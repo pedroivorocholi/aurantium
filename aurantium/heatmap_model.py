@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from .components import fmt
-from .heatmap_universes import SECTORS, SHARE_CLASSES
+from .heatmap_universes import SECTORS, SHARE_CLASSES, SHORT_LABELS
 
 
 @dataclass(frozen=True)
@@ -134,7 +134,7 @@ def tiles_sectors(quotes: dict[str, dict], caps: dict[str, float]) -> list[Tile]
         pct = _num(q.get("change_pct")) if q else None
         cap = caps.get(key) if sized else None
         out.append(Tile(
-            etf, label, float(cap) if sized else 1.0, pct,
+            etf, SHORT_LABELS.get(key, label), float(cap) if sized else 1.0, pct,
             _tooltip(label, etf, q.get("price") if q else None, pct,
                      "Sector cap", fmt.compact(cap)),
             loading=pct is None, sector_key=key,

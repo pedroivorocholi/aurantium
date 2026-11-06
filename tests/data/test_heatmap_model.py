@@ -110,3 +110,14 @@ def test_portfolio_tiles_convert_and_flag_loading():
     assert tiles["AAA"].weight == 15 * 2.0 * 2 and tiles["BBB"].weight == 2 * 10.0 * 2
     assert tiles["CCC"].loading and tiles["CCC"].weight == 0
     assert tiles["DDD"].loading and tiles["DDD"].weight == 0
+
+
+def test_a_long_sector_name_tiles_under_its_short_label():
+    """A mid-size tile should show a name, not fall back to the ETF ticker;
+    the tooltip keeps the full name."""
+    from aurantium.heatmap_model import tiles_sectors
+
+    comm = next(t for t in tiles_sectors({}, {}) if t.symbol == "XLC")
+    assert comm.label == "Comm Services"
+    assert comm.tooltip.startswith("Communication Services (XLC)")
+    assert hu.view_label("Communication Services") == "Communication Services"
