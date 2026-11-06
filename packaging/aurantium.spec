@@ -76,6 +76,8 @@ hiddenimports += [
     "aurantium.heatmap_universes",
     # Heatmap panel tile model (pure). Imported by the panel only.
     "aurantium.heatmap_model",
+    # Macro / Rates curve, spread and positioning maths (pure). Imported by the panel only.
+    "aurantium.macro_model",
 ]
 # Shared UI components (imported by panels) and the onboarding dialog (imported
 # lazily inside app.py). Listed explicitly so the frozen build never misses them.
