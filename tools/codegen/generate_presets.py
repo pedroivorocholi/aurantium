@@ -275,6 +275,7 @@ def build_desk(win, QtAds, app, desk: dict) -> dict:
         dock = win.add_panel(
             panel_id,
             instance_id=instance_id,
+            link_group=DEFAULT_GROUP,  # add_panel no longer links by default
             area=area,
             target_instance=target_instance,
         )

@@ -6,32 +6,50 @@
       "panel_id": "macro",
       "link_group": "A",
       "settings": {
-        "tenors": [
-          [
-            0.25,
-            "3M",
-            "^IRX"
-          ],
-          [
-            5.0,
-            "5Y",
-            "^FVX"
-          ],
-          [
-            10.0,
-            "10Y",
-            "^TNX"
-          ],
-          [
-            30.0,
-            "30Y",
-            "^TYX"
-          ]
+        "country": "US",
+        "comparisons": [
+          "1M"
         ],
-        "instruments": [
+        "gauges": [
           [
-            "Dollar Index",
-            "DX-Y.NYB"
+            "policy",
+            "*",
+            "Policy rate"
+          ],
+          [
+            "curve",
+            "*:10",
+            "10Y"
+          ],
+          [
+            "curve",
+            "*:2-10",
+            "2s10s"
+          ],
+          [
+            "quote",
+            "DX-Y.NYB",
+            "Dollar Index"
+          ],
+          [
+            "quote",
+            "^VIX",
+            "VIX"
+          ],
+          [
+            "quote",
+            "^MOVE",
+            "MOVE"
+          ],
+          [
+            "quote",
+            "CL=F",
+            "WTI"
+          ],
+          [
+            "quote",
+            "GC=F",
+            "Gold"
           ]
         ],
         "cftc": [
@@ -116,7 +134,8 @@
         "annotations": [],
         "annotations_symbol": "^TNX",
         "drawing_color": "#2196f3",
-        "events_lane": true
+        "events_lane": true,
+        "compare": []
       },
       "floating": false
     },
@@ -125,12 +144,14 @@
       "panel_id": "news",
       "link_group": "A",
       "settings": {
+        "source": "linked",
+        "query": "markets",
         "read": []
       },
       "floating": false
     }
   ],
-  "ads_state": "000002b278da8d52414ec33010bcf38a953997a449a1414a5255413d82505b382293ac5a8bc446f6b650c4e3b14308aa1a230e96bdb3e3995969d3d97b53c31eb5114a666c7c11324059aa4ac84dc6d6abc52861b33cbda779b5e7b2c4ea46952fb6b73c18c2061efa8f0cd606755f5b994249e2425ac4b5f3b4af61512b4ead4168f1e56b2d882c7ca7055a0ab5029f4e602729639197333ae2cc357258f1e7d60e8a9dd6e85a0d2fb53a77011e45b541825bdee02f0c45ad0c562e4a90a78113f95f248f5da9e8692b0c297d38353d6e0e5afb64b75cd38060070f4f213ed0e4577102eea4c1776def6eba1fc6e47a02f1e57490e18923f1cd9ca6e9d03fc28ca3690271140e7a05fd86d8b767e3f2b32f9b09dfb0",
+  "ads_state": "000002b278da8d52cb4ec33010bcf3152b732e7989924392aa0aea1184dac2119964d55a2436b2b785223e1e3b8454551dc4c1b277763c332b6d36fb681bd8a33642c99c455721039495aa85dce46cbd5a4c52362bb2079ad77b2e2bac6f55f56a7bcb83216ce171f8c8606d500fb5952995242ea4455cbbc8861a168de2d41984165fbe3582c8c2f75aa0a55027f0e504769272168f7226279cb9460e2bfed2d941b9d31a5dabe59556972ec093a8374870c75b3cc25036ca60eda20445163891ff451ab1ab143d6f8521a50fe7a6a74daff598ec966bf208f6b07f0af189a6982629b893053fb5bdfbe97e19d76104c934f13246e2487c37e7697af48f30517c934212875eaf60d810fb1ed9b8e2e21b91a7dfa2",
   "symbols": {
     "A": "^TNX"
   },
