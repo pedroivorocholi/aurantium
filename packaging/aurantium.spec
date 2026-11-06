@@ -52,6 +52,7 @@ hiddenimports = ["PySide6.QtNetwork"]
 from aurantium.panels import BUILTIN as _PANELS
 
 hiddenimports += [
+    "aurantium.net",
     "aurantium.panels",
     "aurantium.panels._news_common",
     "aurantium.panels._events_lane",

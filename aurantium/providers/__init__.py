@@ -3,6 +3,7 @@ DataHub singleton. Called once from ``__main__.py`` before panels load."""
 
 from __future__ import annotations
 
+from .. import net
 from ..datahub import DataHub, TopicPolicy
 from . import _yf
 from .dayinfo import DayInfoProvider
@@ -18,6 +19,9 @@ def register_all_providers() -> None:
     """Instantiate providers, register them, and set per-topic-pattern
     refresh policies."""
     hub = DataHub.instance()
+
+    # Parse the CA bundle once, not per connection (it holds the GIL ~0.5 s).
+    net.install()
 
     # Enable yfinance's own retry for network blips; 429 backoff/cooldown is
     # handled in the providers via the helpers in ``_yf``.
