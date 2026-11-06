@@ -94,6 +94,8 @@ hiddenimports += [
     # Macro / Rates gauge strip: painted tiles edited in place (add, replace,
     # remove, drag to reorder).
     "aurantium.components.gauge_strip",
+    # Macro / Rates yield curve: comparisons, twist strip, country switch.
+    "aurantium.components.curve_view",
     # Pure-maths colour module: OKLab, CVD and contrast. Imported normally by
     # theme.py and several panels, so static analysis should find it — listed
     # anyway, because everything else in this block is.

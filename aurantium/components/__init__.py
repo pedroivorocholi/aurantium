@@ -1,5 +1,6 @@
 """Reusable UI building blocks shared across aurantium panels."""
 
+from .curve_view import CurveView
 from .gauge_strip import DEFAULT_GAUGES, Gauge, GaugeStrip
 from .list_editor import (
     EditorColumn,
@@ -36,6 +37,7 @@ from .symbol_search import (
 
 __all__ = [
     "CatalogEntry",
+    "CurveView",
     "DEFAULT_GAUGES",
     "EditorColumn",
     "EditorSection",
