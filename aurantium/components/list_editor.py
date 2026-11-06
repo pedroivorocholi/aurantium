@@ -173,8 +173,11 @@ class _AddPickerDialog(QDialog):
     def _refresh(self, text: str) -> None:
         self.results.clear()
         for entry in search_catalog(self._catalog, text, limit=40):
-            item = QListWidgetItem(f"{entry.label}   ·   {entry.code}")
-            item.setToolTip(f"{entry.category} — {entry.code}")
+            # a curve point or policy rate has an internal code ("US:10", "*"),
+            # not one a user would recognise: its plain name says it all
+            plain = entry.kind in ("curve", "policy")
+            item = QListWidgetItem(entry.label if plain else f"{entry.label}   ·   {entry.code}")
+            item.setToolTip(entry.category if plain else f"{entry.category} — {entry.code}")
             item.setData(Qt.ItemDataRole.UserRole, entry)
             self.results.addItem(item)
         free = (text or "").strip()

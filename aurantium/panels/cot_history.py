@@ -3,10 +3,11 @@ of Traders net speculative positioning for one commodity, from the same
 keyless ``cftc:`` topic the Macro/Rates panel uses (the provider ships ~2.3
 years of history in the payload).
 
-Covers every commodity in ``commodities_meta`` that has a COT market, picked
-from the same grouped dropdown as the Futures Curve panel. Picking a market
-drives the panel's link group; a linked symbol that maps to a covered
-commodity switches the chart.
+Covers every commodity in ``commodities_meta`` that has a COT market, plus the
+financial markets the provider also serves (S&P 500 E-mini, Bitcoin, Euro FX),
+picked from the same grouped dropdown as the Futures Curve panel. Picking a
+market drives the panel's link group; a linked symbol that maps to a covered
+market switches the chart.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from PySide6.QtCore import QRectF, Qt
 from PySide6.QtWidgets import QButtonGroup, QHBoxLayout, QLabel, QPushButton
 
 from ..guide import PanelGuide
-from ..commodities_meta import COMMODITIES, CommodityMeta, by_symbol
+from ..commodities_meta import CATEGORIES, COMMODITIES, MONTH_CODES, CommodityMeta, by_symbol
 from ..components import attach_hover, clamp_view
 from ..panel import Panel, register_panel
 from ..theme import ACCENT, BG, FG_DIM, FONT_SM, tick_color
@@ -29,8 +30,33 @@ from ..components.responsive_row import ResponsiveRow
 #: range-button choices: (label, days back; None = everything)
 _RANGES = [("6M", 183), ("1Y", 365), ("All", None)]
 
-#: only commodities with a wired COT market appear in this panel
-_COVERED = tuple(m for m in COMMODITIES if m.cftc_market)
+#: the financial COT markets the provider serves beside the commodities
+#: (Macro / Rates lists them too, so its clicks must land on them here)
+FINANCIALS: tuple[CommodityMeta, ...] = (
+    CommodityMeta("S&P 500 (E-mini)", "ES=F", "sp500", "ES", "CME", "HMUZ", "Financials"),
+    CommodityMeta("Bitcoin", "BTC=F", "bitcoin", "BTC", "CME", MONTH_CODES, "Financials"),
+    CommodityMeta("Euro FX", "6E=F", "euro_fx", "6E", "CME", "HMUZ", "Financials"),
+)
+
+#: other symbols a linked panel may send for a financial market
+_FINANCIAL_ALIASES = {
+    "ES=F": "sp500", "^GSPC": "sp500", "SPY": "sp500",
+    "BTC=F": "bitcoin", "BTC-USD": "bitcoin",
+    "6E=F": "euro_fx", "EURUSD=X": "euro_fx",
+}
+
+#: every market with a wired COT series appears in this panel
+_COVERED = tuple(m for m in COMMODITIES if m.cftc_market) + FINANCIALS
+_CATEGORIES = CATEGORIES + ("Financials",)
+
+
+def _covered_for_symbol(symbol: str) -> Optional[CommodityMeta]:
+    """The covered market a linked symbol stands for, else None."""
+    meta = by_symbol(symbol)
+    if meta is not None and meta.cftc_market:
+        return meta
+    market = _FINANCIAL_ALIASES.get((symbol or "").strip().upper())
+    return next((m for m in FINANCIALS if m.cftc_market == market), None)
 
 
 def _segments_cross(xs: list, ys: list, box) -> bool:
@@ -60,7 +86,9 @@ class CotHistoryPanel(Panel):
     GUIDE = PanelGuide(
         purpose="How large speculators are positioned in one futures market, week by week (CFTC Commitments of Traders).",
         links="Pick a market in the dropdown and linked panels follow; click a "
-        "commodity elsewhere and the chart switches to it.",
+        "commodity (or the S&P 500, Bitcoin, the euro) elsewhere and the chart "
+        "switches to it. Clicking a market in Macro / Rates' positioning list "
+        "opens this panel on it.",
         interactions=(
             "**6M**, **1Y** and **All** set the range; hover for any week's reading.",
             "Above the dashed zero line speculators are net long — positioned for "
@@ -88,7 +116,7 @@ class CotHistoryPanel(Panel):
 
         # -- market selector + range buttons -----------------------------------
         sel_row = ResponsiveRow()
-        self.selector = make_commodity_combo(self, _COVERED)
+        self.selector = make_commodity_combo(self, _COVERED, _CATEGORIES)
         self.selector.currentIndexChanged.connect(self._on_select)
         sel_row.addWidget(self.selector)
         sel_row.addStretch(1)
@@ -313,13 +341,9 @@ class CotHistoryPanel(Panel):
 
     def on_symbol(self, symbol: str) -> None:
         # a linked symbol only switches the chart when it maps to a covered
-        # commodity; anything else is ignored
-        meta = by_symbol(symbol)
-        if (
-            meta is not None
-            and meta.cftc_market
-            and meta.cftc_market != self._meta.cftc_market
-        ):
+        # market; anything else is ignored
+        meta = _covered_for_symbol(symbol)
+        if meta is not None and meta.cftc_market != self._meta.cftc_market:
             self._set_market(meta)
 
     # -- persistence -------------------------------------------------------------

@@ -35,13 +35,13 @@ _LABEL_MIN_PX = 70
 CONTRACT_COUNT = 8
 
 
-def make_commodity_combo(parent, commodities) -> QComboBox:
+def make_commodity_combo(parent, commodities, categories=CATEGORIES) -> QComboBox:
     """A commodity dropdown grouped by category (disabled header items),
     with type-to-search (the list now spans ~26 markets). Data role holds
     the commodity root. Shared by the curve and positioning panels so both
     selectors look identical."""
     combo = QComboBox(parent)
-    for cat in CATEGORIES:
+    for cat in categories:
         in_cat = [m for m in commodities if m.category == cat]
         if not in_cat:
             continue

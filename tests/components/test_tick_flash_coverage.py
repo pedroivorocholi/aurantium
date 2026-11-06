@@ -2,7 +2,7 @@
 
 The tick flash (``MarketTable.flash_cell``) had exactly one caller — the
 watchlist's Last cell. Chg and Chg% beside it, and the quote cells of World
-Indices, FX, Commodities, Macro and Portfolio, recoloured in silence. These
+Indices, FX, Commodities and Portfolio, recoloured in silence. These
 tests feed each panel two quotes and check the cells that moved flashed, the
 ones that did not stayed still, and nothing flashes under reduced motion.
 """
@@ -115,17 +115,3 @@ def test_an_unchanged_refresh_flashes_nothing(qapp, animate):
     p._on_quote(sym, _quote(100.0, 1.0, 1.0))
     p._on_quote(sym, _quote(100.0, 1.0, 1.0))
     assert not p.table._flashes
-
-
-def test_macro_instrument_rows_flash(qapp, animate):
-    from aurantium.panels.macro import MacroPanel
-
-    p = MacroPanel()
-    p.build()
-    target = next(
-        t for t in p._inst_row_of_target if p._inst_items(t) is not None
-    )
-    p._on_inst_quote(target, _quote(100.0, 1.0, 1.0))
-    assert not p.inst_table._flashes
-    p._on_inst_quote(target, _quote(101.0, 2.0, 2.0))
-    assert _flashing(p.inst_table) == {id(i) for i in p._inst_items(target)}
