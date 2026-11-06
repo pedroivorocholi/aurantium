@@ -11,8 +11,9 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtCore import QEvent, QObject, Qt, Signal
 from PySide6.QtGui import QColor
+from shiboken6 import isValid
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
@@ -30,7 +31,7 @@ from ..components import (
     attach_suggestions,
     make_filter_edit,
 )
-from ..panel import NULL_GLYPH, Panel, register_panel
+from ..panel import NULL_GLYPH, UNLINKED, Panel, register_panel
 from ..undo import UndoStack
 from ..theme import apply_tick, LABEL
 from ..components.responsive_row import ResponsiveRow
@@ -84,7 +85,47 @@ class WatchlistPanel(Panel):
         ),
     )
 
+    #: emitted whenever the displayed list changes, and when this panel joins
+    #: or leaves a link group (a following Heatmap must re-resolve then too).
+    symbols_changed = Signal()
+
+    #: live instances in the order they were built; pruned on ``destroyed``.
+    _instances: list["WatchlistPanel"] = []
+
+    @classmethod
+    def _prune(cls) -> None:
+        cls._instances = [w for w in cls._instances if isValid(w)]
+
+    @classmethod
+    def in_group(cls, group: str) -> Optional["WatchlistPanel"]:
+        """The first-opened live Watchlist currently in ``group``, else None.
+
+        The group is read from each instance now, never cached, so a panel
+        moved to another group is found there at once."""
+        if group == UNLINKED:
+            return None
+        for w in cls._instances:
+            if isValid(w) and w.link_group == group:
+                return w
+        return None
+
+    def symbols(self) -> list[str]:
+        """The displayed symbols, top to bottom (follows the user's sort)."""
+        out: list[str] = []
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, COL_SYMBOL)
+            if item is not None:
+                out.append(str(item.text()))
+        return out
+
+    def set_link_group(self, group: str) -> None:
+        super().set_link_group(group)
+        self.symbols_changed.emit()
+
     def build(self) -> None:
+        if self not in WatchlistPanel._instances:
+            WatchlistPanel._instances.append(self)
+            self.destroyed.connect(lambda *_: WatchlistPanel._prune())
         self._symbols: list[str] = list(DEFAULT_SYMBOLS)
         # symbol -> its column-0 item (find current row via table.row(item)) and
         # symbol -> the live-updated value cells. Keyed by item reference, not
@@ -160,6 +201,7 @@ class WatchlistPanel(Panel):
         self.table.apply_filter(self._filter.text())
         for sym in self._symbols:
             self.subscribe(f"quote:{sym}", lambda data, s=sym: self._on_quote(s, data))
+        self.symbols_changed.emit()
 
     def _append_row(self, symbol: str) -> None:
         row = self.table.rowCount()
