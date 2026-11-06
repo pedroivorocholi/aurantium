@@ -85,6 +85,7 @@ class NewsPanel(NewsPanelBase):
         self._linked_symbol = ""
         # Portfolio mode
         self._store = None
+        self._fx = None
         self._news_topic: Optional[str] = None
         self._profile_syms: set[str] = set()
         self._sectors: dict[str, Optional[str]] = {}
@@ -241,17 +242,20 @@ class NewsPanel(NewsPanelBase):
             self._store = PortfolioStore.instance()
             self._store.changed.connect(self._schedule_portfolio)
             # a rate landing or a new preferred currency reweighs the book
-            FxService.instance().changed.connect(self._schedule_portfolio)
+            self._fx = FxService.instance()
+            self._fx.changed.connect(self._schedule_portfolio)
         elif not on and self._store is not None:
             try:
                 self._store.changed.disconnect(self._schedule_portfolio)
             except (RuntimeError, TypeError):
                 pass
-            try:
-                FxService.instance().changed.disconnect(self._schedule_portfolio)
-            except (RuntimeError, TypeError):
-                pass
+            if self._fx is not None:
+                try:
+                    self._fx.changed.disconnect(self._schedule_portfolio)
+                except (RuntimeError, TypeError):
+                    pass
             self._store = None
+            self._fx = None
 
     def _schedule_portfolio(self) -> None:
         self._portfolio_debounce.start()

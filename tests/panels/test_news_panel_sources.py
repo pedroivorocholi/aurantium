@@ -486,3 +486,68 @@ def test_closed_or_switched_panel_ignores_store_changes(store, qapp, monkeypatch
     assert switched._hub.newsp() == []
     switched.close()
     switched.deleteLater()
+
+
+# -- portfolio mode: preferred currency ---------------------------------------
+
+
+def _fx_panel(store, make_panel, svc):
+    """Portfolio-mode panel holding a USD name and a BRL one at a set rate."""
+    from PySide6.QtTest import QTest
+
+    from aurantium.fx import pair_symbol
+
+    pair = pair_symbol("BRL", svc.preferred())
+    svc._live[pair] = 0.2
+    svc._currencies["PETR4.SA"] = "BRL"  # a quote would have said so
+    store.add("AAA", 1, 100.0, "2026-01-02")
+    store.add("PETR4.SA", 100, 1.0, "2026-01-02")
+    p = make_panel()
+    calls = []
+    hub = p._hub
+    orig_sub, orig_unsub = hub.subscribe, hub.unsubscribe
+    hub.subscribe = lambda o, t, *a, **k: (calls.append(("sub", t)), orig_sub(o, t, *a, **k))
+    hub.unsubscribe = lambda o, t: (calls.append(("unsub", t)), orig_unsub(o, t))
+    p.set_source("portfolio")
+    calls[:] = [c for c in calls if c[1].startswith("newsp:")]
+    assert len(calls) == 1 and calls[0][0] == "sub"
+    return p, pair, calls, QTest
+
+
+def test_fx_tick_resubscribes_only_when_weights_move(store, make_panel, svc):
+    p, pair, calls, QTest = _fx_panel(store, make_panel, svc)
+    topic = p._news_topic
+    svc._live[pair] = 0.2001  # 20.01 vs 100: still 0.83 / 0.17
+    svc.changed.emit()
+    QTest.qWait(900)
+    assert p._news_topic == topic and len(calls) == 1
+    svc._live[pair] = 0.5  # 50 vs 100: 0.67 / 0.33
+    svc.changed.emit()
+    QTest.qWait(900)
+    assert p._news_topic != topic
+    assert [c for c in calls[1:] if c[1].startswith("newsp:")] == [
+        ("unsub", topic), ("sub", p._news_topic)]
+
+
+def test_fx_changed_disconnected_after_close(store, make_panel, svc):
+    p, pair, calls, QTest = _fx_panel(store, make_panel, svc)
+    # closeEvent's first act is _watch_store(False); closing for real here
+    # would make the fixture's own close warn about already-gone signals
+    p._watch_store(False)
+    svc._live[pair] = 0.5
+    svc.changed.emit()
+    QTest.qWait(900)
+    assert not p._portfolio_debounce.isActive()
+    assert len(calls) == 1
+
+
+def test_all_unvalued_holds_current_list(store, make_panel, svc):
+    p, pair, calls, QTest = _fx_panel(store, make_panel, svc)
+    topic = p._news_topic
+    p._hub.subs[topic](_portfolio_items())
+    assert _rows(p) == 3
+    svc.value = lambda *a, **k: None  # every rate "still loading"
+    p._rebuild_portfolio()
+    assert p._news_topic == topic and _rows(p) == 3
+    assert p._news_empty_title != "Your portfolio is empty"
+    assert len(calls) == 1
