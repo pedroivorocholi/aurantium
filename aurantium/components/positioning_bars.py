@@ -205,14 +205,21 @@ class PositioningBars(QWidget):
     def set_rows(self, rows: Sequence) -> None:
         """Replace every row with ``(market, label, net, wow, pct)`` tuples
         (or ``PositionRow``s). A market already listed keeps its place in the
-        animation and glides to its new slot."""
+        animation and glides to its new slot.
+
+        The same markets in the same order (a data refresh) only update the
+        figures: a drag or a click under way is left alone."""
+        incoming = [raw if isinstance(raw, PositionRow) else self._coerce(raw) for raw in rows]
+        incoming = [d for d in incoming if d is not None]
+        if [d.market for d in incoming] == self.markets():
+            for row, data in zip(self._rows, incoming):
+                row.data = data
+            self.update()
+            return
         before = self._snapshot()
         pool = list(self._rows)
         fresh: list[_Row] = []
-        for raw in rows:
-            data = raw if isinstance(raw, PositionRow) else self._coerce(raw)
-            if data is None:
-                continue
+        for data in incoming:
             match = next((r for r in pool if r.data.market == data.market), None)
             if match is not None:
                 pool.remove(match)

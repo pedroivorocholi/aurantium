@@ -135,6 +135,29 @@ def test_set_rows_never_emits(bars):
     assert bars.markets()[0] == "copper"
 
 
+def test_fresh_data_keeps_a_click_and_a_drag_under_way(bars):
+    """A refresh (same markets, same order) only updates the figures."""
+    fresher = [(m, label, (net or 0) * 2, wow, pct) for m, label, net, wow, pct in ROWS]
+    clicked = QSignalSpy(bars.market_clicked)
+    QTest.mousePress(bars, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier,
+                     centre(bars, 1))
+    bars.set_rows(fresher)
+    QTest.mouseRelease(bars, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier,
+                       centre(bars, 1))
+    assert clicked.count() == 1 and clicked.at(0)[0] == "crude_oil"
+    assert bars.net_text(1) == "-90.4K"
+
+    changed = QSignalSpy(bars.markets_changed)
+    target = bars.row_rect(4)
+    end = QPoint(target.center().x(), target.bottom() - 2)
+    _drag(bars, centre(bars, 0), end, release=False)
+    bars.set_rows(ROWS)
+    assert bars.is_dragging()
+    QTest.mouseRelease(bars, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, end)
+    assert changed.count() == 1
+    assert bars.markets()[-1] == "gold"
+
+
 def test_plus_requests_add(bars):
     add = QSignalSpy(bars.add_requested)
     changed = QSignalSpy(bars.markets_changed)

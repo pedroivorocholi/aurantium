@@ -141,8 +141,10 @@ def open_linked_panel(window, panel_id: str, link_group: str, settings: dict) ->
     always a panel at the end of it. Only ``window._docks``,
     ``window._unbuilt``, ``window.add_panel`` and ``window.focus_dock`` are
     touched (the tests drive it through a fake with just those)."""
-    panel_id, _alias = PanelRegistry.resolve(panel_id)
-    settings = dict(settings or {})
+    # a retired id opens its replacement: explicit settings win over the
+    # alias defaults, as in add_panel
+    panel_id, alias_settings = PanelRegistry.resolve(panel_id)
+    settings = {**alias_settings, **(settings or {})}
     for instance_id, dock in list(window._docks.items()):
         content = dock.widget()
         if (getattr(content, "panel_id", None) == panel_id
@@ -288,12 +290,7 @@ class MainWindow(QMainWindow):
         from . import guide
 
         guide.open_guide_hook = self.show_guide  # every panel's ? opens here
-        from . import panel as panel_module
-
-        # Macro's positioning bars open the CFTC history in their link group
-        panel_module.open_panel_hook = (
-            lambda pid, group, settings: open_linked_panel(self, pid, group, settings)
-        )
+        self._install_open_panel_hook()
         self._install_panel_maximize()
         self._install_refresh_all()
         self._install_search_shortcut()
@@ -702,16 +699,45 @@ class MainWindow(QMainWindow):
             "Panel maximized — press F11 or Esc to restore.", 4000
         )
 
+    def _install_open_panel_hook(self) -> None:
+        """Let panels open panels (Macro's positioning bars open the CFTC
+        history in their link group). The hook holds the window weakly and is
+        cleared when the window is destroyed — not on close, which
+        close-to-tray ignores — so it never outlives it or keeps it alive."""
+        import weakref
+
+        from . import panel as panel_module
+
+        ref = weakref.ref(self)
+
+        def hook(panel_id: str, link_group: str, settings: dict) -> None:
+            win = ref()
+            if win is not None:
+                open_linked_panel(win, panel_id, link_group, settings)
+
+        def clear(*_args) -> None:
+            if panel_module.open_panel_hook is hook:
+                panel_module.open_panel_hook = None
+
+        panel_module.open_panel_hook = hook
+        self.destroyed.connect(clear)
+
     def focus_dock(self, dock) -> None:
         """Bring ``dock`` to the front: out from behind a maximized panel, as
         the current tab of its area, and its window raised and active."""
-        if self._maximized_instance and self._maximized_instance != dock.objectName():
-            self._exit_maximize()  # it may be one of the panels hidden for it
+        maxed = self._docks.get(self._maximized_instance or "")
+        if (maxed is not None and maxed is not dock
+                and maxed.dockContainer() is dock.dockContainer()):
+            # a maximize hides only its own window's other panels: leave one
+            # in another window (another monitor) alone
+            self._exit_maximize()
         dock.toggleView(True)
         dock.setAsCurrentTab()
         window = dock.window()
         if window.isMinimized():
-            window.showNormal()
+            # un-minimize only: a window minimized while maximized comes back
+            # maximized
+            window.setWindowState(window.windowState() & ~Qt.WindowState.WindowMinimized)
         window.raise_()
         window.activateWindow()
         content = dock.widget()
