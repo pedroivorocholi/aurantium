@@ -191,10 +191,16 @@ def test_custom_edit_is_undoable(make, monkeypatch):
     assert [s for _l, s in _custom(p)] == ["AAPL", "MSFT", "NVDA"]
     assert "quote:MSFT" in p._topics
 
-    # Add tile…, appended at the end
-    monkeypatch.setattr(mod, "open_add_picker",
-                        lambda *a, **k: CatalogEntry("Gold", "GC=F", "quote", "Metals"))
+    # Add tile…, appended at the end; the picker offers the broad catalog
+    offered = {}
+
+    def picker(_parent, catalog, **_k):
+        offered["codes"] = {e.code for e in catalog}
+        return CatalogEntry("Gold", "GC=F", "quote", "Metals")
+
+    monkeypatch.setattr(mod, "open_add_picker", picker)
     _act(_menu(p), "Add tile").trigger()
+    assert {"GC=F", "XLK", "^GSPC"} <= offered["codes"]
     assert _custom(p)[-1] == ["Gold", "GC=F"]
     assert stack.undo() == "Add GC=F to heatmap"
     assert "GC=F" not in [s for _l, s in _custom(p)]

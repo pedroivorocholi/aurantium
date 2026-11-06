@@ -31,7 +31,10 @@ from shiboken6 import isValid
 from ..transitions import fade_in_content
 from ..color import mix_oklab, readable_on
 from ..components import (
+    FX_ENTRIES,
+    INDEX_ENTRIES,
     SECTOR_ETF_ENTRIES,
+    commodity_entries,
     EditorColumn,
     EditorSection,
     open_add_picker,
@@ -1049,8 +1052,14 @@ class HeatmapPanel(Panel):
         self._set_custom([r for r in self._custom if r not in gone],
                          f"Remove {tile_symbol} from heatmap")
 
+    @staticmethod
+    def _tile_catalog() -> list:
+        # the same broad list the other monitor panels offer; tenors stay out
+        # (a yield is not a market-map tile). Any typed symbol works too.
+        return INDEX_ENTRIES + SECTOR_ETF_ENTRIES + commodity_entries() + FX_ENTRIES
+
     def _add_tile(self) -> None:
-        entry = open_add_picker(self, SECTOR_ETF_ENTRIES, title="Add Tile")
+        entry = open_add_picker(self, self._tile_catalog(), title="Add Tile")
         if entry is None:
             return
         added = clean_tiles([[entry.label, entry.code]])
@@ -1073,7 +1082,7 @@ class HeatmapPanel(Panel):
                     [list(r) for r in self._custom],
                     description="One tile per row on the Custom map — any Yahoo "
                     "Finance symbol works.",
-                    catalog=SECTOR_ETF_ENTRIES,
+                    catalog=self._tile_catalog(),
                     presets=[
                         ("All 11 sectors", [[e.label, e.code] for e in SECTOR_ETF_ENTRIES]),
                     ],
