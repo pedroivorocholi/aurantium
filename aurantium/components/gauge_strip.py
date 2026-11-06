@@ -123,6 +123,12 @@ class Reading:
     change_sign: int
     spark: tuple[float, ...]
     note: str = ""
+    note_tone: str = ""  # one of NOTE_TONES
+
+
+#: How a note line is inked: plain, or "down" for a state worth a glance
+#: ("inverted") — the loss colour, the one the change figure already uses.
+NOTE_TONES = ("", "down")
 
 
 class _Tile:
@@ -258,7 +264,7 @@ class GaugeStrip(QWidget):
         return [t.gauge for t in self._tiles]
 
     def set_reading(self, index: int, value: str, change: str, change_sign: int,
-                    spark: Sequence[float], note: str = "") -> None:
+                    spark: Sequence[float], note: str = "", note_tone: str = "") -> None:
         if not 0 <= index < len(self._tiles):
             return
         clean = []
@@ -270,8 +276,9 @@ class GaugeStrip(QWidget):
             if math.isfinite(f):
                 clean.append(f)
         sign = (change_sign > 0) - (change_sign < 0)
+        tone = note_tone if note_tone in NOTE_TONES else ""
         self._tiles[index].reading = Reading(str(value), str(change or ""), sign, tuple(clean),
-                                              str(note or ""))
+                                              str(note or ""), tone)
         self.update()
 
     def set_label(self, index: int, text: str) -> None:
@@ -283,8 +290,13 @@ class GaugeStrip(QWidget):
 
     # -- user edits (each emits gauges_changed) ------------------------------
 
+    # Each edit snapshots first, so a tile lifted mid-drag glides from the
+    # pointer, then ends the drag: its index would otherwise point at
+    # whichever tile now sits in that slot.
+
     def add_gauge(self, gauge: Gauge) -> None:
         before = self._snapshot()
+        self._end_drag()
         self._tiles.append(_Tile(gauge))
         self._after_edit(before, [])
         self._emit_changed()
@@ -293,6 +305,7 @@ class GaugeStrip(QWidget):
         if not 0 <= index < len(self._tiles):
             return
         before = self._snapshot()
+        self._end_drag()
         old = self._tiles[index]
         self._tiles[index] = _Tile(gauge)
         self._after_edit(before, [old])
@@ -302,6 +315,7 @@ class GaugeStrip(QWidget):
         if not 0 <= index < len(self._tiles):
             return
         before = self._snapshot()
+        self._end_drag()
         old = self._tiles.pop(index)
         self._after_edit(before, [old])
         self._emit_changed()
@@ -313,6 +327,7 @@ class GaugeStrip(QWidget):
         if not 0 <= index < n or not 0 <= slot <= n or slot in (index, index + 1):
             return False
         before = self._snapshot()
+        self._end_drag()
         tile = self._tiles.pop(index)
         self._tiles.insert(slot - 1 if slot > index else slot, tile)
         self._after_edit(before, [])
@@ -326,6 +341,11 @@ class GaugeStrip(QWidget):
 
     def reading(self, index: int) -> Optional[Reading]:
         return self._tiles[index].reading if 0 <= index < len(self._tiles) else None
+
+    def note_ink(self, index: int) -> str:
+        """The colour tile ``index``'s note is drawn in."""
+        reading = self.reading(index)
+        return DOWN if reading is not None and reading.note_tone == "down" else FG_DIM
 
     def is_loading(self, index: int) -> bool:
         return 0 <= index < len(self._tiles) and self._tiles[index].reading is None
@@ -555,6 +575,7 @@ class GaugeStrip(QWidget):
         self._drag = -1
         self._slot = -1
         self._press = -1
+        self._hover = -1  # the next move works out what is under the pointer
         self.unsetCursor()
 
     def _cancel_drag(self) -> None:
@@ -626,17 +647,10 @@ class GaugeStrip(QWidget):
             return
         pos = event.position().toPoint()
         if self._drag >= 0:
-            index, slot = self._drag, self._slot
-            before = self._snapshot()
-            self._end_drag()
-            n = len(self._tiles)
-            if 0 <= slot <= n and slot not in (index, index + 1):
-                tile = self._tiles.pop(index)
-                self._tiles.insert(slot - 1 if slot > index else slot, tile)
-                self._after_edit(before, [])
-                self._emit_changed()
-            else:
-                self._after_edit(before, [])  # glide back home
+            # move_gauge ends the drag itself, after noting where the lifted
+            # tile was, so it glides from the pointer into its slot
+            if not self.move_gauge(self._drag, self._slot):
+                self._cancel_drag()  # dropped where it was: glide back home
             return
         pressed, self._press = self._press, -1
         # a click is a press and release on the same tile, so sliding off a
@@ -647,6 +661,16 @@ class GaugeStrip(QWidget):
         elif i >= 0 and i == pressed:
             self.gauge_clicked.emit(self._tiles[i].gauge)
         super().mouseReleaseEvent(event)
+
+    def focusOutEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        # a drag nobody can finish (focus went elsewhere, an Alt+Tab) is put back
+        self._cancel_drag()
+        super().focusOutEvent(event)
+
+    def changeEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        if event.type() == QEvent.Type.ActivationChange and not self.isActiveWindow():
+            self._cancel_drag()
+        super().changeEvent(event)
 
     def keyPressEvent(self, event) -> None:  # noqa: N802 (Qt override)
         if event.key() == Qt.Key.Key_Escape and self._drag >= 0:
@@ -786,7 +810,7 @@ class GaugeStrip(QWidget):
 
         if reading is not None and reading.note:
             p.setFont(self._f_note)
-            p.setPen(QColor(FG_DIM))
+            p.setPen(QColor(DOWN if reading.note_tone == "down" else FG_DIM))
             note = self._fm_note.elidedText(reading.note, Qt.TextElideMode.ElideRight, int(w))
             p.drawText(QRectF(x, spark.bottom() + SPACE_XS, w, self._fm_note.height()),
                        Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, note)

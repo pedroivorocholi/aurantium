@@ -8,9 +8,10 @@ panel restoring or undoing) never does.
 """
 
 import pytest
-from PySide6.QtCore import QPoint, Qt
+from PySide6.QtCore import QEvent, QPoint, Qt
+from PySide6.QtGui import QFocusEvent
 from PySide6.QtTest import QSignalSpy, QTest
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QVBoxLayout, QWidget
 
 from aurantium import motion, theme
 from aurantium.components.gauge_strip import DEFAULT_GAUGES, Gauge, GaugeStrip
@@ -299,3 +300,105 @@ def test_gaps_in_the_history_are_skipped(strip):
     strip.set_reading(4, "17.6", "-0.8", -1, [17.0, None, "n/a", float("nan"), 17.6])
     assert strip.reading(4).spark == (17.0, 17.6)
     assert not strip.grab().isNull()
+
+
+# -- review fixes ------------------------------------------------------------
+
+
+def test_programmatic_edit_mid_drag_ends_the_drag(strip):
+    changed = QSignalSpy(strip.gauges_changed)
+    end = centre(strip, 7)
+    _drag(strip, centre(strip, 4), end, release=False)
+    assert strip.is_dragging()
+    strip.remove_gauge(1)
+    assert not strip.is_dragging()
+    assert changed.count() == 1
+    after = strip.gauges()
+    QTest.mouseRelease(strip, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, end)
+    assert changed.count() == 1  # the stale drop does nothing
+    assert strip.gauges() == after
+
+
+@pytest.mark.parametrize("edit", ["add", "replace"])
+def test_add_or_replace_mid_drag_ends_the_drag(strip, edit):
+    _drag(strip, centre(strip, 4), centre(strip, 7), release=False)
+    if edit == "add":
+        strip.add_gauge(SILVER)
+    else:
+        strip.replace_gauge(0, SILVER)
+    assert not strip.is_dragging()
+
+
+def test_focus_loss_cancels_a_drag(strip):
+    changed = QSignalSpy(strip.gauges_changed)
+    end = centre(strip, 7)
+    _drag(strip, centre(strip, 4), end, release=False)
+    assert strip.is_dragging()
+    QApplication.sendEvent(strip, QFocusEvent(QEvent.Type.FocusOut,
+                                              Qt.FocusReason.ActiveWindowFocusReason))
+    assert not strip.is_dragging()
+    QTest.mouseRelease(strip, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, end)
+    assert changed.count() == 0
+
+
+def test_window_deactivation_cancels_a_drag(strip, monkeypatch):
+    _drag(strip, centre(strip, 4), centre(strip, 7), release=False)
+    # offscreen there is no other window to switch to, so stand in for one
+    monkeypatch.setattr(strip, "isActiveWindow", lambda: False)
+    QApplication.sendEvent(strip, QEvent(QEvent.Type.ActivationChange))
+    assert not strip.is_dragging()
+
+
+def test_drop_resets_hover(strip):
+    QTest.mouseMove(strip, centre(strip, 4))
+    assert strip._hover == 4
+    target = strip.tile_rect(7)
+    _drag(strip, centre(strip, 4), QPoint(target.right() - 4, target.center().y()))
+    assert strip._hover == -1
+
+
+def test_strip_gets_taller_in_a_layout_when_narrow(qapp):
+    host = QWidget()
+    lay = QVBoxLayout(host)
+    lay.setContentsMargins(0, 0, 0, 0)
+    s = GaugeStrip()
+    s.set_gauges(list(DEFAULT_GAUGES))
+    lay.addWidget(s)
+    lay.addStretch(1)
+    host.resize(1100, 600)
+    host.show()
+    QApplication.processEvents()
+    wide = s.height()
+    assert wide == s.heightForWidth(s.width())
+    host.resize(420, 600)
+    QApplication.processEvents()
+    assert s.height() > wide
+    assert s.height() == s.heightForWidth(s.width())
+    host.close()
+    host.deleteLater()
+
+
+def test_deleting_mid_animation_is_safe(qapp, monkeypatch):
+    monkeypatch.setattr(motion, "animations_enabled", lambda: True)
+    s = GaugeStrip()
+    s.set_gauges(list(DEFAULT_GAUGES))
+    s.resize(1100, s.heightForWidth(1100))
+    s.show()
+    QApplication.processEvents()
+    s.remove_gauge(0)
+    assert s.is_animating()
+    s.close()
+    s.deleteLater()
+    QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    QTest.qWait(motion.TILE_TRAVEL_MS + 60)  # the animation's ticks must not reach a dead widget
+
+
+def test_note_tone_colours_state_notes(strip):
+    strip.set_reading(2, "-0.41", "-2bp", -1, [0.1, -0.4], note="inverted", note_tone="down")
+    assert strip.reading(2).note_tone == "down"
+    assert strip.note_ink(2) == theme.DOWN
+    strip.set_reading(1, "4.2", "+1bp", 1, [4.1, 4.2], note="as of Sep")
+    assert strip.reading(1).note_tone == ""
+    assert strip.note_ink(1) == theme.FG_DIM
+    strip.set_reading(3, "99", "+0.1", 1, [1, 2], note="x", note_tone="loud")
+    assert strip.reading(3).note_tone == ""  # unknown tones fall back to plain
