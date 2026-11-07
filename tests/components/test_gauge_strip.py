@@ -652,3 +652,103 @@ def test_expansion_motion_follows_the_animation_setting(strip, monkeypatch):
     QTest.qWait(motion.CARD_GROW_MS + 150)
     assert not strip.is_animating()
     assert strip.card_rect().height() >= theme.GAUGE_CARD_PX
+
+
+def _second_row_tile(strip) -> int:
+    return next(i for i in range(len(strip.gauges())) if strip.tile_rect(i).top() > strip.tile_rect(0).bottom())
+
+
+def test_switching_rows_closes_the_old_card_over_its_last_frame(strip, monkeypatch):
+    strip.resize(420, strip.heightForWidth(420))
+    _settle(strip)
+    lower = _second_row_tile(strip)
+    monkeypatch.setattr(motion, "animations_enabled", lambda: True)
+    strip.expand(0)
+    _settle(strip)
+    old = strip.card_rect()
+    strip.expand(lower)
+    assert strip.is_animating()
+    # the old row's opening is never an empty band: it closes over a still
+    # of the card it held, from where that card was
+    closing = strip.closing_card_rect()
+    assert closing.isValid() and closing.top() == old.top()
+    strip.finish_animation()
+    assert not strip.closing_card_rect().isValid()
+    assert strip.card_rect().top() > strip.tile_rect(lower).bottom()
+    # with animations off the switch is instant, with nothing left closing
+    monkeypatch.setattr(motion, "animations_enabled", lambda: False)
+    strip.expand(0)
+    assert not strip.is_animating() and not strip.closing_card_rect().isValid()
+    assert strip.card_rect().top() > strip.tile_rect(0).bottom()
+
+
+def test_a_reorder_glides_the_open_card_with_its_tile(strip, monkeypatch):
+    strip.resize(420, strip.heightForWidth(420))
+    _settle(strip)
+    monkeypatch.setattr(motion, "animations_enabled", lambda: True)
+    strip.expand(0)
+    _settle(strip)
+    was = strip.painted_card_rect()
+    strip.move_gauge(0, len(strip.gauges()))  # to the last row
+    assert strip.expanded_index() == len(strip.gauges()) - 1
+    target = strip.card_rect()
+    assert target.top() != was.top()
+    # the card starts where it was drawn, not at its new slot …
+    assert strip.painted_card_rect().top() == was.top()
+    strip.finish_animation()
+    # … and lands there with the tiles
+    assert strip.painted_card_rect() == strip.card_rect()
+    monkeypatch.setattr(motion, "animations_enabled", lambda: False)
+    strip.move_gauge(len(strip.gauges()) - 1, 0)
+    assert strip.painted_card_rect() == strip.card_rect()
+    assert strip.card_rect().top() > strip.tile_rect(0).bottom()
+
+
+@pytest.mark.parametrize("animated", [False, True])
+def test_opening_scrolls_the_card_into_view(qapp, monkeypatch, animated):
+    from PySide6.QtWidgets import QScrollArea
+
+    monkeypatch.setattr(motion, "animations_enabled", lambda: animated)
+    area = QScrollArea()
+    area.setWidgetResizable(True)
+    body = QWidget()
+    lay = QVBoxLayout(body)
+    lay.setContentsMargins(0, 0, 0, 0)
+    s = GaugeStrip(body)
+    s.set_gauges(list(DEFAULT_GAUGES))
+    lay.addWidget(s)
+    filler = QWidget(body)
+    filler.setMinimumHeight(600)
+    lay.addWidget(filler)
+    area.setWidget(body)
+    area.resize(420, 360)  # room for a tile and its card, not the whole strip
+    area.show()
+    QApplication.processEvents()
+    last = len(DEFAULT_GAUGES) - 1  # on the bottom row
+    s.expand(last)
+    QTest.qWait(motion.CARD_GROW_MS + 150 if animated else 30)
+    QApplication.processEvents()
+    view = area.viewport()
+    card = s.card_rect()
+    top = s.mapTo(view, s.tile_rect(last).topLeft()).y()
+    bottom = s.mapTo(view, card.bottomLeft()).y()
+    assert card.height() >= theme.GAUGE_CARD_PX
+    assert area.verticalScrollBar().value() > 0  # it had to scroll for it
+    assert 0 <= top and bottom < view.height()
+    area.close()
+    area.deleteLater()
+
+
+def test_close_hint_is_not_offered_over_the_chart(strip):
+    from datetime import date
+
+    from aurantium.components.gauge_card import CLOSE_HINT, GaugeDetail
+
+    strip.expand(4)
+    _settle(strip)
+    card = strip.card()
+    card.set_detail(GaugeDetail(series=((date(2026, 10, 1), 1.0), (date(2026, 11, 1), 2.0))))
+    QApplication.processEvents()
+    assert card.tooltip_at(QPoint(theme.SPACE_SM, theme.SPACE_SM)) == CLOSE_HINT
+    on_chart = card.plot.geometry().center()
+    assert card.tooltip_at(card.plot.parentWidget().mapTo(card, on_chart)) == ""

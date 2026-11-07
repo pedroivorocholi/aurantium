@@ -282,7 +282,8 @@ def _bar_day(t) -> Optional[date]:
 def _range_reasons(days: Sequence[date], unit: str) -> dict[str, str]:
     """Why each range chip can't draw ``days`` (oldest first), keyed by chip:
     the history doesn't reach back that far, or fewer than two readings
-    fall inside it to draw a line between."""
+    fall inside it (from its first day on, as ``_cut`` keeps them) to draw
+    a line between."""
     if not days:
         return {}
     first, last = days[0], days[-1]
@@ -292,7 +293,7 @@ def _range_reasons(days: Sequence[date], unit: str) -> dict[str, str]:
         if first > start + _RANGE_SLACK:
             out[chip] = (f"No {_RANGE_WORDS[chip]} of history: it reaches back "
                          f"only to {_short_date(first.isoformat(), last)}")
-        elif sum(1 for d in days if d > start) < 2:
+        elif sum(1 for d in days if d >= start) < 2:  # the same days _cut keeps
             out[chip] = f"Fewer than two {unit} in the last {_RANGE_WORDS[chip]}"
     return out
 

@@ -753,18 +753,33 @@ def test_high_low_and_source_shown(make):
 
 
 def test_fred_gauge_card_reads_its_releases(make):
-    p = make(settings={"gauges": [["fred", "UNRATE", "Unemployment"]]})
-    points = [[f"{y}-{m:02d}-01", 4.0 + (y - 2022) * 0.1 + m / 100] for y in range(2021, 2027)
-              for m in range(1, 13) if (y, m) <= (2026, 9)]
-    _publish("fred:UNRATE", {"points": points, "title": "x"})
+    p = make(settings={"gauges": [["fred", "GDP", "GDP"]]})
+    # quarterly releases, the last one for July
+    points = [[f"{y}-{m:02d}-01", 20000 + (y - 2021) * 400 + m * 10] for y in range(2021, 2027)
+              for m in (1, 4, 7, 10) if (y, m) <= (2026, 7)]
+    _publish("fred:GDP", {"points": points, "title": "x"})
     strip = p.gauge_strip
     strip.expand(0)
     card = strip.card()
-    assert card.source_text() == "FRED · Sep 2026 release"
-    # monthly releases: one month holds at most one, so 1M can't draw a line
+    assert card.source_text() == "FRED · Jul 2026 release"
+    # a month holds one quarterly release at most: no line to draw
     assert not card.chip("1M").isEnabled()
     assert "release" in card.chip("1M").toolTip().lower()
     assert card.chip("5Y").isEnabled()
     # the remembered 1M falls through to the next range that can draw
     assert card.chip("6M").isChecked()
-    assert len(card.series()) >= 6
+    assert [d.isoformat() for d, _v in card.series()] == ["2026-01-01", "2026-04-01", "2026-07-01"]
+
+
+def test_range_reasons_and_the_cut_agree_on_the_first_day():
+    from aurantium.panels.macro import MacroPanel, _range_reasons
+
+    # 1M before 5 Nov starts on 5 Oct: a reading on that very day counts
+    series = [(date(2026, 10, 5), 4.10), (date(2026, 11, 5), 4.22)]
+    reasons = _range_reasons([d for d, _v in series], "readings")
+    assert "1M" not in reasons
+    detail = MacroPanel._cut(series, reasons, "1M")
+    assert detail.range == "1M" and len(detail.series) == 2
+    # a day earlier and it falls outside both
+    early = [(date(2026, 10, 4), 4.10), (date(2026, 11, 5), 4.22)]
+    assert "1M" in _range_reasons([d for d, _v in early], "readings")

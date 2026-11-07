@@ -60,8 +60,8 @@ from PySide6.QtCore import (
     QVariantAnimation,
     Signal,
 )
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen
-from PySide6.QtWidgets import QApplication, QMenu, QSizePolicy, QToolTip, QWidget
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtWidgets import QApplication, QMenu, QScrollArea, QSizePolicy, QToolTip, QWidget
 
 from .. import motion
 from ..macro_model import tenor_label
@@ -163,6 +163,7 @@ class _Tile:
 
 
 _PLUS = 0  # the + tile's uid in animation snapshots (tile uids start at 1)
+_CARD = -1  # the open card's key in animation snapshots
 
 #: Tile geometry. Gaps match the dense step the rest of the terminal uses.
 _GAP = SPACE_MD
@@ -277,7 +278,12 @@ class GaugeStrip(QWidget):
         self._ranges: dict[tuple[str, str], str] = {}  # this session's chip per gauge
         self._card: Optional[GaugeCard] = None  # made on first open: a chart costs
         self._clip: Optional[QWidget] = None    # the card's window while it grows
-        self._card_geom = QRect()
+        self._card_geom = QRect()        # the card's slot
+        self._openings: dict[int, QRect] = {}  # every opening drawn, by uid
+        #: a card closing under one row while it opens under another: a still
+        #: of what it showed, drawn into the closing opening (no empty band)
+        self._closing: Optional[tuple[int, QPixmap]] = None
+        self._follow = False             # keep the opening card in view
         self._laid_height = -1
 
         # press feedback sinks just the pressed tile (see press.py)
@@ -369,10 +375,15 @@ class GaugeStrip(QWidget):
             return
         card = self._ensure_card()
         before = self._card_uid
+        still = None
+        if (before >= 0 and self._clip.isVisible() and motion.animations_enabled()
+                and self._row_of(before) != self._row_of(tile.uid)):
+            still = card.grab()  # before the card turns to the new gauge
         self._expanded_uid = self._card_uid = tile.uid
+        self._follow = True
         card.set_loading(self.detail_range())
         self._sync_card_heading()
-        self._animate_open(tile.uid, before)
+        self._animate_open(tile.uid, before, still)
         self.expansion_changed.emit(tile.gauge)
 
     def collapse(self) -> None:
@@ -380,6 +391,7 @@ class GaugeStrip(QWidget):
             return
         self._expanded_uid = -1
         self._hand_focus_back()
+        self._follow = False
         self._animate_open(-1, self._card_uid)
         self.expansion_changed.emit(None)
 
@@ -415,9 +427,26 @@ class GaugeStrip(QWidget):
         return self._ensure_card()
 
     def card_rect(self) -> QRect:
-        """Where the card is drawn right now (zero height when closed)."""
+        """The card's slot: where it is (zero height when closed), as far
+        open as it is so far."""
         self._ensure_layout()
         return QRect(self._card_geom)
+
+    def painted_card_rect(self) -> QRect:
+        """Where the card is drawn right now: its slot, unless it is still
+        gliding there with its tile after a reorder."""
+        self._ensure_layout()
+        if self._card_geom.height() <= 0:
+            return QRect()
+        return self._painted(_CARD, self._card_geom).toAlignedRect()
+
+    def closing_card_rect(self) -> QRect:
+        """Where a card switched to another row is still closing (drawn from
+        a still of what it showed), else a null rect."""
+        if self._closing is None:
+            return QRect()
+        r = self._openings.get(self._closing[0])
+        return QRect(r) if r is not None and r.height() > 0 else QRect()
 
     def _ensure_card(self) -> GaugeCard:
         if self._card is None:
@@ -460,18 +489,22 @@ class GaugeStrip(QWidget):
         i = next((k for k, t in enumerate(self._tiles) if t.uid == uid), -1)
         return self._rects[i].top() if 0 <= i < len(self._rects) else -1
 
-    def _animate_open(self, uid: int, before: int) -> None:
+    def _animate_open(self, uid: int, before: int, still: Optional[QPixmap] = None) -> None:
         """Open the card under ``uid``'s row (or close it, ``uid`` -1). A
-        switch between tiles of one row keeps the opening where it is."""
+        switch between tiles of one row keeps the opening where it is; to
+        another row, the old opening closes over a still of the old card
+        while the new one opens, so nothing is left blank."""
         if uid >= 0 and before >= 0 and before != uid and before in self._open:
             if self._row_of(before) == self._row_of(uid):
                 self._open[uid] = self._open.pop(before)
         target = {uid: 1.0} if uid >= 0 else {}
         self._open_anim.stop()
         if not (motion.animations_enabled() and self.isVisible()):
+            self._closing = None
             self._open = dict(target)
             self._settle_open()
             return
+        self._closing = (before, still) if still is not None and before in self._open else None
         self._open_from = dict(self._open)
         self._open_to = target
         self._open_anim.setDuration(motion.CARD_GROW_MS)
@@ -485,6 +518,8 @@ class GaugeStrip(QWidget):
                       for u in keys}
         self._relayout()
         self.update()
+        if self._follow:
+            self._follow_card()
 
     def _settle_open(self) -> None:
         if self._open_anim.state() == QVariantAnimation.State.Running:
@@ -495,8 +530,44 @@ class GaugeStrip(QWidget):
             self._open = {}
             self._card_uid = -1
         self._open_from, self._open_to = {}, {}
+        self._closing = None
         self._relayout()
         self.update()
+        if self._follow:
+            # once the panel's layout has taken the new height
+            self._follow = False
+            QTimer.singleShot(0, self, self._follow_card)
+
+    def _scroll_area(self) -> Optional[QScrollArea]:
+        w = self.parentWidget()
+        while w is not None:
+            if isinstance(w, QScrollArea) and w.widget() is not None and w.widget().isAncestorOf(self):
+                return w
+            w = w.parentWidget()
+        return None
+
+    def _follow_card(self) -> None:
+        """Scroll the nearest scroll area so the open card, and the tile it
+        belongs to, are in view. Called on every frame of the opening, so
+        the view travels with the card; once at the end."""
+        k = self.expanded_index()
+        sa = self._scroll_area()
+        if k < 0 or sa is None or self._card_geom.height() <= 0:
+            return
+        body = sa.widget()
+        if body.layout() is not None:
+            body.layout().activate()
+        self._ensure_layout()
+        top = self.mapTo(body, QPoint(0, self._rects[k].top())).y()
+        bottom = self.mapTo(body, QPoint(0, self._card_geom.bottom())).y()
+        bar = sa.verticalScrollBar()
+        view = sa.viewport().height()
+        v = bar.value()
+        if bottom > v + view - 1:
+            v = bottom - view + 1
+        v = min(v, top)  # the tile itself never scrolls out of the top
+        if v != bar.value():
+            bar.setValue(v)
 
     def _drop_missing_expansion(self) -> None:
         """The open gauge left the strip (a remove, an undo): close at once."""
@@ -506,6 +577,8 @@ class GaugeStrip(QWidget):
         self._open_to = {u: f for u, f in self._open_to.items() if u in uids}
         if self._card_uid >= 0 and self._card_uid not in uids:
             self._card_uid = -1
+        if self._closing is not None and self._closing[0] not in uids:
+            self._closing = None
         if self._expanded_uid >= 0 and self._expanded_uid not in uids:
             self._expanded_uid = -1
             self._hand_focus_back()
@@ -666,9 +739,9 @@ class GaugeStrip(QWidget):
             return GAUGE_CARD_PX
         return max(GAUGE_CARD_PX, self._card.heightForWidth(width))
 
-    def _grid(self, width: int) -> tuple[list[QRect], QRect, int, int, QRect]:
+    def _grid(self, width: int) -> tuple[list[QRect], QRect, int, int, dict[int, QRect]]:
         """Tile rects, the + tile's rect, the row count, the total height and
-        the card's rect at ``width``.
+        every opening's rect (by tile uid) at ``width``.
 
         Columns are as many minimum-width tiles as fit beside a reserved +
         column; the tiles of a row then share the leftover width (up to a
@@ -707,19 +780,20 @@ class GaugeStrip(QWidget):
             plus = QRect(last.right() + 1 + _GAP, last.top(), _PLUS_W, th)
         else:
             plus = QRect(0, 0, _PLUS_W, th)
-        card = QRect()
-        k = next((i for i, t in enumerate(self._tiles) if t.uid == self._card_uid), -1)
-        if k >= 0 and self._open.get(self._card_uid, 0.0) > 0.0:
-            top = tops[k // cols] + th + _GAP
-            card = QRect(0, top, width, round(self._open[self._card_uid] * full))
-        return rects, plus, rows, height, card
+        openings: dict[int, QRect] = {}
+        for i, t in enumerate(self._tiles):
+            f = self._open.get(t.uid, 0.0)
+            if f > 0.0:
+                openings[t.uid] = QRect(0, tops[i // cols] + th + _GAP, width, round(f * full))
+        return rects, plus, rows, height, openings
 
     def _ensure_layout(self) -> None:
         if self._laid_width != self.width() or len(self._rects) != len(self._tiles):
             self._relayout()
 
     def _relayout(self) -> None:
-        self._rects, self._plus, rows, height, self._card_geom = self._grid(self.width())
+        self._rects, self._plus, rows, height, self._openings = self._grid(self.width())
+        self._card_geom = QRect(self._openings.get(self._card_uid, QRect()))
         self._laid_width = self.width()
         self._rows = rows
         if height != self._laid_height:
@@ -734,10 +808,11 @@ class GaugeStrip(QWidget):
         (its chart is laid out once, not on every frame)."""
         if self._clip is None:
             return
-        geom = self._card_geom
-        if geom.height() <= 0 or self._card_uid < 0:
+        if self._card_geom.height() <= 0 or self._card_uid < 0:
             self._clip.hide()
             return
+        # after a reorder the card glides with its tile, like every tile
+        geom = self._painted(_CARD, self._card_geom).toAlignedRect()
         self._clip.setGeometry(geom)
         full = max(geom.height(), self._card_full_h(geom.width()))
         if self._card.size() != QSize(geom.width(), full):
@@ -783,6 +858,8 @@ class GaugeStrip(QWidget):
         self._ensure_layout()
         shot = {t.uid: self._painted(t.uid, r) for t, r in zip(self._tiles, self._rects)}
         shot[_PLUS] = self._painted(_PLUS, self._plus)
+        if self._card_geom.height() > 0:
+            shot[_CARD] = self._painted(_CARD, self._card_geom)
         if self._drag >= 0:
             shot[self._tiles[self._drag].uid] = QRectF(self._lifted_rect())
         return shot
@@ -810,6 +887,7 @@ class GaugeStrip(QWidget):
 
     def _on_anim_value(self, value) -> None:
         self._t = float(value)
+        self._place_card()
         self.update()
 
     def _settle(self) -> None:
@@ -817,6 +895,7 @@ class GaugeStrip(QWidget):
         self._from.clear()
         self._fade_in.clear()
         self._ghosts.clear()
+        self._place_card()
         self.update()
 
     # -- dragging -------------------------------------------------------------------
@@ -998,6 +1077,13 @@ class GaugeStrip(QWidget):
             p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
             p.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
             t = self._t
+            closing = self.closing_card_rect()
+            if closing.isValid():
+                # the old card, closing like a drawer over its last frame
+                pix = self._closing[1]
+                p.drawPixmap(closing.topLeft(), pix,
+                             QRect(0, 0, round(closing.width() * pix.devicePixelRatio()),
+                                   round(closing.height() * pix.devicePixelRatio())))
             for tile, rect in self._ghosts:
                 p.setOpacity(max(0.0, 1.0 - t))
                 self._paint_tile(p, tile, rect, hover=False)
@@ -1051,7 +1137,7 @@ class GaugeStrip(QWidget):
     def _paint_caret(self, p: QPainter) -> None:
         """A small notch on the card's top edge, pointing up at its tile, so
         it reads as that tile opened rather than a new row from nowhere."""
-        card = self._card_geom
+        card = self.painted_card_rect()
         k = next((i for i, t in enumerate(self._tiles) if t.uid == self._card_uid), -1)
         if k < 0 or card.height() <= 0 or k == self._drag:
             return

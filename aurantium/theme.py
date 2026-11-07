@@ -132,6 +132,13 @@ GAUGE_TILE_MIN_PX = 112
 #: only when a narrow panel wraps its chips and footer onto more lines.
 GAUGE_CARD_PX = 224
 
+#: A small chart's furniture (the gauge card's chart): the value axis's
+#: width, wide enough for "4,012.3" in the tick font; the data line's
+#: width; and the diameter of a marked point (the latest value, the hover).
+CHART_AXIS_PX = 52
+CHART_LINE_PX = 1.5
+CHART_DOT_PX = 7
+
 
 # -- palettes --------------------------------------------------------------
 # Dark is the original, byte-for-byte. Light is a clean paper variant that

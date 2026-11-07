@@ -284,3 +284,50 @@ def test_financials_actions_are_buttons_when_wide_menu_when_narrow(qapp):
     copy_btn = next(b for b, a, _m in p._actions._entries if a is p._copy_act)
     assert not copy_btn.isEnabled()
     dock.close()
+
+
+@pytest.mark.parametrize("width", [260, 340])
+def test_an_open_macro_gauge_card_fits_a_narrow_dock(qapp, registry, width):
+    """A Macro gauge opened into its detail card: chips, figures and footer
+    wrap inside the dock; nothing reaches past the card or scrolls sideways."""
+    from datetime import date
+
+    from PySide6.QtWidgets import QScrollArea, QWidget
+
+    from aurantium.components.fit_width import relax_min_widths
+    from aurantium.components.gauge_card import GaugeDetail
+
+    panel = registry.get("macro").cls()
+    panel.build()
+    relax_min_widths(panel)
+    panel.on_symbol = lambda s: None
+    dock = QScrollArea()
+    dock.setWidgetResizable(True)
+    dock.setWidget(panel)
+    dock.resize(width, 600)
+    dock.show()
+    qapp.processEvents()
+    strip = panel.gauge_strip
+    strip.expand(4)
+    series = tuple((date(2026, 10, d), 17.0 + d / 10) for d in range(1, 31))
+    strip.set_reading(4, "4,012.30", "+12.40%", 1, [1.0, 2.0], note="as of 1 Sep 2026")
+    strip.set_detail(GaugeDetail(series=series, fmt=lambda v: f"{v:,.2f}",
+                                 source="U.S. Treasury · 5 Nov 2026", range="1M"))
+    strip.finish_animation()
+    for _ in range(3):
+        qapp.processEvents()
+    card = strip.card()
+    assert dock.horizontalScrollBar().maximum() == 0
+    assert card.width() <= strip.width()
+    assert strip.card_rect().height() >= card.heightForWidth(card.width())
+    clipped = []
+    for w in card.findChildren(QWidget):
+        if not w.isVisibleTo(card) or w.parentWidget() is None:
+            continue
+        r = w.geometry()
+        parent = w.parentWidget()
+        if r.right() > parent.width() or r.bottom() > parent.height():
+            clipped.append(f"{type(w).__name__} {w.objectName()} {r} in {parent.size()}")
+    assert not clipped, clipped
+    dock.close()
+    dock.deleteLater()

@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QStackedWidget,
+    QToolTip,
     QVBoxLayout,
     QWidget,
 )
@@ -47,6 +48,9 @@ from ..theme import (
     BG,
     BG_ALT,
     BORDER_STRONG,
+    CHART_AXIS_PX,
+    CHART_DOT_PX,
+    CHART_LINE_PX,
     DOWN,
     FG_DIM,
     FONT_MD,
@@ -77,10 +81,10 @@ CLOSE_HINT = "Click here or press Esc to close"
 
 #: the chart never gets shorter than this, however the header wraps
 _CHART_MIN_PX = 6 * SPACE_LG + 2 * SPACE_XS
+#: the floor a footer figure keeps before it elides
+_FOOT_MIN_PX = 12 * SPACE_LG
 #: the narrowest dock a panel is laid out for (tests/components/test_fit_width)
 _NARROWEST_PX = 260
-#: px the value axis is given, wide enough for "4,012.3"
-_AXIS_PX = 52
 
 
 def _epoch(d: date) -> int:
@@ -124,13 +128,58 @@ class GaugeDetail:
     min_span: float = 0.0
 
 
+class _FitLabel(QLabel):
+    """A footer figure ("High 4.52% · 5 Nov 2025", the source). Its minimum
+    is its whole text, up to a floor, so a narrow footer puts it on a line
+    of its own rather than cutting it; only a line too narrow for even that
+    shortens it, with an ellipsis."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__("", parent)
+        self._full = ""
+
+    def setText(self, text: str) -> None:  # noqa: N802 (Qt API)
+        self._full = str(text or "")
+        self._fit()
+        self.updateGeometry()
+
+    def full_text(self) -> str:
+        return self._full
+
+    def _natural(self) -> int:
+        m = self.contentsMargins()
+        return self.fontMetrics().horizontalAdvance(self._full) + m.left() + m.right()
+
+    def sizeHint(self) -> QSize:  # noqa: N802 (Qt override)
+        return QSize(self._natural(), super().sizeHint().height())
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802 (Qt override)
+        return QSize(min(self._natural(), _FOOT_MIN_PX), super().minimumSizeHint().height())
+
+    def _fit(self) -> None:
+        shown = self._full
+        if self.width() < self._natural():
+            shown = self.fontMetrics().elidedText(self._full, Qt.TextElideMode.ElideRight,
+                                                  max(1, self.width()))
+        super().setText(shown)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        super().resizeEvent(event)
+        self._fit()
+
+    def changeEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        super().changeEvent(event)
+        if event.type() in (QEvent.Type.FontChange, QEvent.Type.StyleChange):
+            self._fit()
+
+
 def _label(parent: QWidget, px: int, color: str, mono: bool = False, weight: int = 0,
-           shrink: bool = True) -> QLabel:
-    lbl = QLabel("", parent)
+           fit: bool = False) -> QLabel:
+    lbl = _FitLabel(parent) if fit else QLabel("", parent)
     family = MONO_FONT if mono else UI_FONT
     weight_css = f" font-weight: {weight};" if weight else ""
     lbl.setStyleSheet(f'{_CLEAR} color: {color}; font-family: "{family}"; font-size: {px}px;{weight_css}')
-    if shrink:
+    if not fit:
         lbl.setMinimumWidth(1)  # clips, never widens a narrow panel
     # clicks fall through to the card, which closes on them
     lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -144,7 +193,6 @@ class GaugeCard(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
-        self.setToolTip(CLOSE_HINT)
         self._series: tuple[tuple[date, float], ...] = ()
         self._xs: list[int] = []
         self._fmt: Callable[[float], str] = _plain
@@ -187,7 +235,11 @@ class GaugeCard(QWidget):
         self._chip_row = QWidget(self)
         self._chip_row.setObjectName("gaugeCardChips")
         self._chip_row.setStyleSheet(f"QWidget#gaugeCardChips {{ {_CLEAR} }}")
-        chips = QHBoxLayout(self._chip_row)
+        chips = ResponsiveRow(self._chip_row)  # wraps when even they don't fit
+        # never wider than the chips (they stay right-aligned); vertically
+        # Expanding: the heading's row then gives it the height
+        # its wrapped lines need, not one line's
+        self._chip_row.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Expanding)
         chips.setContentsMargins(0, 0, 0, 0)
         chips.setSpacing(SPACE_SM)
         self._group = QButtonGroup(self)
@@ -223,9 +275,9 @@ class GaugeCard(QWidget):
         foot = ResponsiveRow()
         foot.setSpacing(SPACE_LG)
         # kept whole: a narrow card wraps them onto lines of their own
-        self._high = _label(self, FONT_SM, FG_DIM, mono=True, shrink=False)
-        self._low = _label(self, FONT_SM, FG_DIM, mono=True, shrink=False)
-        self._source = _label(self, FONT_SM, FG_DIM, shrink=False)
+        self._high = _label(self, FONT_SM, FG_DIM, mono=True, fit=True)
+        self._low = _label(self, FONT_SM, FG_DIM, mono=True, fit=True)
+        self._source = _label(self, FONT_SM, FG_DIM, fit=True)
         foot.addWidget(self._high)
         foot.addWidget(self._low)
         foot.addStretch(1)
@@ -257,15 +309,16 @@ class GaugeCard(QWidget):
             ax.setPen(pg.mkPen(BORDER_STRONG))
             ax.setTickFont(font)
         left = w.getAxis("left")
-        left.setWidth(_AXIS_PX)
+        left.setWidth(CHART_AXIS_PX)
         left.enableAutoSIPrefix(False)
         left.setStyle(maxTickLevel=0)
         left.setTickDensity(0.8)
 
-        self._line = pg.PlotDataItem(pen=pg.mkPen(LABEL, width=1.5))
+        self._line = pg.PlotDataItem(pen=pg.mkPen(LABEL, width=CHART_LINE_PX))
         self._line.setZValue(10)
         w.addItem(self._line)
-        self._last = pg.ScatterPlotItem(size=7, brush=pg.mkBrush(LABEL), pen=pg.mkPen(BG_ALT, width=1))
+        self._last = pg.ScatterPlotItem(size=CHART_DOT_PX, brush=pg.mkBrush(LABEL),
+                                        pen=pg.mkPen(BG_ALT, width=1))
         self._last.setZValue(11)
         w.addItem(self._last)
         self._guide = pg.InfiniteLine(angle=90, movable=False,
@@ -273,7 +326,8 @@ class GaugeCard(QWidget):
         self._guide.setZValue(20)
         self._guide.setVisible(False)
         w.addItem(self._guide, ignoreBounds=True)
-        self._dot = pg.ScatterPlotItem(size=7, brush=pg.mkBrush(LABEL), pen=pg.mkPen(BG, width=1))
+        self._dot = pg.ScatterPlotItem(size=CHART_DOT_PX, brush=pg.mkBrush(LABEL),
+                                       pen=pg.mkPen(BG, width=1))
         self._dot.setZValue(21)
         w.addItem(self._dot, ignoreBounds=True)
         self._readout = pg.TextItem("", color=LABEL, anchor=(0, 1), fill=pg.mkBrush(BG),
@@ -332,7 +386,6 @@ class GaugeCard(QWidget):
             b.setChecked(name == self._range and why is None)
         self._group.setExclusive(True)
         self._source.setText(detail.source)
-        self._source.setToolTip("Source, and the date it last published")
         self._apply()
 
     # -- reading back (the strip, tests) -------------------------------------------
@@ -362,13 +415,13 @@ class GaugeCard(QWidget):
         return self._change.text()
 
     def high_text(self) -> str:
-        return self._high.text()
+        return self._high.full_text()
 
     def low_text(self) -> str:
-        return self._low.text()
+        return self._low.full_text()
 
     def source_text(self) -> str:
-        return self._source.text()
+        return self._source.full_text()
 
     def hover_text_near(self, day: date) -> str:
         """The readout the chart shows with the pointer over ``day``."""
@@ -410,8 +463,7 @@ class GaugeCard(QWidget):
 
     def mousePressEvent(self, event) -> None:  # noqa: N802 (Qt override)
         pos = event.position().toPoint()
-        on_chart = self._body.geometry().contains(pos) and self._body.currentWidget() is self.plot
-        self._press = None if on_chart else pos
+        self._press = None if self._on_chart(pos) else pos
         event.accept()
 
     def mouseReleaseEvent(self, event) -> None:  # noqa: N802 (Qt override)
@@ -426,7 +478,26 @@ class GaugeCard(QWidget):
                 and event.key() == Qt.Key.Key_Escape and self.isVisible()):
             event.accept()  # ours before a window's Esc shortcut takes it
             return True
+        if event.type() == QEvent.Type.ToolTip:
+            # chips answer for themselves; the rest of the card says how to
+            # close it, except over the chart, where a click does not
+            tip = self.tooltip_at(event.pos())
+            if tip:
+                QToolTip.showText(event.globalPos(), tip, self)
+            else:
+                QToolTip.hideText()
+                event.ignore()
+            return True
         return super().event(event)
+
+    def tooltip_at(self, pos) -> str:
+        """The card's own tooltip at ``pos`` (card coordinates)."""
+        if self._on_chart(pos):
+            return ""
+        return CLOSE_HINT
+
+    def _on_chart(self, pos) -> bool:
+        return self._body.currentWidget() is self.plot and self._body.geometry().contains(pos)
 
     def keyPressEvent(self, event) -> None:  # noqa: N802 (Qt override)
         if event.key() == Qt.Key.Key_Escape:
