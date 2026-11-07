@@ -45,8 +45,9 @@ Live findings (yfinance 1.5.1, 2026-11-05)
   yfinance's ``fast_info.shares``, read directly so a failure raises instead
   of logging an ERROR and passing for "no data"). Counts are cached for a
   day, at most ``MAX_SHARE_LOOKUPS`` are fetched per refresh, and a 429 fails
-  the topic. An equity still without a cap carries ``cap_pending``, so the
-  map shows it waiting rather than dropping it.
+  the topic. An equity still without a cap carries ``cap_pending`` while its
+  lookup is pending (the map shows it waiting) or ``no_size`` once Yahoo has
+  no share count either (an index leaves it out and says so in a footnote).
 * ``yf.Sector(key)`` wants the lower-case hyphenated Yahoo key
   (``technology``, ``consumer-cyclical``); the screener value ``Technology``
   fails. :func:`yahoo_sector_key` maps one to the other.
@@ -203,19 +204,21 @@ class _LookupBudget:
         self.left = n
 
 
-def _shares(sym: str, budget: _LookupBudget) -> Optional[float]:
-    """:func:`_share_count`, cached. ``None`` when unknown: Yahoo has none,
-    the request failed (not cached: retried next refresh), or this fetch's
-    budget is spent. A rate limit raises, so the topic fails calmly."""
+def _shares(sym: str, budget: _LookupBudget) -> tuple[Optional[float], bool]:
+    """``(shares, answered)``: :func:`_share_count`, cached. ``answered`` is
+    True when Yahoo gave a final answer (a count, or "none" -- then
+    ``shares`` is ``None``), False while still unknown: the request failed
+    (not cached: retried next refresh) or this fetch's budget is spent. A
+    rate limit raises, so the topic fails calmly."""
     with _shares_lock:
         lock = _share_locks.setdefault(sym, threading.Lock())
     with lock:  # one lookup per symbol at a time; a second caller reads the cache
         with _shares_lock:
             hit = _SHARES.get(sym)
         if hit and (time.monotonic() - hit[0]) < (SHARES_TTL_S if hit[1] else SHARES_RETRY_S):
-            return hit[1]
+            return hit[1], True
         if budget.left <= 0:
-            return None
+            return None, False
         if RATE_LIMIT_GATE.blocked():
             raise YFRateLimitError()
         budget.left -= 1
@@ -224,21 +227,28 @@ def _shares(sym: str, budget: _LookupBudget) -> Optional[float]:
         except Exception as exc:
             if is_rate_limited(exc):
                 raise
-            return None
+            return None, False
         with _shares_lock:
             _SHARES[sym] = (time.monotonic(), n)
-        return n
+        return n, True
 
 
 def _fill_cap(row: dict, quote_type: Any, budget: _LookupBudget) -> dict:
     """An equity Yahoo gave no cap: price x shares, in the base unit. One
-    still without a cap is marked ``cap_pending``: it waits on the map."""
+    still without a cap is marked ``cap_pending`` while its share count is
+    being looked up (it waits on the map), or ``no_size`` once Yahoo has
+    said it has none (an index leaves it out and says so)."""
     if row.get("market_cap") or quote_type != "EQUITY":
         return row
-    shares = _shares(row["symbol"], budget) if row.get("price") else None
+    if not row.get("price"):
+        row["no_size"] = True
+        return row
+    shares, answered = _shares(row["symbol"], budget)
     if shares:
         _base, factor = normalise_currency(row.get("currency"))
         row["market_cap"] = row["price"] * factor * shares
+    elif answered:
+        row["no_size"] = True
     else:
         row["cap_pending"] = True
     return row

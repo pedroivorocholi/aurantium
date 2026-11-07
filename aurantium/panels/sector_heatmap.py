@@ -51,6 +51,7 @@ from ..heatmap_model import (
     tiles_mixed,
     tiles_portfolio,
     tiles_sectors,
+    unsized_members,
 )
 from ..heatmap_universes import (
     INDEX_REGIONS,
@@ -592,6 +593,9 @@ class HeatmapPanel(Panel):
             "In any other view, right-click and **Show in Custom** to copy the "
             "map's tiles into your Custom list and edit them there.",
             "A dark tile is still loading; a dashed one has no reading.",
+            "An index leaves out a member Yahoo has no size for (it cannot be "
+            "ranked) and names it beside the title; in Custom or Watchlist "
+            "such a symbol is drawn at the median size.",
         ),
         fields=(
             ("Size", "Market cap — sector cap for Sectors, position value in "
@@ -914,8 +918,19 @@ class HeatmapPanel(Panel):
     def _show_note(self, has_tiles: bool) -> None:
         # with no tiles to annotate, the map's own empty state says it instead
         msg = next(reversed(self._errors.values())) if self._errors and has_tiles else ""
-        self.note.setText(f"{WARN_GLYPH} {msg}" if msg else "")
-        self.note.setToolTip(msg)
+        if msg:
+            self.note.setText(f"{WARN_GLYPH} {msg}")
+            self.note.setToolTip(msg)
+            return
+        # an index leaves out members Yahoo has no size for: say which
+        unsized = []
+        if has_tiles and self._view.startswith("index:"):
+            unsized = unsized_members(self._screens.get(index_topic(self._view[6:])) or [])
+        n = len(unsized)
+        self.note.setText(f"{n} member{'s' if n != 1 else ''} without size data" if n else "")
+        self.note.setToolTip(
+            "Left out: Yahoo has no market cap or share count for " + ", ".join(unsized)
+            if n else "")
 
     def _on_store_changed(self) -> None:
         if self._view == "portfolio":

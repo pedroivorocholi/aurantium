@@ -322,10 +322,13 @@ def test_no_share_data_is_cached_but_a_failed_request_is_not(hub, monkeypatch, s
     p = ScreenProvider()
     p._fetch(topic)
     rows = {r["symbol"]: r for r in hub.published[topic]["rows"]}
-    assert rows["BROKEN.L"]["cap_pending"] and rows["NODATA.L"]["cap_pending"]
+    # a failed request is still pending; Yahoo saying "none" is a final answer
+    assert rows["BROKEN.L"]["cap_pending"] and not rows["BROKEN.L"].get("no_size")
+    assert rows["NODATA.L"]["no_size"] and not rows["NODATA.L"].get("cap_pending")
     assert screen._SHARES["NODATA.L"][1] is None and "BROKEN.L" not in screen._SHARES
     p._fetch(topic)
     assert shares.count("BROKEN.L") == 2 and shares.count("NODATA.L") == 1
+    assert {r["symbol"]: r for r in hub.published[topic]["rows"]}["NODATA.L"]["no_size"]
 
 
 def test_one_share_lookup_per_symbol_at_a_time(monkeypatch, shares):
@@ -349,7 +352,7 @@ def test_one_share_lookup_per_symbol_at_a_time(monkeypatch, shares):
     release.set()
     for w in workers:
         w.join(5)
-    assert shares == ["ALV.DE"] and out == [1e9, 1e9]
+    assert shares == ["ALV.DE"] and out == [(1e9, True), (1e9, True)]
 
 
 def test_share_count_reads_the_latest_timeseries_value(monkeypatch):

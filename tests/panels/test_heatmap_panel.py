@@ -504,3 +504,18 @@ def test_international_index_tile_click_sends_the_yahoo_symbol(make):
     QTest.mouseClick(p.map, Qt.MouseButton.LeftButton, pos=_centre(p, biggest))
     assert biggest.endswith(".HK")
     assert SymbolContext.instance().symbol("A") == biggest == p.current_symbol
+
+
+def test_index_footer_names_members_without_size_data(make):
+    p = make(view="index:ibov")
+    members = INDEXES["ibov"][2]
+    rows = [{**_row(s, 1e10 * (100 - i)), "currency": "BRL"} for i, s in enumerate(members[:-1])]
+    rows.append({**_row(members[-1], None), "currency": "BRL", "no_size": True})
+    _publish(index_topic("ibov"), {"rows": rows, "as_of": "x"})
+    assert members[-1] not in _syms(p)
+    assert p.note.text() == "1 member without size data"
+    assert members[-1] in p.note.toolTip()
+    # good sizes for everyone: the footnote goes
+    rows[-1] = {**_row(members[-1], 1e9), "currency": "BRL"}
+    _publish(index_topic("ibov"), {"rows": rows, "as_of": "y"})
+    assert p.note.text() == ""

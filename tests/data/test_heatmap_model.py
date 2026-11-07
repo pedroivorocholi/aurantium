@@ -252,7 +252,7 @@ def test_index_labels_drop_the_exchange_suffix_unless_ambiguous():
     by = {t.symbol: t.label for t in hm.tiles_from_screen(sx5e, 40, short_labels=True)}
     assert by["MC.PA"] == "MC" and by["OR.PA"] == "OR"
     assert by["SAN.PA"] == "SAN.PA" and by["SAN.MC"] == "SAN.MC"  # Sanofi vs Santander
-    assert by["SAP.DE"] == "SAP.DE" and by["ASML.AS"] == "ASML.AS"  # not the main suffix
+    assert by["SAP.DE"] == "SAP" and by["ASML.AS"] == "ASML"  # every exchange's suffix goes
     hk = hm.tiles_from_screen([_cur_row("0700.HK", 4e12, "HKD"), _cur_row("0005.HK", 2e12, "HKD")],
                               40, short_labels=True)
     assert [t.label for t in hk] == ["0700", "0005"]
@@ -265,3 +265,22 @@ def test_index_labels_drop_the_exchange_suffix_unless_ambiguous():
     # off by default: sector screens and Custom lists are untouched
     assert [t.label for t in hm.tiles_from_screen(sx5e, 40)] == [
         t.symbol for t in hm.tiles_from_screen(sx5e, 40)]
+
+
+def test_a_member_without_size_data_is_left_out_of_an_index():
+    rows = [_cur_row("SAP.DE", 2.4e11, "EUR"),
+            {**_cur_row("IGTI11.SA", None, "BRL"), "no_size": True},
+            {**_cur_row("ALV.DE", None, "EUR"), "cap_pending": True}]
+    syms = [t.symbol for t in hm.tiles_from_screen(rows, 40)]
+    assert "IGTI11.SA" not in syms  # cannot be ranked among the largest
+    assert "ALV.DE" in syms  # a lookup still pending waits on the map
+    assert hm.unsized_members(rows) == ["IGTI11.SA"]
+
+
+def test_a_chosen_symbol_without_size_data_shows_at_equal_size():
+    rows = [_cur_row("A.SA", 1e9, "BRL"), _cur_row("B.SA", 3e9, "BRL"),
+            {**_cur_row("IGTI11.SA", None, "BRL", pct=0.4), "no_size": True}]
+    by = {t.symbol: t for t in hm.tiles_mixed(["A.SA", "B.SA", "IGTI11.SA"], rows, {})}
+    t = by["IGTI11.SA"]
+    assert t.weight == 2e9 and not t.loading and t.change_pct == 0.4  # the median
+    assert "Size not available" in t.tooltip

@@ -159,28 +159,30 @@ def _rate_tile(sym: str, weight: float) -> Tile:
 
 
 def _short_labels(tiles: list[Tile]) -> list[Tile]:
-    """Labels without the view's main exchange suffix (``PETR4``, ``0700``),
-    which only eats a small tile's width. A symbol keeps its suffix when it
-    is not the main one (DAX's ``AIR.PA``) or when the bare name would be
-    ambiguous on this map (Euro Stoxx's ``SAN.PA`` Sanofi vs ``SAN.MC``
-    Santander). The tile's symbol, tooltip and link stay the full one."""
-    def split(sym: str) -> tuple[str, str]:
-        stem, dot, suffix = sym.rpartition(".")
-        return (stem, suffix) if dot and stem else (sym, "")
+    """Labels without the exchange suffix (``PETR4``, ``0700``, ``SAP``), which
+    only eats a small tile's width. A symbol keeps its suffix only when the
+    bare name would be ambiguous on this map (Euro Stoxx's ``SAN.PA`` Sanofi
+    vs ``SAN.MC`` Santander). The tile's symbol, tooltip and link stay the
+    full one."""
+    def stem(sym: str) -> str:
+        head, dot, _suffix = sym.rpartition(".")
+        return head if dot and head else sym
 
-    parts = {t.symbol: split(t.symbol) for t in tiles}
-    suffixes = Counter(sfx for _stem, sfx in parts.values() if sfx)
-    if not suffixes:
-        return tiles
-    main = suffixes.most_common(1)[0][0]
-    stems = Counter(stem for stem, _sfx in parts.values())
+    stems = Counter(stem(t.symbol) for t in tiles)
     out = []
     for t in tiles:
-        stem, sfx = parts[t.symbol]
-        if sfx == main and stems[stem] == 1 and t.label == t.symbol:
-            t = replace(t, label=stem)
+        short = stem(t.symbol)
+        if short != t.symbol and stems[short] == 1 and t.label == t.symbol:
+            t = replace(t, label=short)
         out.append(t)
     return out
+
+
+def unsized_members(rows: list[dict]) -> list[str]:
+    """Symbols Yahoo has no size for at all (``no_size``): an index cannot
+    rank them among its largest, so it leaves them out and names them."""
+    return [r["symbol"] for r in rows
+            if r.get("no_size") and r.get("symbol") and not _num(r.get("market_cap"))]
 
 
 def tiles_from_screen(
@@ -193,7 +195,9 @@ def tiles_from_screen(
     market cap are dropped, except an equity whose cap is still being looked
     up (``cap_pending``), which waits; share classes are merged; caps in
     another currency than most are converted (see the module docstring).
-    ``short_labels`` (index views) drops the main exchange suffix."""
+    A member Yahoo has no size for (``no_size``) is left out: see
+    :func:`unsized_members`. ``short_labels`` (index views) drops exchange
+    suffixes."""
     merged = _merge_share_classes(rows)
     caps, waiting = _comparable_caps(merged, merged, convert)
     tiles = [_equity_tile(merged[s], cap) for s, cap in caps.items()]
@@ -231,6 +235,16 @@ def tiles_mixed(
             continue
         q = quotes.get(sym) or quotes.get(want[sym])
         row = merged.get(sym) or {}
+        if row.get("no_size"):  # the user chose it: shown, at the equal size
+            src = q or row
+            pct = _num(src.get("change_pct"))
+            out.append(Tile(
+                sym, sym, median, pct,
+                _tooltip(src.get("name"), sym, src.get("price"), pct,
+                         "Size not available:", "drawn at the median size"),
+                loading=pct is None,
+            ))
+            continue
         if q is None and not row:
             out.append(Tile(sym, sym, median, None, f"{sym}\nLoading", loading=True))
             continue
