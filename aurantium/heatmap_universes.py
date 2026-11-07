@@ -225,7 +225,7 @@ _TSX60: tuple[str, ...] = (
     "BIP-UN.TO", "CAE.TO", "CCO.TO", "CM.TO", "CNR.TO", "CNQ.TO", "CP.TO", "CTC-A.TO",
     "CCL-B.TO", "CLS.TO", "CVE.TO", "GIB-A.TO", "CSU.TO", "DOL.TO", "EMA.TO", "ENB.TO",
     "FFH.TO", "FM.TO", "FSV.TO", "FTS.TO", "FNV.TO", "WN.TO", "GIL.TO", "H.TO",
-    "IMO.TO", "IFC.TO", "K.TO", "L.TO", "MG.TO", "MFC.TO", "MRU.TO", "NTR.TO",
+    "IMO.TO", "IFC.TO", "K.TO", "L.TO", "MG.TO", "MFC.TO", "MRU.TO", "NA.TO", "NTR.TO",
     "OTEX.TO", "PPL.TO", "POW.TO", "QSR.TO", "RCI-B.TO", "RY.TO", "SAP.TO", "SHOP.TO",
     "SLF.TO", "SU.TO", "TRP.TO", "TECK-B.TO", "T.TO", "TRI.TO", "TD.TO", "TOU.TO",
     "WCN.TO", "WPM.TO", "WSP.TO",

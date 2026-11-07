@@ -35,9 +35,11 @@ def test_share_classes_merge():
     assert tiles["GOOGL"].weight == 2e12  # whole-company cap on each class: max, not sum
     assert tiles["GOOGL"].change_pct == 1.0
     assert "Market cap 2.0T" in tiles["GOOGL"].tooltip and "Price 100.00" in tiles["GOOGL"].tooltip
-    # an alias with no kept symbol present is shown under the kept symbol
+    # an alias with no kept symbol present is its own tile: a Brazilian ON
+    # share (PETR3) trades at another price than the PN one, so it must not
+    # be shown or linked as PETR4
     only = hm.tiles_from_screen([_row("GOOG", 1e12)], 10)
-    assert [t.symbol for t in only] == ["GOOGL"]
+    assert [t.symbol for t in only] == ["GOOG"]
 
 
 def test_missing_members_are_skipped():
@@ -74,8 +76,28 @@ def test_mixed_missing_equity_uses_quote():
 
 def test_mixed_alias_without_row_uses_its_own_quote():
     tiles = hm.tiles_mixed(["GOOG"], [], {"GOOG": _quote("GOOG", 1.7)})
-    assert [t.symbol for t in tiles] == ["GOOGL"]
+    assert [t.symbol for t in tiles] == ["GOOG"]
     assert not tiles[0].loading and tiles[0].change_pct == 1.7
+
+
+def test_a_lone_brazilian_share_class_keeps_its_own_symbol():
+    rows = [_row("PETR3.SA", 6.6e11)]
+    assert [t.symbol for t in hm.tiles_mixed(["PETR3.SA"], rows, {})] == ["PETR3.SA"]
+    both = hm.tiles_mixed(["PETR3.SA", "PETR4.SA"],
+                          rows + [_row("PETR4.SA", 6.2e11)], {})
+    assert [t.symbol for t in both] == ["PETR4.SA"]
+    assert hm.fold_share_classes(["PETR3.SA"]) == {"PETR3.SA": "PETR3.SA"}
+    assert hm.fold_share_classes(["PETR3.SA", "PETR4.SA"]) == {"PETR4.SA": "PETR3.SA"}
+
+
+def test_ibovespa_share_classes_take_the_max_cap_not_the_sum():
+    rows = [_row("PETR3.SA", 6.6e11, pct=-1.0), _row("PETR4.SA", 6.2e11, pct=-1.3),
+            _row("BBDC3.SA", 1.46e11), _row("BBDC4.SA", 1.59e11), _row("VALE3.SA", 3e11)]
+    by = {t.symbol: t for t in hm.tiles_from_screen(rows, 40)}
+    assert set(by) == {"PETR4.SA", "BBDC4.SA", "VALE3.SA"}
+    assert by["PETR4.SA"].weight == 6.6e11  # Yahoo puts the whole company on each class
+    assert by["PETR4.SA"].change_pct == -1.3  # the kept class's own move
+    assert by["BBDC4.SA"].weight == 1.59e11
 
 
 def test_sectors_equal_until_caps_arrive():
@@ -134,7 +156,7 @@ _INTERNATIONAL = {
     "sx5e": ((50, 50), (".DE", ".PA", ".AS", ".MI", ".MC", ".BR", ".HE", ".IR")),
     "n225": ((225, 225), (".T",)),
     "hsi": ((70, 105), (".HK",)),
-    "tsx60": ((55, 62), (".TO",)),
+    "tsx60": ((60, 60), (".TO",)),
 }
 
 
@@ -198,3 +220,48 @@ def test_mixed_currency_caps_are_converted_before_layout():
     tiles = hm.tiles_from_screen(ftse, 40, convert)
     assert [t.symbol for t in tiles] == ["X.L", "Y.L", "Z.L"]
     assert tiles[1].weight == 1.1e9 * 0.8 and set(seen) == {("USD", "GBP")}
+
+
+def test_a_pending_cap_waits_on_the_map_instead_of_vanishing():
+    rows = [_cur_row("SAP.DE", 2.4e11, "EUR"), _cur_row("SIE.DE", 2e11, "EUR"),
+            {**_cur_row("ALV.DE", None, "EUR"), "cap_pending": True}]
+    by = {t.symbol: t for t in hm.tiles_from_screen(rows, 40)}
+    assert by["ALV.DE"].loading and by["ALV.DE"].weight == 2.2e11  # the median
+    # in a Custom list too: waiting, not a quote-coloured stand-in
+    tiles = hm.tiles_mixed(["SAP.DE", "ALV.DE"], rows, {"ALV.DE": _quote("ALV.DE", 1.0)})
+    assert tiles[1].loading and tiles[1].change_pct is None
+    # an ordinary capless row (a sector screen's fund) is still dropped
+    assert "SPY" not in {t.symbol for t in hm.tiles_from_screen(
+        rows + [_cur_row("SPY", None, "USD")], 40)}
+
+
+def test_a_cap_of_unknown_currency_waits_in_a_mixed_view():
+    rows = [_cur_row("X.L", 1e9, "GBp"), _cur_row("Y.L", 2e9, "GBp"),
+            _cur_row("Z.L", 3e9, "USD"), _cur_row("Q.L", 5e9, None)]
+    by = {t.symbol: t for t in hm.tiles_from_screen(rows, 40, lambda c, d, v: v)}
+    assert by["Q.L"].loading  # shown, waiting, never sized in a guessed unit
+    by = {t.symbol: t for t in hm.tiles_mixed(["X.L", "Z.L", "Q.L"], rows, {},
+                                              lambda c, d, v: v)}
+    assert by["Q.L"].loading
+
+
+def test_index_labels_drop_the_exchange_suffix_unless_ambiguous():
+    sx5e = [_cur_row("SAN.PA", 1e11, "EUR"), _cur_row("SAN.MC", 1.2e11, "EUR"),
+            _cur_row("MC.PA", 3e11, "EUR"), _cur_row("OR.PA", 2e11, "EUR"),
+            _cur_row("SAP.DE", 2.5e11, "EUR"), _cur_row("ASML.AS", 5e11, "EUR")]
+    by = {t.symbol: t.label for t in hm.tiles_from_screen(sx5e, 40, short_labels=True)}
+    assert by["MC.PA"] == "MC" and by["OR.PA"] == "OR"
+    assert by["SAN.PA"] == "SAN.PA" and by["SAN.MC"] == "SAN.MC"  # Sanofi vs Santander
+    assert by["SAP.DE"] == "SAP.DE" and by["ASML.AS"] == "ASML.AS"  # not the main suffix
+    hk = hm.tiles_from_screen([_cur_row("0700.HK", 4e12, "HKD"), _cur_row("0005.HK", 2e12, "HKD")],
+                              40, short_labels=True)
+    assert [t.label for t in hk] == ["0700", "0005"]
+    assert [t.symbol for t in hk] == ["0700.HK", "0005.HK"]  # linking keeps Yahoo's symbol
+    assert "(0700.HK)" in hk[0].tooltip or "0700.HK" in hk[0].tooltip
+    # a bare US ticker that matches a stripped label keeps the suffix on
+    mixed = hm.tiles_from_screen([_cur_row("AIR.PA", 1e11, "EUR"), _cur_row("BN.PA", 5e10, "EUR"),
+                                  _cur_row("AIR", 1e10, "EUR")], 40, short_labels=True)
+    assert {t.symbol: t.label for t in mixed}["AIR.PA"] == "AIR.PA"
+    # off by default: sector screens and Custom lists are untouched
+    assert [t.label for t in hm.tiles_from_screen(sx5e, 40)] == [
+        t.symbol for t in hm.tiles_from_screen(sx5e, 40)]

@@ -79,12 +79,14 @@ def fetch_members(page: str, map_symbol=normalise, cols=_SYMBOL_COLS,
     html = _get(f"https://{host}.wikipedia.org/wiki/{page}").decode("utf-8")
     best: list[str] = []
     every: list[str] = []
-    for table in pd.read_html(io.StringIO(html)):
+    # keep_default_na=False: pandas otherwise reads the ticker "NA" (National
+    # Bank of Canada) as a missing value and the row silently disappears
+    for table in pd.read_html(io.StringIO(html), keep_default_na=False):
         names = {str(c).strip().lower(): c for c in table.columns}
         col = next((names[c.lower()] for c in cols if c.lower() in names), None)
         if col is None:
             continue
-        syms = [map_symbol(s) for s in table[col].dropna()]
+        syms = [map_symbol(s) for s in table[col] if str(s).strip()]
         syms = [s for s in syms if s]
         every += syms
         if len(syms) > len(best):
@@ -132,7 +134,7 @@ SOURCES = {
         ("証券コード",), host="ja", union=True), (225, 225)),
     "_HSI": (lambda: fetch_members("Hang_Seng_Index", _hong_kong, ("Ticker",)), (70, 105)),
     "_TSX60": (lambda: fetch_members("S%26P/TSX_60", _local(".TO"), ("Symbol",)),
-               (55, 62)),
+               (60, 60)),
 }
 
 

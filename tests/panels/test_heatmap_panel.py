@@ -18,7 +18,7 @@ from aurantium.heatmap_universes import INDEXES, SECTORS
 from aurantium.panel import UNLINKED
 from aurantium.panels.watchlist import WatchlistPanel
 from aurantium.portfolio_store import PortfolioStore
-from aurantium.providers.screen import symbols_topic
+from aurantium.providers.screen import index_topic, symbols_topic
 from aurantium.symbol_context import SymbolContext
 
 #: the exact empty-state wording the spec fixes for a group with no Watchlist
@@ -166,7 +166,7 @@ def test_double_click_drills_and_back_returns(make):
 def test_double_click_outside_sectors_does_not_drill(make):
     p = make(view="index:dow")
     members = INDEXES["dow"][2]
-    _publish(symbols_topic(members), {"rows": [_row(s, 1e9) for s in members], "as_of": "x"})
+    _publish(index_topic("dow"), {"rows": [_row(s, 1e9) for s in members], "as_of": "x"})
     QTest.mouseDClick(p.map, Qt.MouseButton.LeftButton, pos=_centre(p, members[0]))
     assert p.view == "index:dow"
 
@@ -221,7 +221,7 @@ def test_the_map_takes_focus_on_click(make):
 def test_index_view_shows_the_largest_n(make):
     p = make(view="index:sp500")
     label, n, members = INDEXES["sp500"]
-    topic = symbols_topic(members)
+    topic = index_topic("sp500")
     assert topic in p._topics
     rows = [_row(s, 1e9 * (600 - i)) for i, s in enumerate(members[:120])]
     _publish(topic, {"rows": rows, "as_of": "x"})
@@ -232,7 +232,7 @@ def test_index_view_shows_the_largest_n(make):
 def test_error_keeps_the_last_good_tiles(make):
     p = make(view="index:dow")
     members = INDEXES["dow"][2]
-    topic = symbols_topic(members)
+    topic = index_topic("dow")
     _publish(topic, {"rows": [_row(s, 1e9) for s in members], "as_of": "x"})
     before = _syms(p)
     _publish_error(topic, "Yahoo rate limit — retrying shortly")
@@ -465,7 +465,7 @@ def test_view_selector_groups_indexes_by_region(make):
     assert p.crumb.text() == "Ibovespa · largest 40"
 
 
-def test_mixed_currency_watchlist_waits_for_the_rate(make):
+def test_mixed_currency_custom_view_waits_for_the_rate(make):
     from aurantium.fx import FxService
 
     syms = ["AAPL", "PETR4.SA"]
@@ -477,19 +477,29 @@ def test_mixed_currency_watchlist_waits_for_the_rate(make):
     assert tiles["PETR4.SA"].loading and not tiles["AAPL"].loading
     assert FxService.instance().preferred() == "USD"
     _publish("quote:BRLUSD=X", _quote(0.0, price=0.2))
-    QTest.qWait(350)  # FxService coalesces ``changed`` over 150 ms
+    # FxService coalesces ``changed`` over 150 ms; poll, bounded, for the redraw
+    def petr4_sized():
+        return not next(t for t in _tiles(p) if t.symbol == "PETR4.SA").loading
+
+    for _ in range(100):  # up to ~2 s (PySide6 has no QTest.qWaitFor)
+        if petr4_sized():
+            break
+        QTest.qWait(20)
+    assert petr4_sized()
     tiles = {t.symbol: t for t in _tiles(p)}
-    assert not tiles["PETR4.SA"].loading
     assert tiles["PETR4.SA"].weight == pytest.approx(6e11 * 0.2)
     assert tiles["AAPL"].weight == 3e12
+    assert tiles["PETR4.SA"].label == "PETR4.SA"  # Custom labels are never shortened
 
 
 def test_international_index_tile_click_sends_the_yahoo_symbol(make):
     p = make(view="index:hsi")
     members = INDEXES["hsi"][2]
     rows = [{**_row(s, 1e11 * (100 - i)), "currency": "HKD"} for i, s in enumerate(members)]
-    _publish(symbols_topic(members), {"rows": rows, "as_of": "x"})
+    _publish(index_topic("hsi"), {"rows": rows, "as_of": "x"})
     assert len(_tiles(p)) == 40
+    # index tiles drop the ".HK" every one of them shares; the symbol keeps it
+    assert all(t.label == t.symbol[:-3] for t in _tiles(p))
     biggest = members[0]
     QTest.mouseClick(p.map, Qt.MouseButton.LeftButton, pos=_centre(p, biggest))
     assert biggest.endswith(".HK")

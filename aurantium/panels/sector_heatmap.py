@@ -62,7 +62,7 @@ from ..heatmap_universes import (
 )
 from ..panel import NULL_GLYPH, UNLINKED, WARN_GLYPH, Panel, register_panel
 from ..portfolio_store import PortfolioStore
-from ..providers.screen import symbols_topic
+from ..providers.screen import index_topic, symbols_topic
 from ..theme import (
     ACCENT,
     BG,
@@ -853,7 +853,7 @@ class HeatmapPanel(Panel):
         if v.startswith("sector:"):
             return [f"screen:sector:{v[7:]}:{SECTOR_N}"]
         if v.startswith("index:"):
-            return [symbols_topic(INDEXES[v[6:]][2])]
+            return [index_topic(v[6:])]
         if v == "portfolio":
             return [f"quote:{s}" for s in self._open_symbols()]
         syms = self._mixed_symbols()
@@ -942,9 +942,11 @@ class HeatmapPanel(Panel):
             rows = self._screens.get(f"screen:sector:{v[7:]}:{SECTOR_N}")
             return tiles_from_screen(rows, SECTOR_N) if rows else []
         if v.startswith("index:"):
-            _label, n, members = INDEXES[v[6:]]
-            rows = self._screens.get(symbols_topic(members))
-            return tiles_from_screen(rows, n, self._convert_cap) if rows else []
+            _label, n, _members = INDEXES[v[6:]]
+            rows = self._screens.get(index_topic(v[6:]))
+            if not rows:
+                return []
+            return tiles_from_screen(rows, n, self._convert_cap, short_labels=True)
         if v == "portfolio":
             fx = FxService.instance()
             return tiles_portfolio(
@@ -962,7 +964,7 @@ class HeatmapPanel(Panel):
         if v != "custom":
             return tiles
         # the user's own names lead their tiles ("Technology" over "XLK")
-        names = {SHARE_CLASSES.get(s, s): label for label, s in self._custom if label != s}
+        names = {self._custom_tile_of(s): label for label, s in self._custom if label != s}
         return [replace(t, label=names[t.symbol]) if t.symbol in names else t for t in tiles]
 
     def _empty_message(self) -> tuple[str, str, bool]:
@@ -1047,7 +1049,13 @@ class HeatmapPanel(Panel):
     def _custom_rows_for(self, tile_symbol: str) -> list[tuple[str, str]]:
         """The Custom rows a tile stands for: a merged share class (GOOG under
         GOOGL) is one tile but may be two rows."""
-        return [r for r in self._custom if SHARE_CLASSES.get(r[1], r[1]) == tile_symbol]
+        return [r for r in self._custom if self._custom_tile_of(r[1]) == tile_symbol]
+
+    def _custom_tile_of(self, symbol: str) -> str:
+        """The tile a Custom row's symbol is drawn under: its kept share class
+        when that is in the list too, else itself (``fold_share_classes``)."""
+        kept = SHARE_CLASSES.get(symbol)
+        return kept if kept and any(s == kept for _l, s in self._custom) else symbol
 
     def _custom_label(self, tile_symbol: str) -> str:
         rows = self._custom_rows_for(tile_symbol)

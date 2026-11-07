@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import statistics
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable, Optional
 
 from .components import fmt
@@ -50,11 +50,25 @@ def _tooltip(name, symbol, price, change_pct, extra_label, extra_value) -> str:
     )
 
 
-def _merge_share_classes(rows: list[dict]) -> dict[str, dict]:
+def fold_share_classes(symbols) -> dict[str, str]:
+    """``{tile symbol: symbol as requested}``, in order. An alias share class
+    folds into its kept one only when that one is also requested: a lone
+    PETR3 (ordinary shares, its own price) stays PETR3 rather than being shown
+    and linked as PETR4."""
+    asked = set(symbols)
+    out: dict[str, str] = {}
+    for s in symbols:
+        kept = SHARE_CLASSES.get(s)
+        out.setdefault(kept if kept in asked else s, s)
+    return out
+
+
+def _merge_share_classes(rows: list[dict], kept_wanted=()) -> dict[str, dict]:
     """``{symbol: row}`` with share-class aliases folded into the kept symbol:
     the larger cap used (Yahoo reports the WHOLE company's cap on every share
     class, so summing would double-count), the kept symbol's change and price
-    used. An alias whose kept symbol is absent is shown under the kept symbol."""
+    used. An alias folds only when its kept symbol is among the rows or in
+    ``kept_wanted``; otherwise it is its own tile."""
     by: dict[str, dict] = {}
     for r in rows:
         sym = r.get("symbol")
@@ -66,6 +80,8 @@ def _merge_share_classes(rows: list[dict]) -> dict[str, dict]:
             continue
         k = by.get(kept)
         if k is None:
+            if kept not in kept_wanted:
+                continue
             by[kept] = {**a, "symbol": kept}
         else:
             caps = [c for c in (_num(k.get("market_cap")), _num(a.get("market_cap")))
@@ -89,24 +105,30 @@ def _cap_currency(r: dict) -> Optional[str]:
 def _comparable_caps(
     merged: dict[str, dict], syms, convert: Optional[CapConverter]
 ) -> tuple[dict[str, float], set[str]]:
-    """``({symbol: cap in one currency}, symbols waiting on a rate)`` for the
-    rows among ``syms`` with a positive cap. One currency, or no ``convert``:
-    caps as reported. A row of unknown currency in a mixed view is left out
-    (it is sized like a non-equity) rather than guessed."""
+    """``({symbol: cap in one currency}, symbols waiting)`` for the rows among
+    ``syms`` with a positive cap. One currency, or no ``convert``: caps as
+    reported. Waiting: an equity whose cap the provider is still looking up
+    (``cap_pending``), one whose rate has not landed, and, in a mixed view,
+    one of unknown currency -- shown, never sized in a guessed unit."""
     raw: dict[str, tuple[float, Optional[str]]] = {}
+    waiting: set[str] = set()
     for s in syms:
         r = merged.get(s)
         cap = _num(r.get("market_cap")) if r else None
         if cap is not None and cap > 0:
             raw[s] = (cap, _cap_currency(r))
+        elif r and r.get("cap_pending"):
+            waiting.add(s)
     counts = Counter(cur for _cap, cur in raw.values() if cur)
     if len(counts) <= 1 or convert is None:
-        return {s: cap for s, (cap, _cur) in raw.items()}, set()
+        if counts and convert is not None:  # one known currency, some unknown
+            waiting |= {s for s, (_cap, cur) in raw.items() if cur is None}
+        return {s: cap for s, (cap, cur) in raw.items() if s not in waiting}, waiting
     target = counts.most_common(1)[0][0]
     caps: dict[str, float] = {}
-    waiting: set[str] = set()
     for s, (cap, cur) in raw.items():
         if cur is None:
+            waiting.add(s)
             continue
         v = cap if cur == target else convert(cur, target, cap)
         if v is None or v <= 0:
@@ -131,16 +153,47 @@ def _equity_tile(r: dict, weight: float) -> Tile:
 
 
 def _rate_tile(sym: str, weight: float) -> Tile:
-    """An equity whose cap waits on an exchange rate: drawn as loading."""
+    """An equity whose size is not known yet (a rate, a share count): drawn
+    as loading."""
     return Tile(sym, sym, weight, None, f"{sym}\nLoading", loading=True)
 
 
+def _short_labels(tiles: list[Tile]) -> list[Tile]:
+    """Labels without the view's main exchange suffix (``PETR4``, ``0700``),
+    which only eats a small tile's width. A symbol keeps its suffix when it
+    is not the main one (DAX's ``AIR.PA``) or when the bare name would be
+    ambiguous on this map (Euro Stoxx's ``SAN.PA`` Sanofi vs ``SAN.MC``
+    Santander). The tile's symbol, tooltip and link stay the full one."""
+    def split(sym: str) -> tuple[str, str]:
+        stem, dot, suffix = sym.rpartition(".")
+        return (stem, suffix) if dot and stem else (sym, "")
+
+    parts = {t.symbol: split(t.symbol) for t in tiles}
+    suffixes = Counter(sfx for _stem, sfx in parts.values() if sfx)
+    if not suffixes:
+        return tiles
+    main = suffixes.most_common(1)[0][0]
+    stems = Counter(stem for stem, _sfx in parts.values())
+    out = []
+    for t in tiles:
+        stem, sfx = parts[t.symbol]
+        if sfx == main and stems[stem] == 1 and t.label == t.symbol:
+            t = replace(t, label=stem)
+        out.append(t)
+    return out
+
+
 def tiles_from_screen(
-    rows: list[dict], limit: int, convert: Optional[CapConverter] = None
+    rows: list[dict],
+    limit: int,
+    convert: Optional[CapConverter] = None,
+    short_labels: bool = False,
 ) -> list[Tile]:
     """The ``limit`` largest tiles of an index/sector screen. Rows without a
-    market cap are dropped; share classes are merged; caps in another
-    currency than most are converted (see the module docstring)."""
+    market cap are dropped, except an equity whose cap is still being looked
+    up (``cap_pending``), which waits; share classes are merged; caps in
+    another currency than most are converted (see the module docstring).
+    ``short_labels`` (index views) drops the main exchange suffix."""
     merged = _merge_share_classes(rows)
     caps, waiting = _comparable_caps(merged, merged, convert)
     tiles = [_equity_tile(merged[s], cap) for s, cap in caps.items()]
@@ -148,7 +201,8 @@ def tiles_from_screen(
         median = statistics.median(caps.values()) if caps else 1.0
         tiles += [_rate_tile(s, median) for s in merged if s in waiting]
     tiles.sort(key=lambda t: t.weight, reverse=True)
-    return tiles[: max(0, limit)]
+    tiles = tiles[: max(0, limit)]
+    return _short_labels(tiles) if short_labels else tiles
 
 
 def tiles_mixed(
@@ -163,10 +217,8 @@ def tiles_mixed(
     coloured from its quote and sized at the median equity cap, or 1.0 each
     when there are no equities. A symbol with no data yet, or whose cap waits
     on a rate, is kept as a ``loading`` tile rather than dropped."""
-    merged = _merge_share_classes(screen_rows)
-    want: dict[str, str] = {}  # kept symbol -> symbol as requested
-    for s in symbols:
-        want.setdefault(SHARE_CLASSES.get(s, s), s)
+    want = fold_share_classes(symbols)  # tile symbol -> symbol as requested
+    merged = _merge_share_classes(screen_rows, kept_wanted=set(want))
     caps, waiting = _comparable_caps(merged, want, convert)
     median = statistics.median(caps.values()) if caps else 1.0
     out: list[Tile] = []
