@@ -26,12 +26,12 @@ from __future__ import annotations
 import bisect
 import calendar
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from typing import Callable, Mapping, Optional
 
 import pyqtgraph as pg
 from PySide6.QtCore import QEvent, QPoint, QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
 from PySide6.QtWidgets import (
     QButtonGroup,
     QHBoxLayout,
@@ -126,6 +126,146 @@ class GaugeDetail:
     #: the smallest value span the chart shows: a spread that moved 1bp in
     #: a month is a flat line, not a mountain range
     min_span: float = 0.0
+
+
+#: room between two date labels, beyond the labels themselves
+_TICK_GAP_PX = 2 * SPACE_LG
+#: a span up to this many days is labelled by day ("3 Nov"); up to
+#: _MONTHS_UP_TO by month ("Nov"); anything longer by year ("2024")
+_DAYS_UP_TO = 62
+_MONTHS_UP_TO = 2 * 366
+#: tick steps per unit, finest first. Never a label on every day.
+_DAY_STEPS = (7, 14)
+_MONTH_STEPS = (1, 2, 3, 6)
+_YEAR_STEPS = (1, 2, 5, 10, 25)
+_DAY_S = 86400
+_MONDAY = date(1970, 1, 5)  # day ticks count weeks from here
+
+
+def _utc_day(x: float) -> date:
+    return date(1970, 1, 1) + timedelta(days=int(x // _DAY_S))
+
+
+class _DateAxis(pg.AxisItem):
+    """The card's time axis: one tick level, calendar-aligned, with labels
+    that suit the span and never touch.
+
+    A month reads by day ("3 Nov", on Mondays), six months or a year by month ("Nov";
+    January carries its year, "2026", so a year turning is marked), five
+    years by year ("2024"). The step is the finest one whose labels each
+    get their own width plus a gap at the axis's current width; when even
+    the coarsest day or month step is too tight, the next unit up is used.
+    Values are UTC midnights (``_epoch``)."""
+
+    def __init__(self) -> None:
+        super().__init__("bottom")
+        self._date_fm = QFontMetrics(QFont())
+
+    def setTickFont(self, font) -> None:  # noqa: N802 (pyqtgraph API)
+        super().setTickFont(font)
+        self._date_fm = QFontMetrics(font)
+
+    # -- choosing ticks -------------------------------------------------------
+
+    def _logical(self, size: float) -> float:
+        """pyqtgraph measures the axis in device pixels; labels are measured
+        in logical ones."""
+        view = self.getViewWidget()
+        ratio = view.devicePixelRatioF() if view is not None else 1.0
+        return size / (ratio or 1.0)
+
+    def _candidates(self, span_days: float):
+        days = [("day", n) for n in _DAY_STEPS]
+        months = [("month", n) for n in _MONTH_STEPS]
+        years = [("year", n) for n in _YEAR_STEPS]
+        if span_days <= _DAYS_UP_TO:
+            return days + months + years
+        if span_days <= _MONTHS_UP_TO:
+            return months + years
+        return years
+
+    def _label_w(self, unit: str) -> int:
+        samples = {"day": ("30 Sep", "28 May"), "month": ("May", "Sep", "2026"),
+                   "year": ("2026",)}[unit]
+        return max(self._date_fm.horizontalAdvance(t) for t in samples)
+
+    @staticmethod
+    def _period_days(unit: str, n: int) -> float:
+        return {"day": 1.0, "month": 30.44, "year": 365.25}[unit] * n
+
+    @staticmethod
+    def _values(unit: str, n: int, lo: date, hi: date) -> list[int]:
+        out = []
+        if unit == "day":
+            # Mondays (every other one for 14): evenly spaced, unlike dates
+            # of the month, whose last step to the 1st is a short one
+            d = lo
+            while d <= hi:
+                weeks, weekday = divmod((d - _MONDAY).days, 7)
+                if weekday == 0 and weeks % (n // 7) == 0:
+                    out.append(d)
+                d += timedelta(days=1)
+        elif unit == "month":
+            y, m = lo.year, lo.month
+            while date(y, m, 1) <= hi:
+                if (m - 1) % n == 0 and date(y, m, 1) >= lo:
+                    out.append(date(y, m, 1))
+                y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+        else:
+            for y in range(lo.year, hi.year + 1):
+                if y % n == 0 and date(y, 1, 1) >= lo:
+                    out.append(date(y, 1, 1))
+        return [_epoch(d) for d in out]
+
+    def ticks(self, lo: float, hi: float, width: float) -> tuple[str, list[int]]:
+        """(unit, tick values) for the span ``lo``..``hi`` drawn ``width``
+        logical px wide."""
+        if hi <= lo or width <= 0:
+            return "day", []
+        span_days = (hi - lo) / _DAY_S
+        px_per_day = width / span_days
+        first, last = _utc_day(lo), _utc_day(hi)
+        if _epoch(first) < lo:
+            first += timedelta(days=1)
+        choice = None
+        for unit, n in self._candidates(span_days):
+            if self._period_days(unit, n) * px_per_day >= self._label_w(unit) + _TICK_GAP_PX:
+                choice = (unit, n)
+                break
+        if choice is None:
+            choice = ("year", _YEAR_STEPS[-1])
+        return choice[0], self._values(*choice, first, last)
+
+    def tickValues(self, minVal, maxVal, size):  # noqa: N802 (pyqtgraph API)
+        unit, values = self.ticks(minVal, maxVal, self._logical(size))
+        self._date_unit = unit
+        return [(self._period_days(unit, 1) * _DAY_S, values)]
+
+    def tickStrings(self, values, scale, spacing):  # noqa: N802 (pyqtgraph API)
+        return [self.date_text(v, getattr(self, "_date_unit", "day")) for v in values]
+
+    @staticmethod
+    def date_text(value: float, unit: str) -> str:
+        d = _utc_day(value)
+        if unit == "day":
+            return f"{d.day} {d.strftime('%b')}"
+        if unit == "month":
+            return str(d.year) if d.month == 1 else d.strftime("%b")
+        return str(d.year)
+
+    def tick_labels(self) -> list[tuple[float, str]]:
+        """(centre x in logical px along the axis, text) of every label at
+        the axis's current range and width (tests, and nothing else)."""
+        lo, hi = self.range
+        width = self.geometry().width()
+        unit, values = self.ticks(lo, hi, width)
+        if hi <= lo:
+            return []
+        return [((v - lo) / (hi - lo) * width, self.date_text(v, unit))
+                for v in values if lo <= v <= hi]
+
+    def label_width(self, text: str) -> int:
+        return self._date_fm.horizontalAdvance(text)
 
 
 class _FitLabel(QLabel):
@@ -291,7 +431,7 @@ class GaugeCard(QWidget):
     def _make_plot(self) -> pg.PlotWidget:
         """The app's small-chart style (see curve_view._make_plot): the card's
         own surface, faint grid, dim tabular ticks, no zoom or pan."""
-        w = pg.PlotWidget(axisItems={"bottom": pg.DateAxisItem("bottom", utcOffset=0)})
+        w = pg.PlotWidget(axisItems={"bottom": _DateAxis()})
         w.setMenuEnabled(False)
         w.setBackground(BG_ALT)
         w.showGrid(x=True, y=True, alpha=0.15)

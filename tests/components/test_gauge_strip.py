@@ -752,3 +752,61 @@ def test_close_hint_is_not_offered_over_the_chart(strip):
     assert card.tooltip_at(QPoint(theme.SPACE_SM, theme.SPACE_SM)) == CLOSE_HINT
     on_chart = card.plot.geometry().center()
     assert card.tooltip_at(card.plot.parentWidget().mapTo(card, on_chart)) == ""
+
+
+# -- the card's date axis -------------------------------------------------------------
+
+
+def _daily(days: int, step: int = 1):
+    from datetime import date, timedelta
+
+    end = date(2026, 11, 5)
+    return tuple((end - timedelta(days=k), 100.0 + k % 9) for k in range(days, -1, -step))
+
+
+@pytest.mark.parametrize("width", [260, 900])
+@pytest.mark.parametrize("span, step, pattern", [
+    ("1M", 1, r"^\d{1,2} [A-Z][a-z]{2}$"),   # "3 Nov"
+    ("5Y", 7, r"^\d{4}$"),                    # "2024"
+])
+def test_date_ticks_never_overlap_and_suit_the_range(qapp, width, span, step, pattern):
+    import re
+
+    from aurantium.components.gauge_card import GaugeCard, GaugeDetail
+
+    card = GaugeCard()
+    days = 31 if span == "1M" else 5 * 366
+    card.set_detail(GaugeDetail(series=_daily(days, step), range=span))
+    card.resize(width, theme.GAUGE_CARD_PX)
+    card.show()
+    for _ in range(3):
+        QApplication.processEvents()
+    axis = card.plot.getAxis("bottom")
+    labels = axis.tick_labels()
+    assert len(labels) >= 2, labels
+    for _x, text in labels:
+        assert re.match(pattern, text), text
+    # each label's box, centred on its tick, clear of the next one
+    boxes = sorted((x - axis.label_width(t) / 2, x + axis.label_width(t) / 2) for x, t in labels)
+    for (_a0, a1), (b0, _b1) in zip(boxes, boxes[1:]):
+        assert a1 + theme.SPACE_SM <= b0, labels
+    # never a label on every day
+    if span == "1M":
+        assert len(labels) <= 5
+    card.close()
+    card.deleteLater()
+
+
+def test_a_year_reads_by_month_and_marks_january_with_its_year(qapp):
+    from aurantium.components.gauge_card import GaugeCard, GaugeDetail
+
+    card = GaugeCard()
+    card.set_detail(GaugeDetail(series=_daily(366), range="1Y"))
+    card.resize(900, theme.GAUGE_CARD_PX)
+    card.show()
+    for _ in range(3):
+        QApplication.processEvents()
+    texts = [t for _x, t in card.plot.getAxis("bottom").tick_labels()]
+    assert "2026" in texts and any(t in texts for t in ("Feb", "Mar", "Apr", "Jul"))
+    card.close()
+    card.deleteLater()
