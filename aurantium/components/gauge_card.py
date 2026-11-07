@@ -467,11 +467,11 @@ class GaugeCard(QWidget):
         left.setStyle(maxTickLevel=0)
         left.setTickDensity(0.8)
 
-        self._line = pg.PlotDataItem(pen=pg.mkPen(LABEL, width=CHART_LINE_PX))
+        self._line = pg.PlotDataItem(pen=pg.mkPen(LABEL, width=CHART_LINE_PX), antialias=True)
         self._line.setZValue(10)
         w.addItem(self._line)
         self._last = pg.ScatterPlotItem(size=CHART_DOT_PX, brush=pg.mkBrush(LABEL),
-                                        pen=pg.mkPen(BG_ALT, width=1))
+                                        pen=pg.mkPen(BG_ALT, width=1), antialias=True)
         self._last.setZValue(11)
         w.addItem(self._last)
         self._guide = pg.InfiniteLine(angle=90, movable=False,
@@ -480,7 +480,7 @@ class GaugeCard(QWidget):
         self._guide.setVisible(False)
         w.addItem(self._guide, ignoreBounds=True)
         self._dot = pg.ScatterPlotItem(size=CHART_DOT_PX, brush=pg.mkBrush(LABEL),
-                                       pen=pg.mkPen(BG, width=1))
+                                       pen=pg.mkPen(BG, width=1), antialias=True)
         self._dot.setZValue(21)
         w.addItem(self._dot, ignoreBounds=True)
         self._readout = pg.TextItem("", color=LABEL, anchor=(0, 1), fill=pg.mkBrush(BG),

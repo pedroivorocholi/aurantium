@@ -297,7 +297,7 @@ class CurveView(QWidget):
 
     def _build_items(self) -> None:
         cp, sp = self.curve_plot, self.strip_plot
-        self.curve_item = pg.PlotDataItem()
+        self.curve_item = pg.PlotDataItem(antialias=True)
         self.curve_item.setZValue(10)
         cp.addItem(self.curve_item)
         self.inversion_item = pg.PlotDataItem(
@@ -306,6 +306,7 @@ class CurveView(QWidget):
             symbolSize=5,
             symbolBrush=DOWN,
             symbolPen=pg.mkPen(DOWN),
+            antialias=True,
         )
         self.inversion_item.setZValue(11)
         self.inversion_item.setVisible(False)
@@ -334,7 +335,7 @@ class CurveView(QWidget):
             line.setVisible(False)
             plot.addItem(line, ignoreBounds=True)
             self._guides.append(line)
-        self._hover_dots = pg.ScatterPlotItem(size=7, pen=pg.mkPen(BG, width=1))
+        self._hover_dots = pg.ScatterPlotItem(size=7, pen=pg.mkPen(BG, width=1), antialias=True)
         self._hover_dots.setZValue(21)
         cp.addItem(self._hover_dots, ignoreBounds=True)
         self._readout = pg.TextItem(
@@ -735,7 +736,7 @@ class CurveView(QWidget):
             color = _alpha(LABEL, _GHOST_ALPHA[chip])
             item = self.comparison_items.get(chip)
             if item is None:
-                item = pg.PlotDataItem()
+                item = pg.PlotDataItem(antialias=True)
                 item.setZValue(5 - CHIPS.index(chip))
                 cp.addItem(item)
                 self.comparison_items[chip] = item

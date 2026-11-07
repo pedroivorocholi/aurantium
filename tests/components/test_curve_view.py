@@ -400,3 +400,12 @@ def test_chips_wait_unlit_until_history_arrives(view):
     assert chip.isEnabled() and chip.isChecked()
     view.clear_history()                      # a country switch
     assert not chip.isChecked() and chip.toolTip() == MSG_HISTORY_LOADING
+
+
+def test_curve_lines_are_antialiased(view):
+    # without it pyqtgraph draws stair-stepped lines (pyqtgraph's own default is off)
+    load_us(view, comparisons=())
+    view.chip("1M").click()
+    items = [view.curve_item, view.inversion_item, *view.comparison_items.values()]
+    assert all(item.opts["antialias"] for item in items)
+    assert view._hover_dots.opts["antialias"]

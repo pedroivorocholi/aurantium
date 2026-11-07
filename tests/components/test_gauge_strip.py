@@ -883,3 +883,12 @@ def test_a_user_scroll_during_the_open_is_not_pulled_back(qapp, monkeypatch):
     assert bar.value() > 0
     area.close()
     area.deleteLater()
+
+
+def test_card_chart_lines_are_antialiased(qapp):
+    # without it pyqtgraph draws stair-stepped lines (pyqtgraph's own default is off)
+    from aurantium.components.gauge_card import GaugeCard
+
+    card = GaugeCard()
+    assert card._line.opts["antialias"]
+    assert card._last.opts["antialias"] and card._dot.opts["antialias"]
