@@ -16,7 +16,7 @@ SourceDir=..\..
 ; this even though everything else has been renamed.
 AppId=findash
 AppName=Aurantium
-AppVersion=1.16.1
+AppVersion=1.17.0
 AppPublisher=Aurantium
 DefaultDirName={autopf}\Aurantium
 DefaultGroupName=Aurantium
