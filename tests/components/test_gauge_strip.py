@@ -790,6 +790,9 @@ def test_date_ticks_never_overlap_and_suit_the_range(qapp, width, span, step, pa
     boxes = sorted((x - axis.label_width(t) / 2, x + axis.label_width(t) / 2) for x, t in labels)
     for (_a0, a1), (b0, _b1) in zip(boxes, boxes[1:]):
         assert a1 + theme.SPACE_SM <= b0, labels
+    # and none overhangs either end of the axis
+    axis_w = axis.geometry().width()
+    assert boxes[0][0] >= 0 and boxes[-1][1] <= axis_w, (labels, axis_w)
     # never a label on every day
     if span == "1M":
         assert len(labels) <= 5
@@ -810,3 +813,73 @@ def test_a_year_reads_by_month_and_marks_january_with_its_year(qapp):
     assert "2026" in texts and any(t in texts for t in ("Feb", "Mar", "Apr", "Jul"))
     card.close()
     card.deleteLater()
+
+
+def test_a_single_reading_still_names_its_day(qapp):
+    from datetime import date
+
+    from aurantium.components.gauge_card import GaugeCard, GaugeDetail
+
+    card = GaugeCard()
+    card.set_detail(GaugeDetail(series=((date(2026, 11, 5), 4.22),), range="1M"))
+    card.resize(260, theme.GAUGE_CARD_PX)
+    card.show()
+    for _ in range(3):
+        QApplication.processEvents()
+    assert [t for _x, t in card.plot.getAxis("bottom").tick_labels()] == ["5 Nov"]
+    card.close()
+    card.deleteLater()
+
+
+def test_removing_the_new_gauge_mid_switch_lets_the_old_still_go(strip, monkeypatch):
+    strip.resize(420, strip.heightForWidth(420))
+    _settle(strip)
+    lower = _second_row_tile(strip)
+    monkeypatch.setattr(motion, "animations_enabled", lambda: True)
+    strip.expand(0)
+    _settle(strip)
+    strip.expand(lower)
+    assert strip.closing_card_rect().isValid()
+    strip.remove_gauge(lower)
+    assert strip.expanded_index() == -1
+    assert strip._closing is None  # no full-size still kept around
+    assert not strip.closing_card_rect().isValid()
+
+
+def test_a_user_scroll_during_the_open_is_not_pulled_back(qapp, monkeypatch):
+    from PySide6.QtWidgets import QScrollArea
+
+    monkeypatch.setattr(motion, "animations_enabled", lambda: True)
+    area = QScrollArea()
+    area.setWidgetResizable(True)
+    body = QWidget()
+    lay = QVBoxLayout(body)
+    lay.setContentsMargins(0, 0, 0, 0)
+    s = GaugeStrip(body)
+    s.set_gauges(list(DEFAULT_GAUGES))
+    lay.addWidget(s)
+    filler = QWidget(body)
+    filler.setMinimumHeight(600)
+    lay.addWidget(filler)
+    area.setWidget(body)
+    area.resize(420, 360)
+    area.show()
+    QApplication.processEvents()
+    s.expand(len(DEFAULT_GAUGES) - 1)
+    QTest.qWait(motion.CARD_GROW_MS // 3)
+    assert s.is_animating()
+    bar = area.verticalScrollBar()
+    bar.setValue(0)  # the user wheels back to the top mid-open
+    QTest.qWait(motion.CARD_GROW_MS + 150)
+    QApplication.processEvents()
+    assert not s.is_animating()
+    assert bar.value() == 0
+    # the next open follows again
+    s.collapse()
+    s.finish_animation()
+    s.expand(len(DEFAULT_GAUGES) - 2)
+    QTest.qWait(motion.CARD_GROW_MS + 150)
+    QApplication.processEvents()
+    assert bar.value() > 0
+    area.close()
+    area.deleteLater()

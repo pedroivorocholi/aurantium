@@ -155,6 +155,8 @@ class _DateAxis(pg.AxisItem):
     years by year ("2024"). The step is the finest one whose labels each
     get their own width plus a gap at the axis's current width; when even
     the coarsest day or month step is too tight, the next unit up is used.
+    A label that would overhang either end of the axis is dropped; a series
+    too short for any tick (one reading) still gets its day named.
     Values are UTC midnights (``_epoch``)."""
 
     def __init__(self) -> None:
@@ -234,7 +236,18 @@ class _DateAxis(pg.AxisItem):
                 break
         if choice is None:
             choice = ("year", _YEAR_STEPS[-1])
-        return choice[0], self._values(*choice, first, last)
+        unit, values = choice[0], self._values(*choice, first, last)
+        if not values:
+            # a series too short to hold a tick (one reading): name its day
+            mid = _epoch(_utc_day((lo + hi) / 2 + _DAY_S / 2))
+            unit, values = "day", [mid] if lo <= mid <= hi else []
+        # a label whose box would cross either end of the axis is dropped:
+        # it would sit over the value axis or past the chart's edge
+        def inside(v: int) -> bool:
+            x = (v - lo) / (hi - lo) * width
+            half = self._date_fm.horizontalAdvance(self.date_text(v, unit)) / 2
+            return x - half >= 0 and x + half <= width
+        return unit, [v for v in values if inside(v)]
 
     def tickValues(self, minVal, maxVal, size):  # noqa: N802 (pyqtgraph API)
         unit, values = self.ticks(minVal, maxVal, self._logical(size))

@@ -284,6 +284,10 @@ class GaugeStrip(QWidget):
         #: of what it showed, drawn into the closing opening (no empty band)
         self._closing: Optional[tuple[int, QPixmap]] = None
         self._follow = False             # keep the opening card in view
+        #: the scroll position _follow_card last left; any other value means
+        #: the user scrolled, and this open stops pulling the view
+        self._follow_seen: Optional[int] = None
+        self._follow_stopped = False
         self._laid_height = -1
 
         # press feedback sinks just the pressed tile (see press.py)
@@ -381,6 +385,7 @@ class GaugeStrip(QWidget):
             still = card.grab()  # before the card turns to the new gauge
         self._expanded_uid = self._card_uid = tile.uid
         self._follow = True
+        self._follow_seen, self._follow_stopped = None, False
         card.set_loading(self.detail_range())
         self._sync_card_heading()
         self._animate_open(tile.uid, before, still)
@@ -552,7 +557,12 @@ class GaugeStrip(QWidget):
         the view travels with the card; once at the end."""
         k = self.expanded_index()
         sa = self._scroll_area()
-        if k < 0 or sa is None or self._card_geom.height() <= 0:
+        if k < 0 or sa is None or self._card_geom.height() <= 0 or self._follow_stopped:
+            return
+        bar = sa.verticalScrollBar()
+        if self._follow_seen is not None and bar.value() != self._follow_seen:
+            # the user scrolled while it opened: their view wins
+            self._follow, self._follow_stopped = False, True
             return
         body = sa.widget()
         if body.layout() is not None:
@@ -560,7 +570,6 @@ class GaugeStrip(QWidget):
         self._ensure_layout()
         top = self.mapTo(body, QPoint(0, self._rects[k].top())).y()
         bottom = self.mapTo(body, QPoint(0, self._card_geom.bottom())).y()
-        bar = sa.verticalScrollBar()
         view = sa.viewport().height()
         v = bar.value()
         if bottom > v + view - 1:
@@ -568,6 +577,7 @@ class GaugeStrip(QWidget):
         v = min(v, top)  # the tile itself never scrolls out of the top
         if v != bar.value():
             bar.setValue(v)
+        self._follow_seen = bar.value()
 
     def _drop_missing_expansion(self) -> None:
         """The open gauge left the strip (a remove, an undo): close at once."""
@@ -580,6 +590,7 @@ class GaugeStrip(QWidget):
         if self._closing is not None and self._closing[0] not in uids:
             self._closing = None
         if self._expanded_uid >= 0 and self._expanded_uid not in uids:
+            self._closing = None  # its still would only wait, never drawn
             self._expanded_uid = -1
             self._hand_focus_back()
             self._open_anim.stop()
