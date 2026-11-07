@@ -95,6 +95,9 @@ hiddenimports += [
     # Macro / Rates gauge strip: painted tiles edited in place (add, replace,
     # remove, drag to reorder).
     "aurantium.components.gauge_strip",
+    # Macro / Rates: a gauge clicked open into its detail card (chart, ranges,
+    # high/low, source). Built lazily on the first click.
+    "aurantium.components.gauge_card",
     # Macro / Rates yield curve: comparisons, twist strip, country switch.
     "aurantium.components.curve_view",
     # Macro / Rates CFTC positioning: diverging bars edited in place.

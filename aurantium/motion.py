@@ -176,6 +176,11 @@ INDICATOR_OUT_MS = 160
 #: beat, so the row settles as one movement.
 TILE_TRAVEL_MS = 180
 
+#: A gauge opening into its detail card (and closing again): the card is
+#: uncovered top-down like a drawer while everything below it slides down.
+#: A little longer than a tile's glide — it travels ~3 tiles' height.
+CARD_GROW_MS = 220
+
 
 class PacedAnimation(QVariantAnimation):
     """A QVariantAnimation whose clock never jumps more than ``MAX_STEP_MS``.

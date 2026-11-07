@@ -6,7 +6,9 @@ Top to bottom:
 * a **gauge strip** (``GaugeStrip``): the policy rate, the 10Y, 2s10s, the
   dollar, VIX, MOVE, oil and gold by default, each with today's change and a
   one-month sparkline. The three rate gauges are *country-relative* (code
-  ``*``): they follow the panel's country. Everything else is global;
+  ``*``): they follow the panel's country. Everything else is global. A
+  click opens a gauge into a **detail card** under its row: a chart with
+  1M / 6M / 1Y / 5Y ranges, the range's high and low, and the source;
 * the **yield curve** (``CurveView``) for the panel's country, with 1W / 1M /
   1Y comparisons and a twist strip. Its country switch is the panel's;
 * **spreads**: 2s10s and 3m10y for that country, with a one-year sparkline and
@@ -27,9 +29,10 @@ what didn't change.
 
 from __future__ import annotations
 
+import calendar
 import math
 import os
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional, Sequence
 
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt
@@ -61,6 +64,7 @@ from ..components import (
     open_add_picker,
 )
 from ..components.curve_view import CHIPS
+from ..components.gauge_card import RANGES, GaugeDetail
 from ..components.fmt import NULL_GLYPH, num, signed_pct
 from ..components.symbol_catalog import commodity_entries
 from ..guide import PanelGuide
@@ -164,6 +168,17 @@ _EXTRA_QUOTES = [
 ]
 
 _SPARK_DAYS = "1M"  # gauge sparklines: one month
+
+#: a detail card's range → the chart panel's own history topic for it
+_QUOTE_RANGES = {"1M": ("1mo", "1d"), "6M": ("6mo", "1d"), "1Y": ("1y", "1d"), "5Y": ("5y", "1wk")}
+_RANGE_MONTHS = {"1M": 1, "6M": 6, "1Y": 12, "5Y": 60}
+_RANGE_WORDS = {"1M": "month", "6M": "6 months", "1Y": "year", "5Y": "5 years"}
+#: a series reaching back to within this of a range's start covers it
+#: (a range can start on a weekend or a holiday)
+_RANGE_SLACK = timedelta(days=7)
+MSG_DETAIL_FAILED = "History couldn't be loaded — it will retry"
+MSG_POLICY_LATEST = "BIS publishes the latest rate only"
+MSG_LATEST_CURVE = "This source publishes only the latest curve"
 _STALE_DAYS = 7  # an older curve reading names its date on the tile
 
 
@@ -245,6 +260,41 @@ def _stale_note(as_of: str) -> str:
     except ValueError:
         return ""
     return f"as of {_short_date(as_of, _today())}"
+
+
+def _range_start(last: date, chip: str) -> date:
+    """The first day a range chip shows, counting back from ``last``."""
+    idx = last.year * 12 + (last.month - 1) - _RANGE_MONTHS[chip]
+    y, m = divmod(idx, 12)
+    m += 1
+    return date(y, m, min(last.day, calendar.monthrange(y, m)[1]))
+
+
+def _bar_day(t) -> Optional[date]:
+    """A Yahoo daily bar's day. Bars are stamped at the exchange's local
+    midnight, so the nearest UTC midnight is the trading day anywhere."""
+    try:
+        return datetime.fromtimestamp(float(t) + 12 * 3600, tz=timezone.utc).date()
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
+
+
+def _range_reasons(days: Sequence[date], unit: str) -> dict[str, str]:
+    """Why each range chip can't draw ``days`` (oldest first), keyed by chip:
+    the history doesn't reach back that far, or fewer than two readings
+    fall inside it to draw a line between."""
+    if not days:
+        return {}
+    first, last = days[0], days[-1]
+    out = {}
+    for chip in RANGES:
+        start = _range_start(last, chip)
+        if first > start + _RANGE_SLACK:
+            out[chip] = (f"No {_RANGE_WORDS[chip]} of history: it reaches back "
+                         f"only to {_short_date(first.isoformat(), last)}")
+        elif sum(1 for d in days if d > start) < 2:
+            out[chip] = f"Fewer than two {unit} in the last {_RANGE_WORDS[chip]}"
+    return out
 
 
 def _month_year(iso: str) -> str:
@@ -492,6 +542,13 @@ class MacroPanel(Panel):
             "Gauges: **+** adds one by plain name (“dollar”, “Bund 10Y”, FRED "
             "series when a FRED key is set), right-click → **Replace with…** or "
             "**Remove**, drag to reorder.",
+            "**Click a gauge** to open it into a card under its row: a chart with "
+            "**1M**, **6M**, **1Y** and **5Y** ranges, the range's high and low with "
+            "their dates, and the source with its date. Hover the chart for any "
+            "day's value. A range the source has no history for is greyed out; "
+            "hover it for why. Click the gauge or the card again, or press "
+            "**Esc**, to close it. A market gauge's click still goes to the link "
+            "group too.",
             "Positioning: **+** adds a market, right-click → **Remove**, drag to "
             "reorder. Every edit and country switch undoes with Ctrl+Z.",
             "Adding a gauge that is already on the strip outlines the one there "
@@ -539,6 +596,10 @@ class MacroPanel(Panel):
         self._quotes: dict[str, dict] = {}
         self._quote_errors: dict[str, str] = {}
         self._closes: dict[str, list[float]] = {}
+        #: every ``history:*`` payload held (the sparkline month, and the
+        #: open card's range), and the ones that failed
+        self._histories: dict[str, dict] = {}
+        self._history_errors: dict[str, str] = {}
         self._fred: dict[str, dict] = {}
         self._fred_errors: dict[str, str] = {}
         self._cot: dict[str, dict] = {}
@@ -563,6 +624,8 @@ class MacroPanel(Panel):
         self.gauge_strip.add_requested.connect(self._on_add_gauge)
         self.gauge_strip.replace_requested.connect(self._on_replace_gauge)
         self.gauge_strip.gauge_clicked.connect(self._on_gauge_clicked)
+        self.gauge_strip.expansion_changed.connect(self._on_expansion)
+        self.gauge_strip.detail_range_changed.connect(self._on_detail_range)
         col.addWidget(self.gauge_strip)
 
         self.curve_view = CurveView()
@@ -662,15 +725,30 @@ class MacroPanel(Panel):
                 s = g.code
                 want[f"quote:{s}"] = (lambda d, s=s: self._on_quote(s, d),
                                       lambda e, s=s: self._on_quote_error(s, e))
-                want[f"history:{s}:1mo:1d"] = (lambda d, s=s: self._on_closes(s, d),
-                                               lambda e: None)
+                topic = f"history:{s}:1mo:1d"
+                want[topic] = (lambda d, t=topic, s=s: self._on_history(t, s, d),
+                               lambda e, t=topic: self._on_history_error(t, e))
             elif g.kind == "fred" and g.code:
                 sid = g.code
                 want[f"fred:{sid}"] = (lambda d, i=sid: self._on_fred(i, d),
                                        lambda e, i=sid: self._on_fred_error(i, e))
         for _label, market in self._cftc:
             want[f"cftc:{market}"] = (lambda d, m=market: self._on_cot(m, d), lambda e: None)
+        # the open card's range, for a market gauge: only while it is open
+        topic = self._detail_topic()
+        if topic and topic not in want:
+            s = topic.split(":")[1]
+            want[topic] = (lambda d, t=topic, s=s: self._on_history(t, s, d),
+                           lambda e, t=topic: self._on_history_error(t, e))
         return want
+
+    def _detail_topic(self) -> str:
+        """The history topic the open card's chart needs ("" for none)."""
+        g = self.gauge_strip.expanded_gauge()
+        if g is None or g.kind != "quote" or not g.code:
+            return ""
+        period, interval = _QUOTE_RANGES[self.gauge_strip.detail_range()]
+        return f"history:{g.code}:{period}:{interval}"
 
     def _sync_topics(self) -> None:
         """Subscribe what's newly needed, drop what isn't; leave the rest, so
@@ -679,6 +757,8 @@ class MacroPanel(Panel):
         for topic in list(self._topics):
             if topic not in want:
                 self.unsubscribe(topic)
+                self._histories.pop(topic, None)
+                self._history_errors.pop(topic, None)
         for topic, (cb, err) in want.items():
             if topic not in self._topics:
                 self.subscribe(topic, cb, on_error=err)
@@ -737,10 +817,20 @@ class MacroPanel(Panel):
         self._quote_errors[sym] = str(error)
         self._render_gauges()
 
-    def _on_closes(self, sym: str, data: Any) -> None:
-        if isinstance(data, dict):
+    def _on_history(self, topic: str, sym: str, data: Any) -> None:
+        if not isinstance(data, dict):
+            return
+        self._histories[topic] = data
+        self._history_errors.pop(topic, None)
+        if topic == f"history:{sym}:1mo:1d":  # the tile's sparkline month
             self._closes[sym] = [v for v in (data.get("c") or []) if _f(v) is not None]
             self._render_gauges()
+        else:
+            self._render_detail()
+
+    def _on_history_error(self, topic: str, error: str) -> None:
+        self._history_errors[topic] = str(error)
+        self._render_detail()
 
     def _on_fred(self, sid: str, data: Any) -> None:
         if isinstance(data, dict):
@@ -789,6 +879,7 @@ class MacroPanel(Panel):
                 strip.clear_reading(i)
             else:
                 strip.set_reading(i, *reading)
+        self._render_detail()
 
     def _reading(self, g: Gauge):
         """(value, change, sign, spark, note, tone) for a gauge, or None while
@@ -921,6 +1012,154 @@ class MacroPanel(Panel):
     def _on_gauge_clicked(self, g: Gauge) -> None:
         if g.sends_symbol:
             self.set_symbol(g.code)
+
+    # -- the open gauge's detail card -------------------------------------------------
+
+    def _on_expansion(self, _gauge) -> None:
+        """A card opened, moved or closed: fetch only what it now shows."""
+        if self._live:
+            self._sync_topics()
+        self._render_detail()
+
+    def _on_detail_range(self, _chip: str) -> None:
+        if self._live:
+            self._sync_topics()
+        self._render_detail()
+
+    def _render_detail(self) -> None:
+        strip = self.gauge_strip
+        g = strip.expanded_gauge()
+        if g is None:
+            return
+        wanted = strip.detail_range()
+        try:
+            detail = self._detail(g, wanted)
+        except Exception:  # a malformed payload must not take the card down
+            detail = GaugeDetail(message="unavailable", range=wanted)
+        strip.set_detail(detail)
+
+    @staticmethod
+    def _cut(series: list, reasons: dict, wanted: str, **kw) -> GaugeDetail:
+        """The detail for ``series`` ((day, value), oldest first) at the
+        wanted range, or the next one that can draw when it can't."""
+        order = list(RANGES)
+        k = order.index(wanted) if wanted in order else 0
+        usable = [c for c in order[k:] + order[:k][::-1] if c not in reasons]
+        chip = usable[0] if usable else wanted
+        if series and chip not in reasons:
+            start = _range_start(series[-1][0], chip)
+            series = [(d, v) for d, v in series if d >= start]
+        return GaugeDetail(series=tuple(series), reasons=reasons, range=chip, **kw)
+
+    def _detail(self, g: Gauge, wanted: str) -> GaugeDetail:
+        if g.kind == "quote":
+            return self._quote_detail(g.code, wanted)
+        if g.kind == "curve":
+            return self._curve_detail(g.code, wanted)
+        if g.kind == "fred":
+            return self._fred_detail(g.code, wanted)
+        if g.kind == "policy":
+            return self._policy_detail(self._resolve_cc(g.code or "*"), wanted)
+        return GaugeDetail(range=wanted)
+
+    def _quote_detail(self, sym: str, wanted: str) -> GaugeDetail:
+        period, interval = _QUOTE_RANGES[wanted]
+        topic = f"history:{sym}:{period}:{interval}"
+        data = self._histories.get(topic)
+        if data is None:
+            if topic in self._history_errors:
+                return GaugeDetail(message=MSG_DETAIL_FAILED, range=wanted)
+            return GaugeDetail(loading=True, range=wanted)
+        series = []
+        for t, c in zip(data.get("t") or [], data.get("c") or []):
+            d, v = _bar_day(t), _f(c)
+            if d is not None and v is not None:
+                series.append((d, v))
+        if not series:
+            return GaugeDetail(message="No history for this range", range=wanted)
+        source = f"Yahoo · {_short_date(series[-1][0].isoformat(), _today())}"
+        # Yahoo serves the range asked for: nothing to cut, nothing to refuse
+        return GaugeDetail(series=tuple(series), fmt=num, source=source, range=wanted)
+
+    def _curve_detail(self, code: str, wanted: str) -> GaugeDetail:
+        parsed = _parse_curve_code(code)
+        if parsed is None:
+            return GaugeDetail(message="Unknown curve point", range=wanted)
+        cc, a, b = parsed
+        cc = self._resolve_cc(cc)
+        meta = rates_meta.by_code(cc)
+        if meta is None or meta.curve_source == "none":
+            return GaugeDetail(message="No free yield curve for this country", range=wanted)
+        cur = self._curves.get(cc)
+        if cur is None:
+            if cc in self._curve_errors:
+                return GaugeDetail(message="The curve could not be loaded", range=wanted)
+            return GaugeDetail(loading=True, range=wanted)
+        names = " · ".join(str(x) for x in (cur.get("sources") or []) if x != rates_meta.BIS)
+        as_of = str(cur.get("as_of") or "")
+        source = " · ".join(x for x in (names or meta.citation,
+                                         _short_date(as_of, _today()) if as_of else "") if x)
+        if cc not in self._hists:  # the history is on its way
+            return GaugeDetail(loading=True, source=source, range=wanted)
+        # a floor on the chart's span (10bp either way), so a quiet month
+        # reads as quiet instead of filling the card top to bottom
+        if b is None:
+            fn, fmt, span = (lambda pts: rate_at(pts, a)), (lambda v: f"{v:.2f}%"), 0.10
+        else:
+            fn, fmt, span = (lambda pts: spread_bp(pts, a, b)), (lambda v: f"{v:+.0f} bp"), 10.0
+        series = []
+        for iso, v in self._curve_series(cc, fn):
+            d, _has_day = _period(iso)
+            if d is not None:
+                series.append((d, v))
+        if len(series) < 2:
+            return GaugeDetail(message=MSG_LATEST_CURVE, source=source, range=wanted,
+                               reasons={c: MSG_LATEST_CURVE for c in RANGES})
+        reasons = _range_reasons([d for d, _v in series], "readings")
+        return self._cut(series, reasons, wanted, fmt=fmt, source=source, min_span=span)
+
+    def _fred_detail(self, sid: str, wanted: str) -> GaugeDetail:
+        data = self._fred.get(sid)
+        if data is None:
+            err = self._fred_errors.get(sid)
+            if err is None:
+                return GaugeDetail(loading=True, range=wanted)
+            msg = "Needs a FRED key" if "API_KEY" in err else MSG_DETAIL_FAILED
+            return GaugeDetail(message=msg, range=wanted)
+        series = []
+        for iso, v in data.get("points") or []:
+            d, value = _period(iso)[0], _f(v)
+            if d is not None and value is not None:
+                series.append((d, value))
+        if not series:
+            return GaugeDetail(message="No releases yet", source="FRED", range=wanted)
+        source = f"FRED · {_month_year(series[-1][0].isoformat())} release"
+        reasons = _range_reasons([d for d, _v in series], "releases")
+        return self._cut(series, reasons, wanted, fmt=num, source=source)
+
+    def _policy_detail(self, cc: str, wanted: str) -> GaugeDetail:
+        if self._policy is None:
+            if self._policy_error:
+                return GaugeDetail(message=MSG_DETAIL_FAILED, range=wanted)
+            return GaugeDetail(loading=True, range=wanted)
+        as_of = str(self._policy.get("as_of") or "")
+        source = f"BIS · {_short_date(as_of, _today())}" if as_of else "BIS"
+        row = next((r for r in self._policy.get("countries") or [] if r.get("code") == cc), None)
+        if row is None or _f(row.get("policy")) is None:
+            return GaugeDetail(message="No BIS policy rate for this country", source=source,
+                               range=wanted)
+        series = []
+        for item in row.get("history") or []:  # only when the provider carries it
+            if isinstance(item, (list, tuple)) and len(item) == 2:
+                d, v = _period(item[0])[0], _f(item[1])
+                if d is not None and v is not None:
+                    series.append((d, v))
+        if len(series) < 2:
+            return GaugeDetail(message=MSG_POLICY_LATEST, source=source, range=wanted,
+                               reasons={c: MSG_POLICY_LATEST for c in RANGES})
+        reasons = _range_reasons([d for d, _v in series], "decisions")
+        return self._cut(series, reasons, wanted, fmt=lambda v: f"{v:.2f}%", source=source,
+                         min_span=0.25)
 
     def _picker_catalog(self) -> list:
         entries = list(RATES_ENTRIES) + _HERE_ENTRIES + _EXTRA_QUOTES

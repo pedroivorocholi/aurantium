@@ -126,6 +126,12 @@ TILE_LABEL_MIN_PX = 22
 #: ~420px panel still holds three across; tiles share any width beyond it.
 GAUGE_TILE_MIN_PX = 112
 
+#: How tall a Macro gauge opens when clicked into its detail card: three
+#: tiles' worth (3 × 69px + the two gaps between), enough for a chart that
+#: reads as a chart under its figures and range chips. The card grows past it
+#: only when a narrow panel wraps its chips and footer onto more lines.
+GAUGE_CARD_PX = 224
+
 
 # -- palettes --------------------------------------------------------------
 # Dark is the original, byte-for-byte. Light is a clean paper variant that

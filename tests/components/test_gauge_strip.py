@@ -422,3 +422,233 @@ def test_reveal_highlights_a_tile_then_lets_go(strip):
     assert strip.highlighted() == 2
     QTest.qWait(strip.REVEAL_HOLD_MS + 100)
     assert strip.highlighted() == -1
+
+
+# -- click to expand ---------------------------------------------------------------
+
+
+def _click(widget, pos: QPoint) -> None:
+    QTest.mouseClick(widget, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, pos)
+
+
+def _settle(strip: GaugeStrip) -> None:
+    strip.finish_animation()
+    QApplication.processEvents()
+
+
+def test_click_expands_and_click_again_collapses(strip):
+    clicked = QSignalSpy(strip.gauge_clicked)
+    changed = QSignalSpy(strip.expansion_changed)
+    _click(strip, centre(strip, 3))
+    _settle(strip)
+    assert strip.expanded_index() == 3
+    assert strip.expanded_gauge() == DEFAULT_GAUGES[3]
+    assert clicked.count() == 1  # linking is kept: the click still goes out
+    assert changed.count() == 1 and changed.at(0)[0] == DEFAULT_GAUGES[3]
+    card = strip.card_rect()
+    tile = strip.tile_rect(3)
+    # its own full-width row, right below the tile's row
+    assert card.left() == 0 and card.width() == strip.width()
+    assert tile.bottom() < card.top() <= tile.bottom() + theme.SPACE_LG
+    assert card.height() >= theme.GAUGE_CARD_PX
+    assert strip.heightForWidth(strip.width()) >= card.bottom() + 1
+    assert strip.card().isVisibleTo(strip)
+    # the same tile again shrinks it back
+    _click(strip, centre(strip, 3))
+    _settle(strip)
+    assert strip.expanded_index() == -1
+    assert changed.count() == 2 and changed.at(1)[0] is None
+    assert strip.card_rect().height() == 0
+    assert strip.heightForWidth(strip.width()) == strip.tile_rect(0).height()
+    # and a click on the card itself, away from its controls, does too
+    _click(strip, centre(strip, 3))
+    _settle(strip)
+    card = strip.card()
+    _click(card, QPoint(theme.SPACE_SM, theme.SPACE_SM))
+    _settle(strip)
+    assert strip.expanded_index() == -1
+
+
+def test_card_opens_under_its_row_and_later_rows_move_down(strip):
+    strip.resize(420, strip.heightForWidth(420))
+    _settle(strip)
+    assert strip.row_count() > 1
+    first_row_bottom = strip.tile_rect(0).bottom()
+    below = next(i for i in range(len(DEFAULT_GAUGES)) if strip.tile_rect(i).top() > first_row_bottom)
+    before = strip.tile_rect(below).top()
+    _click(strip, centre(strip, 0))
+    _settle(strip)
+    card = strip.card_rect()
+    assert card.top() > first_row_bottom
+    # nothing is hidden: the next row now sits under the card, one gap below
+    top = strip.tile_rect(below).top()
+    assert top > card.bottom()
+    assert top - (card.bottom() + 1) == before - (first_row_bottom + 1)
+    assert len(strip.gauges()) == len(DEFAULT_GAUGES)
+
+
+def test_only_one_expanded(strip):
+    _click(strip, centre(strip, 3))
+    _click(strip, centre(strip, 5))
+    _settle(strip)
+    assert strip.expanded_index() == 5
+    assert len([w for w in strip.findChildren(type(strip.card())) if w.isVisibleTo(strip)]) == 1
+
+
+def test_esc_collapses_only_with_focus(strip):
+    from PySide6.QtGui import QKeyEvent
+    from PySide6.QtWidgets import QLineEdit
+
+    # nothing open: the strip lets Escape through for whoever wants it
+    override = QKeyEvent(QEvent.Type.ShortcutOverride, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier)
+    override.ignore()
+    QApplication.sendEvent(strip, override)
+    assert not override.isAccepted()
+
+    _click(strip, centre(strip, 4))
+    _settle(strip)
+    # open: Escape is claimed before a window shortcut (un-maximise) takes it
+    override = QKeyEvent(QEvent.Type.ShortcutOverride, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier)
+    override.ignore()
+    QApplication.sendEvent(strip, override)
+    assert override.isAccepted()
+    # Escape somewhere else leaves it open
+    other = QLineEdit()
+    other.show()
+    QTest.keyClick(other, Qt.Key.Key_Escape)
+    assert strip.expanded_index() == 4
+    other.close()
+    other.deleteLater()
+    # on the strip it closes the card
+    QTest.keyClick(strip, Qt.Key.Key_Escape)
+    _settle(strip)
+    assert strip.expanded_index() == -1
+    # and from inside the card (a range chip has focus after a click)
+    _click(strip, centre(strip, 4))
+    _settle(strip)
+    QTest.keyClick(strip.card().chip("1Y"), Qt.Key.Key_Escape)
+    _settle(strip)
+    assert strip.expanded_index() == -1
+
+
+def test_drag_does_not_expand(strip):
+    changed = QSignalSpy(strip.expansion_changed)
+    target = strip.tile_rect(7)
+    _drag(strip, centre(strip, 4), QPoint(target.right() - 4, target.center().y()))
+    _settle(strip)
+    assert strip.expanded_index() == -1
+    assert changed.count() == 0
+    # nor does a drop in place (the press-release pair is not a click)
+    r = strip.tile_rect(3)
+    _drag(strip, centre(strip, 3), QPoint(r.left() + 6, r.center().y()))
+    _settle(strip)
+    assert strip.expanded_index() == -1
+
+
+def test_remove_expanded_collapses(strip):
+    changed = QSignalSpy(strip.expansion_changed)
+    _click(strip, centre(strip, 3))
+    _settle(strip)
+    strip.remove_gauge(3)
+    _settle(strip)
+    assert strip.expanded_index() == -1
+    assert changed.count() == 2 and changed.at(1)[0] is None
+    assert not strip.card().isVisibleTo(strip)
+    assert strip.heightForWidth(strip.width()) == strip.tile_rect(0).height()
+    # removing another tile keeps the open one open, under its new index
+    _click(strip, centre(strip, 5))
+    _settle(strip)
+    gauge = strip.expanded_gauge()
+    strip.remove_gauge(0)
+    _settle(strip)
+    assert strip.expanded_gauge() == gauge and strip.expanded_index() == 4
+    # an undo (the panel restoring a list without it) closes it too
+    strip.set_gauges([g for g in strip.gauges() if g != gauge])
+    _settle(strip)
+    assert strip.expanded_index() == -1
+
+
+def test_reorder_keeps_expansion(strip):
+    vix = DEFAULT_GAUGES[4]
+    _click(strip, centre(strip, 4))
+    _settle(strip)
+    target = strip.tile_rect(7)
+    _drag(strip, centre(strip, 4), QPoint(target.right() - 4, target.center().y()))
+    _settle(strip)
+    assert codes(strip.gauges())[-1] == "^VIX"
+    assert strip.expanded_gauge() == vix and strip.expanded_index() == 7
+    # the context menu's Remove still works with a card open
+    menu = strip._context_menu(0)
+    next(a for a in menu.actions() if a.text() == "Remove").trigger()
+    assert strip.expanded_gauge() == vix
+
+
+def test_range_choice_is_remembered_per_gauge(strip):
+    picked = QSignalSpy(strip.detail_range_changed)
+    _click(strip, centre(strip, 4))
+    assert strip.detail_range() == "1M"  # the default
+    strip.card().chip("1Y").click()
+    assert picked.count() == 1 and picked.at(0)[0] == "1Y"
+    assert strip.detail_range() == "1Y"
+    _click(strip, centre(strip, 5))
+    assert strip.detail_range() == "1M"
+    _click(strip, centre(strip, 4))
+    assert strip.detail_range() == "1Y"
+
+
+def test_card_heading_follows_the_tile(strip):
+    _click(strip, centre(strip, 4))
+    card = strip.card()
+    assert card.is_loading()
+    strip.set_reading(4, "17.40", "+2.96%", 1, [16.0, 17.4])
+    assert card.value_text() == "17.40" and card.change_text() == "+2.96%"
+    strip.set_label(4, "VIX index")
+    assert card.label_text() == "VIX index"
+    strip.clear_reading(4)
+    assert card.value_text() == "…"
+
+
+def test_card_shows_high_low_and_snaps_its_hover(strip):
+    from datetime import date
+
+    from aurantium.components.gauge_card import GaugeDetail
+
+    _click(strip, centre(strip, 4))
+    _settle(strip)
+    series = ((date(2026, 10, 6), 18.0), (date(2026, 10, 20), 21.5),
+              (date(2026, 11, 3), 15.25), (date(2026, 11, 5), 17.4))
+    strip.set_detail(GaugeDetail(series=series, fmt=lambda v: f"{v:.2f}",
+                                 source="Yahoo · 5 Nov", range="1M"))
+    card = strip.card()
+    assert not card.is_loading()
+    assert card.high_text() == "High 21.50 · 20 Oct"
+    assert card.low_text() == "Low 15.25 · 3 Nov"
+    assert card.source_text() == "Yahoo · 5 Nov"
+    assert card.chip("1M").isChecked()
+    # the readout snaps to the nearest day that has a value
+    assert card.hover_text_near(date(2026, 10, 19)) == "20 Oct 2026  21.50"
+    # a chip with nothing to show says why and can't be picked
+    strip.set_detail(GaugeDetail(series=series, fmt=str, range="1M",
+                                 reasons={"5Y": "History goes back about a year"}))
+    assert not card.chip("5Y").isEnabled()
+    assert "about a year" in card.chip("5Y").toolTip()
+    # no series: a message stands in for the chart
+    strip.set_detail(GaugeDetail(message="BIS publishes the latest rate only", range="1M"))
+    assert card.message() == "BIS publishes the latest rate only"
+    assert card.high_text() == "" and card.low_text() == ""
+
+
+def test_expansion_motion_follows_the_animation_setting(strip, monkeypatch):
+    monkeypatch.setattr(motion, "animations_enabled", lambda: False)
+    _click(strip, centre(strip, 2))
+    assert not strip.is_animating()
+    assert strip.card_rect().height() >= theme.GAUGE_CARD_PX
+    _click(strip, centre(strip, 2))
+    assert not strip.is_animating() and strip.card_rect().height() == 0
+    monkeypatch.setattr(motion, "animations_enabled", lambda: True)
+    _click(strip, centre(strip, 2))
+    assert strip.is_animating()
+    assert strip.expanded_index() == 2  # the state is final at once; only the drawing travels
+    QTest.qWait(motion.CARD_GROW_MS + 150)
+    assert not strip.is_animating()
+    assert strip.card_rect().height() >= theme.GAUGE_CARD_PX

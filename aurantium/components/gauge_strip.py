@@ -18,6 +18,16 @@ Editing happens in place, never in a dialog:
 * drag a tile past the system drag distance to reorder — a thin accent bar
   marks where it will land, Escape puts it back.
 
+A click on a tile (a press and release on it, never a drag) still emits
+``gauge_clicked`` and also **opens the gauge into a detail card**
+(``GaugeCard``): a full-width row of its own right under the tile's row, with
+a chart, range chips, the range's high and low and the source. The rows below
+slide down to make room — nothing is hidden. One card at a time; a click on
+the same tile, on the card away from its controls, or Escape (with the strip
+or card focused) closes it. The card is view state: not saved, not an undo
+step, and it follows its gauge through a reorder. The panel fills it
+(``set_detail``) after ``expansion_changed`` / ``detail_range_changed``.
+
 ``add_gauge`` / ``replace_gauge`` / ``remove_gauge`` and a drop are *user*
 edits: each emits ``gauges_changed`` with the new list so the panel can push an
 undo step. ``set_gauges`` is the panel talking (a restore, an undo) and never
@@ -55,6 +65,7 @@ from PySide6.QtWidgets import QApplication, QMenu, QSizePolicy, QToolTip, QWidge
 
 from .. import motion
 from ..macro_model import tenor_label
+from .gauge_card import DEFAULT_RANGE, GaugeCard, GaugeDetail
 from ..theme import (
     ACCENT,
     BG_ALT,
@@ -67,6 +78,7 @@ from ..theme import (
     FONT_SM,
     FONT_TITLE,
     FONT_XS,
+    GAUGE_CARD_PX,
     GAUGE_TILE_MIN_PX,
     ICON_PX,
     LABEL,
@@ -161,8 +173,9 @@ _PLUS_W = ICON_PX + 2 * SPACE_LG
 #: A row stops sharing out width past this: two gauges on a wide panel stay
 #: gauges, not banners.
 _TILE_MAX_PX = GAUGE_TILE_MIN_PX * 2
-_NO_SYMBOL_HINT = "No symbol to send to linked panels: clicking does nothing."
-_EDIT_HINT = "Drag to reorder · right-click to replace or remove"
+_NO_SYMBOL_HINT = "Nothing to send to linked panels: a click only opens its detail."
+_EDIT_HINT = "Click for detail · drag to reorder · right-click to replace or remove"
+_OPEN_HINT = "Click to close its detail · drag to reorder · right-click to replace or remove"
 
 
 def _font(family: str, px: int, weight: int = 0) -> QFont:
@@ -191,6 +204,8 @@ class GaugeStrip(QWidget):
     gauges_changed = Signal(list)     # list[Gauge], after every user edit
     add_requested = Signal()
     replace_requested = Signal(int)   # tile index
+    expansion_changed = Signal(object)  # the Gauge opened into its card, or None
+    detail_range_changed = Signal(str)  # a range chip picked on the open card
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -246,6 +261,25 @@ class GaugeStrip(QWidget):
         self._reveal_timer.setSingleShot(True)
         self._reveal_timer.timeout.connect(self._end_reveal)
 
+        # the detail card: which gauge is open, and how far each opening
+        # under a row is drawn (0..1 of the card's height, by tile uid)
+        self._expanded_uid = -1          # the open gauge; -1 = none
+        self._card_uid = -1              # what the card shows (stays while closing)
+        self._open: dict[int, float] = {}
+        self._open_from: dict[int, float] = {}
+        self._open_to: dict[int, float] = {}
+        self._open_anim = QVariantAnimation(self)
+        self._open_anim.setStartValue(0.0)
+        self._open_anim.setEndValue(1.0)
+        self._open_anim.setEasingCurve(QEasingCurve(motion.EASE_TRAVEL))
+        self._open_anim.valueChanged.connect(self._on_open_value)
+        self._open_anim.finished.connect(self._settle_open)
+        self._ranges: dict[tuple[str, str], str] = {}  # this session's chip per gauge
+        self._card: Optional[GaugeCard] = None  # made on first open: a chart costs
+        self._clip: Optional[QWidget] = None    # the card's window while it grows
+        self._card_geom = QRect()
+        self._laid_height = -1
+
         # press feedback sinks just the pressed tile (see press.py)
         self.__dict__["press_region"] = self._press_region
 
@@ -289,6 +323,7 @@ class GaugeStrip(QWidget):
         tone = note_tone if note_tone in NOTE_TONES else ""
         self._tiles[index].reading = Reading(str(value), str(change or ""), sign, tuple(clean),
                                               str(note or ""), tone)
+        self._sync_card_heading()
         self.update()
 
     def clear_reading(self, index: int) -> None:
@@ -296,6 +331,7 @@ class GaugeStrip(QWidget):
         stands (the panel switched country and the new data is on its way)."""
         if 0 <= index < len(self._tiles) and self._tiles[index].reading is not None:
             self._tiles[index].reading = None
+            self._sync_card_heading()
             self.update()
 
     def reveal(self, index: int) -> None:
@@ -319,7 +355,164 @@ class GaugeStrip(QWidget):
         ("10Y" as "UST 10Y"). Empty text goes back to the gauge's own label."""
         if 0 <= index < len(self._tiles):
             self._tiles[index].label = str(text or "")
+            self._sync_card_heading()
             self.update()
+
+    # -- the detail card (view state: never an edit, never saved) --------------
+
+    def expand(self, index: int) -> None:
+        """Open tile ``index`` into its detail card, closing any other."""
+        if not 0 <= index < len(self._tiles):
+            return
+        tile = self._tiles[index]
+        if tile.uid == self._expanded_uid:
+            return
+        card = self._ensure_card()
+        before = self._card_uid
+        self._expanded_uid = self._card_uid = tile.uid
+        card.set_loading(self.detail_range())
+        self._sync_card_heading()
+        self._animate_open(tile.uid, before)
+        self.expansion_changed.emit(tile.gauge)
+
+    def collapse(self) -> None:
+        if self._expanded_uid < 0:
+            return
+        self._expanded_uid = -1
+        self._hand_focus_back()
+        self._animate_open(-1, self._card_uid)
+        self.expansion_changed.emit(None)
+
+    def toggle(self, index: int) -> None:
+        if 0 <= index < len(self._tiles) and self._tiles[index].uid == self._expanded_uid:
+            self.collapse()
+        else:
+            self.expand(index)
+
+    def expanded_index(self) -> int:
+        return next((i for i, t in enumerate(self._tiles) if t.uid == self._expanded_uid), -1)
+
+    def expanded_gauge(self) -> Optional[Gauge]:
+        i = self.expanded_index()
+        return self._tiles[i].gauge if i >= 0 else None
+
+    def detail_range(self) -> str:
+        """The range chip the open gauge last had this session (1M at first)."""
+        g = self.expanded_gauge()
+        return self._ranges.get((g.kind, g.code), DEFAULT_RANGE) if g is not None else DEFAULT_RANGE
+
+    def set_detail(self, detail: GaugeDetail) -> None:
+        """The panel filling the open card."""
+        if self._card is not None and self._expanded_uid >= 0:
+            self._card.set_detail(detail)
+
+    def clear_detail(self) -> None:
+        """The open card back to loading: what it showed no longer stands."""
+        if self._card is not None and self._expanded_uid >= 0:
+            self._card.set_loading(self.detail_range())
+
+    def card(self) -> GaugeCard:
+        return self._ensure_card()
+
+    def card_rect(self) -> QRect:
+        """Where the card is drawn right now (zero height when closed)."""
+        self._ensure_layout()
+        return QRect(self._card_geom)
+
+    def _ensure_card(self) -> GaugeCard:
+        if self._card is None:
+            self._clip = QWidget(self)
+            self._clip.hide()
+            self._card = GaugeCard(self._clip)
+            self._card.range_picked.connect(self._on_card_range)
+            self._card.close_requested.connect(self.collapse)
+        return self._card
+
+    def _on_card_range(self, name: str) -> None:
+        g = self.expanded_gauge()
+        if g is None:
+            return
+        self._ranges[(g.kind, g.code)] = name
+        self._card.set_loading(name)  # the panel answers with the range's data
+        self.detail_range_changed.emit(name)
+
+    def _sync_card_heading(self) -> None:
+        if self._card is None or self._card_uid < 0:
+            return
+        tile = next((t for t in self._tiles if t.uid == self._card_uid), None)
+        if tile is None:
+            return
+        r = tile.reading
+        if r is None:
+            self._card.set_heading(tile.shown_label, "…", "", 0)
+        else:
+            self._card.set_heading(tile.shown_label, r.value, r.change, r.change_sign,
+                                   r.note, r.note_tone)
+
+    def _hand_focus_back(self) -> None:
+        """A closing card must not take the keyboard focus away with it."""
+        focus = QApplication.focusWidget()
+        if self._clip is not None and focus is not None and self._clip.isAncestorOf(focus):
+            self.setFocus(Qt.FocusReason.OtherFocusReason)
+
+    def _row_of(self, uid: int) -> int:
+        self._ensure_layout()
+        i = next((k for k, t in enumerate(self._tiles) if t.uid == uid), -1)
+        return self._rects[i].top() if 0 <= i < len(self._rects) else -1
+
+    def _animate_open(self, uid: int, before: int) -> None:
+        """Open the card under ``uid``'s row (or close it, ``uid`` -1). A
+        switch between tiles of one row keeps the opening where it is."""
+        if uid >= 0 and before >= 0 and before != uid and before in self._open:
+            if self._row_of(before) == self._row_of(uid):
+                self._open[uid] = self._open.pop(before)
+        target = {uid: 1.0} if uid >= 0 else {}
+        self._open_anim.stop()
+        if not (motion.animations_enabled() and self.isVisible()):
+            self._open = dict(target)
+            self._settle_open()
+            return
+        self._open_from = dict(self._open)
+        self._open_to = target
+        self._open_anim.setDuration(motion.CARD_GROW_MS)
+        self._open_anim.start()
+
+    def _on_open_value(self, value) -> None:
+        t = float(value)
+        keys = set(self._open_from) | set(self._open_to)
+        self._open = {u: self._open_from.get(u, 0.0)
+                      + (self._open_to.get(u, 0.0) - self._open_from.get(u, 0.0)) * t
+                      for u in keys}
+        self._relayout()
+        self.update()
+
+    def _settle_open(self) -> None:
+        if self._open_anim.state() == QVariantAnimation.State.Running:
+            return
+        if self._expanded_uid >= 0:
+            self._open = {self._expanded_uid: 1.0}
+        else:
+            self._open = {}
+            self._card_uid = -1
+        self._open_from, self._open_to = {}, {}
+        self._relayout()
+        self.update()
+
+    def _drop_missing_expansion(self) -> None:
+        """The open gauge left the strip (a remove, an undo): close at once."""
+        uids = {t.uid for t in self._tiles}
+        self._open = {u: f for u, f in self._open.items() if u in uids}
+        self._open_from = {u: f for u, f in self._open_from.items() if u in uids}
+        self._open_to = {u: f for u, f in self._open_to.items() if u in uids}
+        if self._card_uid >= 0 and self._card_uid not in uids:
+            self._card_uid = -1
+        if self._expanded_uid >= 0 and self._expanded_uid not in uids:
+            self._expanded_uid = -1
+            self._hand_focus_back()
+            self._open_anim.stop()
+            self._open = {}
+            self._open_from, self._open_to = {}, {}
+            self.expansion_changed.emit(None)
 
     # -- user edits (each emits gauges_changed) ------------------------------
 
@@ -424,7 +617,7 @@ class GaugeStrip(QWidget):
             lines.append(tile.reading.note)
         if not tile.gauge.sends_symbol:
             lines.append(_NO_SYMBOL_HINT)
-        lines.append(_EDIT_HINT)
+        lines.append(_OPEN_HINT if tile.uid == self._expanded_uid else _EDIT_HINT)
         return "\n".join(lines)
 
     def is_dragging(self) -> bool:
@@ -453,62 +646,110 @@ class GaugeStrip(QWidget):
         return self._grid(self.width() if width is None else width)[2]
 
     def is_animating(self) -> bool:
-        return self._anim.state() == QVariantAnimation.State.Running
+        running = QVariantAnimation.State.Running
+        return self._anim.state() == running or self._open_anim.state() == running
 
     def finish_animation(self) -> None:
         if self._anim.state() != QVariantAnimation.State.Stopped:
             self._anim.stop()
         self._settle()
+        if self._open_anim.state() != QVariantAnimation.State.Stopped:
+            self._open_anim.stop()
+            self._settle_open()
 
     # -- layout -----------------------------------------------------------------
 
-    def _grid(self, width: int) -> tuple[list[QRect], QRect, int]:
-        """Tile rects, the + tile's rect and the row count at ``width``.
+    def _card_full_h(self, width: int) -> int:
+        """The open card's height at ``width``: the token, or more when a
+        narrow card wraps its chips and footer."""
+        if self._card is None:
+            return GAUGE_CARD_PX
+        return max(GAUGE_CARD_PX, self._card.heightForWidth(width))
+
+    def _grid(self, width: int) -> tuple[list[QRect], QRect, int, int, QRect]:
+        """Tile rects, the + tile's rect, the row count, the total height and
+        the card's rect at ``width``.
 
         Columns are as many minimum-width tiles as fit beside a reserved +
         column; the tiles of a row then share the leftover width (up to a
         cap), so the grid fills edge to edge and the columns line up across
-        rows. The + tile sits right after the last gauge."""
+        rows. The + tile sits right after the last gauge. Under a row with
+        an open (or opening) gauge sits the card's own row, as tall as it is
+        open so far; the rows below it move down by that much."""
         n = len(self._tiles)
         avail = max(GAUGE_TILE_MIN_PX, width - _PLUS_W - _GAP)
         cols = max(1, (avail + _GAP) // (GAUGE_TILE_MIN_PX + _GAP))
         cols = min(cols, max(1, n))
         tw = min(float(_TILE_MAX_PX), (avail - _GAP * (cols - 1)) / cols)
         th = self._tile_h
+        rows = max(1, math.ceil(n / cols))
+        full = self._card_full_h(width) if self._open else 0
+        opening: dict[int, float] = {}
+        for i, t in enumerate(self._tiles):
+            f = self._open.get(t.uid, 0.0)
+            if f > 0.0:
+                r = i // cols
+                opening[r] = max(opening.get(r, 0.0), f)
+        tops: list[int] = []
+        y = 0.0
+        for r in range(rows):
+            tops.append(round(y))
+            y += th + _GAP + opening.get(r, 0.0) * (full + _GAP)
+        height = max(th, round(y - _GAP))
         rects: list[QRect] = []
         for i in range(n):
             row, col = divmod(i, cols)
             x0 = round(col * (tw + _GAP))
             x1 = round(col * (tw + _GAP) + tw)
-            rects.append(QRect(x0, row * (th + _GAP), x1 - x0, th))
+            rects.append(QRect(x0, tops[row], x1 - x0, th))
         if rects:
             last = rects[-1]
             plus = QRect(last.right() + 1 + _GAP, last.top(), _PLUS_W, th)
         else:
             plus = QRect(0, 0, _PLUS_W, th)
-        rows = max(1, math.ceil(n / cols))
-        return rects, plus, rows
+        card = QRect()
+        k = next((i for i, t in enumerate(self._tiles) if t.uid == self._card_uid), -1)
+        if k >= 0 and self._open.get(self._card_uid, 0.0) > 0.0:
+            top = tops[k // cols] + th + _GAP
+            card = QRect(0, top, width, round(self._open[self._card_uid] * full))
+        return rects, plus, rows, height, card
 
     def _ensure_layout(self) -> None:
         if self._laid_width != self.width() or len(self._rects) != len(self._tiles):
             self._relayout()
 
     def _relayout(self) -> None:
-        self._rects, self._plus, rows = self._grid(self.width())
+        self._rects, self._plus, rows, height, self._card_geom = self._grid(self.width())
         self._laid_width = self.width()
-        if rows != self._rows:
+        self._rows = rows
+        if height != self._laid_height:
             # the strip's height changed: ask the panel's layout for it
-            self._rows = rows
+            self._laid_height = height
             self.updateGeometry()
+        self._place_card()
 
-    def _height_for_rows(self, rows: int) -> int:
-        return rows * self._tile_h + (rows - 1) * _GAP
+    def _place_card(self) -> None:
+        """The card sits at full size inside a window as tall as it is open
+        so far, so it is uncovered like a drawer instead of being squeezed
+        (its chart is laid out once, not on every frame)."""
+        if self._clip is None:
+            return
+        geom = self._card_geom
+        if geom.height() <= 0 or self._card_uid < 0:
+            self._clip.hide()
+            return
+        self._clip.setGeometry(geom)
+        full = max(geom.height(), self._card_full_h(geom.width()))
+        if self._card.size() != QSize(geom.width(), full):
+            self._card.setGeometry(0, 0, geom.width(), full)
+        self._clip.show()
+        self._clip.raise_()
 
     def hasHeightForWidth(self) -> bool:  # noqa: N802 (Qt override)
         return True
 
     def heightForWidth(self, width: int) -> int:  # noqa: N802 (Qt override)
-        return self._height_for_rows(self._grid(width)[2])
+        return self._grid(width)[3]
 
     def sizeHint(self) -> QSize:  # noqa: N802 (Qt override)
         n = max(1, len(self._tiles))
@@ -521,8 +762,12 @@ class GaugeStrip(QWidget):
 
     def resizeEvent(self, event) -> None:  # noqa: N802 (Qt override)
         super().resizeEvent(event)
-        # a resize mid-glide lands it: the targets just moved under it
-        self.finish_animation()
+        # a new width mid-glide lands it: the targets just moved under it.
+        # A new height alone is the card opening: the glide carries on.
+        if event.oldSize().width() != event.size().width():
+            if self._anim.state() != QVariantAnimation.State.Stopped:
+                self._anim.stop()
+            self._settle()
         self._relayout()
 
     # -- animation ----------------------------------------------------------------
@@ -546,6 +791,7 @@ class GaugeStrip(QWidget):
                     animate: bool = True) -> None:
         self._revealed = -1  # the outlined index may now be another tile
         self._reveal_timer.stop()
+        self._drop_missing_expansion()
         self._relayout()
         if self._hover >= len(self._tiles):
             self._hover = -1
@@ -629,6 +875,10 @@ class GaugeStrip(QWidget):
         return (QRect(self._rects[i]), RADIUS_MD) if i >= 0 else None
 
     def event(self, event) -> bool:  # noqa: A003 (Qt override)
+        if (event.type() == QEvent.Type.ShortcutOverride and event.key() == Qt.Key.Key_Escape
+                and (self._drag >= 0 or self._expanded_uid >= 0)):
+            event.accept()  # ours, before a window's Esc shortcut (un-maximise) takes it
+            return True
         if event.type() == QEvent.Type.ToolTip:
             tip = "" if self._drag >= 0 else self.tooltip_at(event.pos())
             if tip:
@@ -662,8 +912,8 @@ class GaugeStrip(QWidget):
         i = self.index_at(pos)
         if i != self._hover:
             self._hover = i
-            sendable = i == -2 or (i >= 0 and self._tiles[i].gauge.sends_symbol)
-            if sendable:
+            # every tile opens its detail on a click, so every tile is a button
+            if i == -2 or i >= 0:
                 self.setCursor(Qt.CursorShape.PointingHandCursor)
             else:
                 self.unsetCursor()
@@ -694,7 +944,11 @@ class GaugeStrip(QWidget):
         if i == pressed == -2:
             self.add_requested.emit()
         elif i >= 0 and i == pressed:
+            uid = self._tiles[i].uid
             self.gauge_clicked.emit(self._tiles[i].gauge)
+            # the click may have changed the strip under us: find the tile again
+            k = next((n for n, t in enumerate(self._tiles) if t.uid == uid), -1)
+            self.toggle(k)
         super().mouseReleaseEvent(event)
 
     def focusOutEvent(self, event) -> None:  # noqa: N802 (Qt override)
@@ -710,6 +964,10 @@ class GaugeStrip(QWidget):
     def keyPressEvent(self, event) -> None:  # noqa: N802 (Qt override)
         if event.key() == Qt.Key.Key_Escape and self._drag >= 0:
             self._cancel_drag()
+            event.accept()
+            return
+        if event.key() == Qt.Key.Key_Escape and self._expanded_uid >= 0:
+            self.collapse()
             event.accept()
             return
         super().keyPressEvent(event)
@@ -749,9 +1007,11 @@ class GaugeStrip(QWidget):
                     self._paint_placeholder(p, QRectF(target))
                     continue
                 p.setOpacity(t if tile.uid in self._fade_in else 1.0)
+                opened = tile.uid == self._card_uid and self._card_geom.height() > 0
                 self._paint_tile(p, tile, self._painted(tile.uid, target), hover=i == self._hover,
-                                 lifted=i == self._revealed)
+                                 lifted=i == self._revealed, opened=opened)
             p.setOpacity(1.0)
+            self._paint_caret(p)
             self._paint_plus(p, self._painted(_PLUS, self._plus), hover=self._hover == -2)
             if self._drag >= 0:
                 bar = self.drop_indicator_rect()
@@ -788,9 +1048,27 @@ class GaugeStrip(QWidget):
         p.drawLine(QPointF(c.x() - arm, c.y()), QPointF(c.x() + arm, c.y()))
         p.drawLine(QPointF(c.x(), c.y() - arm), QPointF(c.x(), c.y() + arm))
 
+    def _paint_caret(self, p: QPainter) -> None:
+        """A small notch on the card's top edge, pointing up at its tile, so
+        it reads as that tile opened rather than a new row from nowhere."""
+        card = self._card_geom
+        k = next((i for i, t in enumerate(self._tiles) if t.uid == self._card_uid), -1)
+        if k < 0 or card.height() <= 0 or k == self._drag:
+            return
+        tile = self._painted(self._tiles[k].uid, self._rects[k])
+        cx, base = tile.center().x(), float(card.top())
+        half, tip = float(SPACE_MD), base - (_GAP - 1)
+        path = QPainterPath(QPointF(cx - half, base))
+        path.lineTo(cx, tip)
+        path.lineTo(cx + half, base)
+        path.closeSubpath()
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(ACCENT))
+        p.drawPath(path)
+
     def _paint_tile(self, p: QPainter, tile: _Tile, rect: QRectF, hover: bool,
-                    lifted: bool = False) -> None:
-        edge = ACCENT if lifted else (FG_DIM if hover else BORDER_STRONG)
+                    lifted: bool = False, opened: bool = False) -> None:
+        edge = ACCENT if (lifted or opened) else (FG_DIM if hover else BORDER_STRONG)
         self._frame(p, rect, edge, CHROME_LOW if lifted else BG_ALT)
         inner = rect.adjusted(_PAD_X, _PAD_Y, -_PAD_X, -_PAD_Y)
         x, w = inner.left(), inner.width()

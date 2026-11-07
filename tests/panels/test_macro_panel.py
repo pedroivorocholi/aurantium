@@ -641,3 +641,130 @@ def test_fresh_curve_reading_has_no_date_note(make):
     p = make()
     _feed_us()
     assert "as of" not in p.gauge_strip.reading(_index(p, "curve", "*:10")).note
+
+
+# -- a gauge expanded into its detail card ----------------------------------------------
+
+
+def _bars(*days):
+    """A history payload: one close per (iso day, close), stamped at New York
+    midnight as Yahoo stamps daily bars."""
+    import calendar
+
+    t = [calendar.timegm(date.fromisoformat(d).timetuple()) + 5 * 3600 for d, _c in days]
+    return {"t": t, "c": [c for _d, c in days]}
+
+
+def test_expanded_quote_gauge_subscribes_its_range_and_drops_it_on_collapse(make):
+    p = make()
+    _feed_us()
+    strip = p.gauge_strip
+    i = _index(p, "quote", "DX-Y.NYB")
+    strip.expand(i)
+    card = strip.card()
+    # 1M is the sparkline's own topic: already held, so the card reads at once
+    assert card.chip("1M").isChecked()
+    assert len(card.series()) == 3
+    card.chip("1Y").click()
+    assert "history:DX-Y.NYB:1y:1d" in p._topics
+    assert card.is_loading()  # never the month's line under a 1Y chip
+    _publish("history:DX-Y.NYB:1y:1d", _bars(("2025-11-05", 103.0), ("2026-04-01", 97.5),
+                                             ("2026-11-05", 99.12)))
+    assert len(card.series()) == 3 and not card.is_loading()
+    card.chip("5Y").click()
+    assert "history:DX-Y.NYB:5y:1wk" in p._topics
+    assert "history:DX-Y.NYB:1y:1d" not in p._topics
+    assert "history:DX-Y.NYB:1y:1d" not in DataHub.instance().subscribed_topics()
+    strip.collapse()
+    assert "history:DX-Y.NYB:5y:1wk" not in p._topics
+    assert "history:DX-Y.NYB:1mo:1d" in p._topics  # the tile's sparkline stays
+    # another quote gauge expanded: only its own range is fetched
+    strip.expand(_index(p, "quote", "^VIX"))
+    assert "history:^VIX:1mo:1d" in p._topics
+    assert not any(t.startswith("history:DX-Y.NYB:") and not t.endswith("1mo:1d") for t in p._topics)
+    # nothing about the expansion is saved
+    assert set(p.settings()) == {"country", "comparisons", "gauges", "cftc"}
+
+
+def test_quote_history_failure_says_so_on_the_card(make):
+    p = make()
+    _feed_us()
+    strip = p.gauge_strip
+    strip.expand(_index(p, "quote", "DX-Y.NYB"))
+    strip.card().chip("6M").click()
+    _publish_error("history:DX-Y.NYB:6mo:1d", "history fetch failed: timeout")
+    assert "couldn't be loaded" in strip.card().message()
+
+
+def test_range_chip_without_history_is_disabled_with_reason(make):
+    p = make()
+    _feed_us()
+    strip = p.gauge_strip
+    strip.expand(_index(p, "curve", "*:10"))
+    card = strip.card()
+    assert card.chip("1Y").isEnabled() and card.chip("6M").isEnabled()
+    assert not card.chip("5Y").isEnabled()
+    assert "history" in card.chip("5Y").toolTip().lower()
+    # the spread reads the same curve history: same limit
+    strip.expand(_index(p, "curve", "*:2-10"))
+    assert not card.chip("5Y").isEnabled()
+    # BIS gives the policy gauge its latest rate only: figures, no chart
+    strip.expand(_index(p, "policy", "*"))
+    assert card.message() == "BIS publishes the latest rate only"
+    assert card.value_text() == "4.00%"
+    assert not any(card.chip(c).isEnabled() for c in ("1M", "6M", "1Y", "5Y"))
+    assert card.source_text() == "BIS · Oct"
+
+
+def test_country_switch_puts_expanded_card_to_loading(make):
+    p = make()
+    _feed_us()
+    strip = p.gauge_strip
+    strip.expand(_index(p, "curve", "*:10"))
+    card = strip.card()
+    assert card.series() and card.label_text() == "US 10Y"
+    p.curve_view.pick_country("JP")
+    assert card.is_loading() and card.series() == ()
+    assert card.label_text() == "JGB 10Y"
+    assert "U.S. Treasury" not in card.source_text()
+    _publish("rates:curve:JP", _curve("JP", JP_NOW, "Japan MOF", "2026-11-05"))
+    assert card.value_text() == "1.52%"
+    assert card.source_text() == "Japan MOF · 5 Nov"
+
+
+def test_high_low_and_source_shown(make):
+    p = make()
+    _feed_us()
+    strip = p.gauge_strip
+    strip.expand(_index(p, "curve", "*:10"))
+    card = strip.card()
+    assert card.source_text() == "U.S. Treasury · 5 Nov"
+    card.chip("1Y").click()
+    assert card.chip("1Y").isChecked()
+    assert card.high_text() == "High 4.52% · 5 Nov 2025"
+    assert card.low_text() == "Low 4.10% · 5 Oct"
+    # a market gauge cites Yahoo with its last bar's date
+    strip.expand(_index(p, "quote", "DX-Y.NYB"))
+    _publish("history:DX-Y.NYB:1mo:1d", _bars(("2026-10-06", 98.0), ("2026-10-20", 98.7),
+                                              ("2026-11-05", 99.12)))
+    assert card.source_text() == "Yahoo · 5 Nov"
+    assert card.high_text() == "High 99.12 · 5 Nov"
+    assert card.low_text() == "Low 98.00 · 6 Oct"
+
+
+def test_fred_gauge_card_reads_its_releases(make):
+    p = make(settings={"gauges": [["fred", "UNRATE", "Unemployment"]]})
+    points = [[f"{y}-{m:02d}-01", 4.0 + (y - 2022) * 0.1 + m / 100] for y in range(2021, 2027)
+              for m in range(1, 13) if (y, m) <= (2026, 9)]
+    _publish("fred:UNRATE", {"points": points, "title": "x"})
+    strip = p.gauge_strip
+    strip.expand(0)
+    card = strip.card()
+    assert card.source_text() == "FRED · Sep 2026 release"
+    # monthly releases: one month holds at most one, so 1M can't draw a line
+    assert not card.chip("1M").isEnabled()
+    assert "release" in card.chip("1M").toolTip().lower()
+    assert card.chip("5Y").isEnabled()
+    # the remembered 1M falls through to the next range that can draw
+    assert card.chip("6M").isChecked()
+    assert len(card.series()) >= 6
