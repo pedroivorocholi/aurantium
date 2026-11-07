@@ -20,6 +20,79 @@
     <language>en</language>
 
     <item>
+      <title>Aurantium 1.17.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.17.0</h3>
+        <ul>
+          <li>aurantium 1.17.0</li>
+          <li>New Heatmap panel replaces Sector Heatmap: sectors, companies in a sector, index members, your Watchlist, Portfolio or a Custom list</li>
+          <li>Heatmap indexes include S&amp;P 500, Nasdaq 100, Dow, Ibovespa, FTSE 100, DAX, CAC 40, Euro Stoxx 50, Nikkei 225, Hang Seng and S&amp;P/TSX 60</li>
+          <li>Heatmap tiles are sized by market cap in any region, converted to one currency when a view mixes currencies</li>
+          <li>Redesigned Macro / Rates panel: country switch, editable gauge strip, comparable yield curve and positioning bars</li>
+          <li>Click a Macro gauge to open it into a detail card with 1M / 6M / 1Y / 5Y history, high and low, and its source; click again or press Esc to close</li>
+          <li>New yield curves for Canada (Bank of Canada) and Brazil (Tesouro Nacional)</li>
+          <li>Preferred currency (Settings menu): Portfolio totals, weights, risk and performance, and Portfolio news ranking, are converted into it</li>
+          <li>Panels menu has a search box</li>
+          <li>Edit button moved beside the filter box in Commodities, World Indices and FX Monitor</li>
+          <li>Faster, smoother startup: secure connections no longer stall the window while data loads</li>
+          <li>Note: going back to an older version loses the Heatmap Custom list and the new Macro gauges and country choice</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sat, 07 Nov 2026 04:52:15 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.17.0/aurantium-setup.exe"
+        sparkle:version="1.17.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76104960"
+        sparkle:edSignature="+TYydj/YhzJ7GkynOi7L0gR2EAH6k8CoknQjMgExjr5bBzFLclSuziQpajE9pubCcC3T0zcVF8NUdGiJvGISBw=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.17.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.17.0</h3>
+        <ul>
+          <li>aurantium 1.17.0</li>
+          <li>New Heatmap panel replaces Sector Heatmap: sectors, companies in a sector, index members, your Watchlist, Portfolio or a Custom list</li>
+          <li>Heatmap indexes include S&amp;P 500, Nasdaq 100, Dow, Ibovespa, FTSE 100, DAX, CAC 40, Euro Stoxx 50, Nikkei 225, Hang Seng and S&amp;P/TSX 60</li>
+          <li>Heatmap tiles are sized by market cap in any region, converted to one currency when a view mixes currencies</li>
+          <li>Redesigned Macro / Rates panel: country switch, editable gauge strip, comparable yield curve and positioning bars</li>
+          <li>Click a Macro gauge to open it into a detail card with 1M / 6M / 1Y / 5Y history, high and low, and its source; click again or press Esc to close</li>
+          <li>New yield curves for Canada (Bank of Canada) and Brazil (Tesouro Nacional)</li>
+          <li>Preferred currency (Settings menu): Portfolio totals, weights, risk and performance, and Portfolio news ranking, are converted into it</li>
+          <li>Panels menu has a search box</li>
+          <li>Edit button moved beside the filter box in Commodities, World Indices and FX Monitor</li>
+          <li>Faster, smoother startup: secure connections no longer stall the window while data loads</li>
+          <li>Note: going back to an older version loses the Heatmap Custom list and the new Macro gauges and country choice</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sat, 07 Nov 2026 04:52:15 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.17.0/aurantium-mac.zip"
+        sparkle:version="1.17.0"
+        sparkle:os="macos"
+        length="298591016"
+        sparkle:edSignature="xEExjZlp7Y8MYke3eiui7QLucAc6dXGOZUtsIkcv6/xC6meTWXkM3OGmADpHDXj7frRpyAJg0xFdGCJ/rcgMCA=="
+        type="application/zip" />
+    </item>
+    <item>
       <title>Aurantium 1.16.1</title>
       <description><![CDATA[
         <style>
