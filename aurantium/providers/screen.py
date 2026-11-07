@@ -6,8 +6,9 @@ Topics
     The ``n`` largest US equities in a screener sector (``Technology``,
     ``Consumer Cyclical``, ...), by intraday market cap, descending.
 ``screen:symbols:<SYM,SYM,...>``
-    Exactly those symbols (sorted, upper-cased, de-duplicated, so equal sets
-    share one topic -- build it with :func:`symbols_topic`).
+    Exactly those symbols, any region (sorted, upper-cased, de-duplicated, so
+    equal sets share one topic -- build it with :func:`symbols_topic`). A
+    symbol Yahoo does not know has no row.
 ``sectorcap:all``
     ``{<Sector>: market_cap}`` for the 11 sectors, from ``yf.Sector(key).overview``.
 
@@ -26,7 +27,18 @@ Live findings (yfinance 1.5.1, 2026-11-05)
 * ``EquityQuery("is-in", ["ticker", ...])`` does NOT work: yfinance raises
   ``Invalid field ... "ticker"`` and no symbol field exists. So the symbols
   topic fetches the 250 largest US caps (the screener's size cap) and filters
-  locally; a requested symbol outside that set (small caps, non-US) is absent.
+  locally, then prices everything else (non-US listings, small caps, ETFs) in
+  one batch quote call per 250 symbols (see below).
+* Yahoo's batch quote endpoint (``/v7/finance/quote?symbols=A,B,...``, through
+  yfinance's crumb-carrying session) takes 250 symbols in one request and
+  answers for every region, with ``marketCap`` in the listing's BASE unit:
+  ``SHEL.L`` is quoted in pence (``GBp``) but its cap is in pounds. Unknown
+  symbols are simply absent. ``longName`` reads better than ``shortName``
+  abroad (``PETROBRAS   PN      N2`` vs ``Petróleo Brasileiro S.A.``).
+* A few large listings come back with no ``marketCap`` at all (2026-11-06:
+  ALV.DE, HLMA.L, FRES.L, PUB.PA...). Their cap is rebuilt from the price and
+  the share count yfinance reads from Yahoo's shares timeseries, which is
+  fetched once a day per symbol.
 * ``yf.Sector(key)`` wants the lower-case hyphenated Yahoo key
   (``technology``, ``consumer-cyclical``); the screener value ``Technology``
   fails. :func:`yahoo_sector_key` maps one to the other.
@@ -34,14 +46,17 @@ Live findings (yfinance 1.5.1, 2026-11-05)
 
 from __future__ import annotations
 
+import re
 import threading
 import time
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 import yfinance as yf
+from yfinance.data import YfData
 
 from ..datahub import DataHub, Provider
+from ..fx import normalise as normalise_currency
 from ..heatmap_universes import SECTOR_KEYS as SECTORS  # the 11 screener sector values
 from ._yf import (
     RATE_LIMIT_GATE,
@@ -57,6 +72,21 @@ UNIVERSE_TTL_S = 55.0
 #: (monotonic ts, quotes); only ever set from a successful fetch
 _UNIVERSE: Optional[tuple[float, list]] = None
 _universe_lock = threading.Lock()
+
+#: symbols per batch quote request (the endpoint answers 250 at once)
+QUOTE_BATCH = 250
+_QUOTE_URL = "https://query1.finance.yahoo.com/v7/finance/quote"
+_QUOTE_FIELDS = ",".join((
+    "symbol", "shortName", "longName", "marketCap", "regularMarketPrice",
+    "regularMarketChangePercent", "currency", "quoteType",
+))
+#: seconds a share count (for a listing Yahoo gives no cap) is reused; a
+#: failed lookup is retried sooner
+SHARES_TTL_S = 24 * 3600.0
+SHARES_RETRY_S = 3600.0
+#: symbol -> (monotonic ts, shares or None)
+_SHARES: dict[str, tuple[float, Optional[float]]] = {}
+_shares_lock = threading.Lock()
 
 
 def yahoo_sector_key(sector: str) -> str:
@@ -90,6 +120,65 @@ def _row(q: dict) -> dict:
         "change_pct": _num(q.get("regularMarketChangePercent")),
         "currency": q.get("currency"),
     }
+
+
+def _quote_row(q: dict) -> dict:
+    """A batch-quote result as a ``screen:*`` row: the long name, tidied."""
+    row = _row(q)
+    name = q.get("longName") or q.get("shortName")
+    if name:
+        row["name"] = re.sub(r"\s+", " ", str(name)).strip()
+    return row
+
+
+def _is_us_shaped(sym: str) -> bool:
+    """A plain US ticker (``AAPL``, ``BRK-B``): no exchange suffix, not an
+    index, FX pair or future. Only these can be in the US universe."""
+    return not any(c in sym for c in ".=^")
+
+
+def _yahoo_quotes(symbols: list[str]) -> list[dict]:
+    """One batch quote request: the raw quote dicts Yahoo returned."""
+    res = YfData().get_raw_json(
+        _QUOTE_URL, params={"symbols": ",".join(symbols), "fields": _QUOTE_FIELDS}
+    )
+    body = res.get("quoteResponse") if isinstance(res, dict) else None
+    quotes = body.get("result") if isinstance(body, dict) else None
+    if not isinstance(quotes, list):
+        raise ValueError("quote endpoint returned no result list")
+    return [q for q in quotes if isinstance(q, dict) and q.get("symbol")]
+
+
+def _share_count(sym: str) -> Optional[float]:
+    """Shares outstanding, from yfinance's shares timeseries."""
+    return _num(yf.Ticker(sym).fast_info.shares)
+
+
+def _shares(sym: str) -> Optional[float]:
+    """:func:`_share_count`, kept for a day (a failure for an hour)."""
+    now = time.monotonic()
+    with _shares_lock:
+        hit = _SHARES.get(sym)
+        if hit and (now - hit[0]) < (SHARES_TTL_S if hit[1] else SHARES_RETRY_S):
+            return hit[1]
+    try:
+        n = with_retry(lambda: _share_count(sym))
+    except Exception:
+        n = None
+    with _shares_lock:
+        _SHARES[sym] = (now, n if n and n > 0 else None)
+    return _SHARES[sym][1]
+
+
+def _fill_cap(row: dict, quote_type: Any) -> dict:
+    """An equity Yahoo gave no cap: price x shares, in the base unit."""
+    if row.get("market_cap") or quote_type != "EQUITY" or not row.get("price"):
+        return row
+    shares = _shares(row["symbol"])
+    if shares:
+        _base, factor = normalise_currency(row.get("currency"))
+        row["market_cap"] = row["price"] * factor * shares
+    return row
 
 
 def _now_iso() -> str:
@@ -150,9 +239,22 @@ class ScreenProvider(Provider):
         return {"rows": [_row(x) for x in quotes if x.get("symbol")], "as_of": _now_iso()}
 
     def _symbols(self, csv: str) -> dict:
-        want = {s for s in csv.split(",") if s}
-        quotes = self._universe()
-        rows = [_row(x) for x in quotes if x.get("symbol") in want]
+        """US tickers from the shared US universe; everything else, and any US
+        ticker it lacks, from batch quotes. Any failed request fails the
+        whole topic: a partial set would draw a wrong map."""
+        want = sorted({s for s in csv.split(",") if s})
+        rows: list[dict] = []
+        if any(_is_us_shaped(s) for s in want):
+            wanted = set(want)
+            rows = [_row(x) for x in self._universe() if x.get("symbol") in wanted]
+        found = {r["symbol"] for r in rows}
+        rest = [s for s in want if s not in found]
+        asked = set(rest)
+        for i in range(0, len(rest), QUOTE_BATCH):
+            chunk = rest[i:i + QUOTE_BATCH]
+            quotes = with_retry(lambda c=chunk: _yahoo_quotes(c))
+            rows += [_fill_cap(_quote_row(q), q.get("quoteType"))
+                     for q in quotes if q["symbol"] in asked]
         return {"rows": rows, "as_of": _now_iso()}
 
     def _universe(self) -> list[dict]:

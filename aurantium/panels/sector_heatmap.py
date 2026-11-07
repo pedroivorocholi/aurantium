@@ -43,7 +43,7 @@ from ..components import (
 )
 from ..components.empty_state import EmptyState
 from ..components.responsive_row import ResponsiveRow
-from ..fx import FxService
+from ..fx import FxService, convert
 from ..guide import LIST_EDITOR, PanelGuide
 from ..heatmap_model import (
     Tile,
@@ -52,7 +52,14 @@ from ..heatmap_model import (
     tiles_portfolio,
     tiles_sectors,
 )
-from ..heatmap_universes import INDEXES, SECTOR_KEYS, SECTORS, SHARE_CLASSES, view_label
+from ..heatmap_universes import (
+    INDEX_REGIONS,
+    INDEXES,
+    SECTOR_KEYS,
+    SECTORS,
+    SHARE_CLASSES,
+    view_label,
+)
 from ..panel import NULL_GLYPH, UNLINKED, WARN_GLYPH, Panel, register_panel
 from ..portfolio_store import PortfolioStore
 from ..providers.screen import symbols_topic
@@ -570,8 +577,11 @@ class HeatmapPanel(Panel):
         ),
         interactions=(
             "**View** picks the map: the 11 Sectors, one sector's largest "
-            "companies, the S&P 500 or Nasdaq 100 (largest 40) or the Dow 30, "
-            "your Portfolio, the group's Watchlist, or a Custom list.",
+            "companies, an index (grouped by region: the S&P 500, Nasdaq 100 "
+            "and Dow 30; Brazil's Ibovespa; Europe's FTSE 100, DAX 40, CAC 40 "
+            "and Euro Stoxx 50; Asia's Nikkei 225 and Hang Seng; Canada's "
+            "S&P/TSX 60 — each its largest 40, the Dow all 30), your "
+            "Portfolio, the group's Watchlist, or a Custom list.",
             "Click a tile to send its symbol to the link group; hover for name, "
             "price, change and size.",
             "Double-click a sector to open its 30 largest companies; **◂ Back** "
@@ -585,13 +595,17 @@ class HeatmapPanel(Panel):
         ),
         fields=(
             ("Size", "Market cap — sector cap for Sectors, position value in "
-             "your currency for Portfolio."),
+             "your currency for Portfolio. When a map mixes currencies, caps "
+             "are converted to one before sizing; a tile waits while its "
+             "exchange rate loads."),
             ("Colour", "Today's % change: red at −2% or worse, through neutral, "
              "to green at +2% or better."),
         ),
         keywords=(
             "heat map", "heatmap", "market map", "treemap", "sectors", "S&P 500",
-            "Nasdaq", "Dow", "portfolio map", "finviz",
+            "Nasdaq", "Dow", "portfolio map", "finviz", "Ibovespa", "IBOV",
+            "FTSE", "DAX", "CAC", "Euro Stoxx", "Nikkei", "Hang Seng", "TSX",
+            "international",
         ),
         sections=(LIST_EDITOR,),
     )
@@ -710,7 +724,7 @@ class HeatmapPanel(Panel):
         self._view_actions: dict[str, Any] = {}
 
         def add(target: QMenu, text: str, view: str) -> None:
-            act = target.addAction(text)
+            act = target.addAction(text.replace("&", "&&"))  # "S&P", not a mnemonic
             act.setCheckable(True)
             group.addAction(act)
             act.triggered.connect(lambda _=False, v=view: self._choose_view(v))
@@ -721,8 +735,13 @@ class HeatmapPanel(Panel):
         for key, label, _etf in SECTORS:
             add(sector_menu, label, f"sector:{key}")
         index_menu = menu.addMenu("Index")
-        for key, (label, _n, _members) in INDEXES.items():
-            add(index_menu, label, f"index:{key}")
+        for i, (region, keys) in enumerate(INDEX_REGIONS):
+            if i:
+                index_menu.addSeparator()
+            # a region heading: dim, and not a choice
+            index_menu.addAction(region).setEnabled(False)
+            for key in keys:
+                add(index_menu, INDEXES[key][0], f"index:{key}")
         menu.addSeparator()
         add(menu, "Portfolio", "portfolio")
         add(menu, "Watchlist", "watchlist")
@@ -903,8 +922,15 @@ class HeatmapPanel(Panel):
             self._refresh()
 
     def _on_fx_changed(self) -> None:
-        if self._view == "portfolio":
+        # every view whose sizes can hang on a rate: mixed-currency caps too
+        if self._view in ("portfolio", "watchlist", "custom") or self._view.startswith("index:"):
             self._render()
+
+    @staticmethod
+    def _convert_cap(src: str, dst: str, cap: float) -> Optional[float]:
+        """A market cap from one listing currency into another; ``None`` (the
+        tile waits) until FxService has the rate."""
+        return convert(cap, src, dst, FxService.instance().rate(src, dst))
 
     # -- tiles ----------------------------------------------------------------
 
@@ -918,7 +944,7 @@ class HeatmapPanel(Panel):
         if v.startswith("index:"):
             _label, n, members = INDEXES[v[6:]]
             rows = self._screens.get(symbols_topic(members))
-            return tiles_from_screen(rows, n) if rows else []
+            return tiles_from_screen(rows, n, self._convert_cap) if rows else []
         if v == "portfolio":
             fx = FxService.instance()
             return tiles_portfolio(
@@ -932,7 +958,7 @@ class HeatmapPanel(Panel):
         if rows is None:
             wanted = set(syms)
             rows = [r for r in self._last_mixed_rows if r.get("symbol") in wanted]
-        tiles = tiles_mixed(syms, rows, self._quotes)
+        tiles = tiles_mixed(syms, rows, self._quotes, self._convert_cap)
         if v != "custom":
             return tiles
         # the user's own names lead their tiles ("Technology" over "XLK")

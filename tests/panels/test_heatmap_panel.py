@@ -434,3 +434,63 @@ def test_close_lets_go_of_the_app_wide_signals(make, qapp):
     assert not p._watch_timer.isActive()
     w.close()
     w.deleteLater()
+
+
+# -- international indexes ----------------------------------------------------
+
+
+def test_view_selector_groups_indexes_by_region(make):
+    from aurantium.heatmap_universes import INDEX_REGIONS
+
+    p = make()
+    index_menu = next(a.menu() for a in p._view_menu.actions()
+                      if a.menu() is not None and a.text() == "Index")
+    # (region header, the indexes under it), read straight off the menu
+    groups, current = [], None
+    for act in index_menu.actions():
+        if act.isSeparator():
+            continue
+        if not act.isEnabled():  # a region heading: not a choice
+            current = (act.text(), [])
+            groups.append(current)
+        else:
+            assert current is not None, "an index above every region heading"
+            current[1].append(act.text().replace("&&", "&"))  # "S&P" is escaped
+    assert groups == [
+        (region, [INDEXES[k][0] for k in keys]) for region, keys in INDEX_REGIONS
+    ]
+    assert ("Brazil", ["Ibovespa"]) in groups
+    p._view_actions["index:ibov"].trigger()
+    assert p.view == "index:ibov"
+    assert p.crumb.text() == "Ibovespa · largest 40"
+
+
+def test_mixed_currency_watchlist_waits_for_the_rate(make):
+    from aurantium.fx import FxService
+
+    syms = ["AAPL", "PETR4.SA"]
+    p = make(view="custom")
+    p._set_custom([(s, s) for s in syms], "test")
+    rows = [_row("AAPL", 3e12), {**_row("PETR4.SA", 6e11), "currency": "BRL"}]
+    _publish(symbols_topic(syms), {"rows": rows, "as_of": "x"})
+    tiles = {t.symbol: t for t in _tiles(p)}
+    assert tiles["PETR4.SA"].loading and not tiles["AAPL"].loading
+    assert FxService.instance().preferred() == "USD"
+    _publish("quote:BRLUSD=X", _quote(0.0, price=0.2))
+    QTest.qWait(350)  # FxService coalesces ``changed`` over 150 ms
+    tiles = {t.symbol: t for t in _tiles(p)}
+    assert not tiles["PETR4.SA"].loading
+    assert tiles["PETR4.SA"].weight == pytest.approx(6e11 * 0.2)
+    assert tiles["AAPL"].weight == 3e12
+
+
+def test_international_index_tile_click_sends_the_yahoo_symbol(make):
+    p = make(view="index:hsi")
+    members = INDEXES["hsi"][2]
+    rows = [{**_row(s, 1e11 * (100 - i)), "currency": "HKD"} for i, s in enumerate(members)]
+    _publish(symbols_topic(members), {"rows": rows, "as_of": "x"})
+    assert len(_tiles(p)) == 40
+    biggest = members[0]
+    QTest.mouseClick(p.map, Qt.MouseButton.LeftButton, pos=_centre(p, biggest))
+    assert biggest.endswith(".HK")
+    assert SymbolContext.instance().symbol("A") == biggest == p.current_symbol

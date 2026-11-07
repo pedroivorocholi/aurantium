@@ -121,3 +121,80 @@ def test_a_long_sector_name_tiles_under_its_short_label():
     assert comm.label == "Comm Services"
     assert comm.tooltip.startswith("Communication Services (XLC)")
     assert hu.view_label("Communication Services") == "Communication Services"
+
+
+# -- international indexes ----------------------------------------------------
+
+#: key -> (accepted member-count range, Yahoo suffixes every member must carry)
+_INTERNATIONAL = {
+    "ibov": ((70, 95), (".SA",)),
+    "ftse": ((95, 105), (".L",)),
+    "dax": ((40, 40), (".DE", ".PA")),  # Airbus trades in Paris
+    "cac": ((40, 40), (".PA", ".AS")),  # ArcelorMittal trades in Amsterdam
+    "sx5e": ((50, 50), (".DE", ".PA", ".AS", ".MI", ".MC", ".BR", ".HE", ".IR")),
+    "n225": ((225, 225), (".T",)),
+    "hsi": ((70, 105), (".HK",)),
+    "tsx60": ((55, 62), (".TO",)),
+}
+
+
+def test_international_indexes_listed_in_order():
+    assert list(hu.INDEXES) == ["sp500", "ndx", "dow", *_INTERNATIONAL]
+    for key, ((lo, hi), suffixes) in _INTERNATIONAL.items():
+        label, n, members = hu.INDEXES[key]
+        assert lo <= len(members) <= hi, (key, len(members))
+        assert n == 40 and len(set(members)) == len(members)
+        assert all(m.endswith(suffixes) for m in members), key
+        assert hu.view_label(key) == f"{label} · largest 40"
+    assert hu.INDEXES["ibov"][0] == "Ibovespa" and hu.INDEXES["dax"][0] == "DAX 40"
+    # Yahoo's own spellings: four-digit Hong Kong codes, dashed class shares
+    assert "0700.HK" in hu.INDEXES["hsi"][2] and "0005.HK" in hu.INDEXES["hsi"][2]
+    assert "RCI-B.TO" in hu.INDEXES["tsx60"][2] and "PETR4.SA" in hu.INDEXES["ibov"][2]
+    # every index sits under exactly one region of the view selector
+    regions = [r for r, _keys in hu.INDEX_REGIONS]
+    assert regions == ["United States", "Brazil", "Europe", "Asia", "Canada"]
+    assert [k for _r, keys in hu.INDEX_REGIONS for k in keys] == list(hu.INDEXES)
+
+
+def _cur_row(sym, cap, cur, pct=1.0):
+    return {"symbol": sym, "name": sym, "market_cap": cap, "price": 10.0,
+            "change_pct": pct, "currency": cur}
+
+
+def test_mixed_currency_caps_are_converted_before_layout():
+    rows = [_cur_row("AAPL", 3e12, "USD"), _cur_row("PETR4.SA", 6e11, "BRL"),
+            _cur_row("SHEL.L", 2e11, "GBp")]
+    rates = {("BRL", "USD"): 0.2, ("GBP", "USD"): 1.25, ("USD", "GBP"): 0.8}
+    seen = []
+
+    def convert(src, dst, cap):
+        """Caps arrive in the listing's base unit; ``None`` while a rate loads."""
+        seen.append((src, dst))
+        rate = 1.0 if src == dst else rates.get((src, dst))
+        return None if rate is None else cap * rate
+
+    syms = ["AAPL", "PETR4.SA", "SHEL.L"]
+    by = {t.symbol: t for t in hm.tiles_mixed(syms, rows, {}, convert)}
+    assert by["PETR4.SA"].weight == 6e11 * 0.2 and not by["PETR4.SA"].loading
+    assert by["SHEL.L"].weight == 2e11 * 1.25  # GBp quotes, GBP caps: no 1/100
+    assert by["AAPL"].weight == 3e12
+    assert ("GBp", "USD") not in seen
+    assert "BRL" in by["PETR4.SA"].tooltip  # the cap is shown in its own currency
+    # no BRL rate yet: that tile waits rather than sizing reais as dollars
+    del rates[("BRL", "USD")]
+    by = {t.symbol: t for t in hm.tiles_mixed(syms, rows, {}, convert)}
+    assert by["PETR4.SA"].loading and by["PETR4.SA"].change_pct is None
+    assert by["PETR4.SA"].weight != 6e11
+    assert not by["AAPL"].loading and not by["SHEL.L"].loading
+    # one currency throughout: no conversion asked for at all
+    seen.clear()
+    tiles = hm.tiles_from_screen([_cur_row("A.SA", 2e9, "BRL"), _cur_row("B.SA", 1e9, "BRL")],
+                                 40, convert)
+    assert [t.weight for t in tiles] == [2e9, 1e9] and seen == []
+    # a mostly-pounds index converts its odd dollar listing into pounds, the
+    # fewest rates to wait on, and ranks by the converted cap
+    ftse = [_cur_row("X.L", 1e9, "GBp"), _cur_row("Z.L", 5e8, "GBp"),
+            _cur_row("Y.L", 1.1e9, "USD")]
+    tiles = hm.tiles_from_screen(ftse, 40, convert)
+    assert [t.symbol for t in tiles] == ["X.L", "Y.L", "Z.L"]
+    assert tiles[1].weight == 1.1e9 * 0.8 and set(seen) == {("USD", "GBP")}
