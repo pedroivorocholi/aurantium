@@ -20,6 +20,73 @@
     <language>en</language>
 
     <item>
+      <title>Aurantium 1.20.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.20.0</h3>
+        <ul>
+          <li>Market now covers 55 markets, grouped by region in Settings ▸ Market and searchable by name or region in Get started, and Currency gains 26 more currencies</li>
+          <li>Every market sets its own benchmark, Movers, Heatmap view and total currency; markets without screener data, such as Colombia and Peru, say Movers aren&#x27;t available</li>
+          <li>Mexico, Argentina, Canada, Germany, Austria and Thailand work like Brazil: typing a US symbol such as AAPL opens its local line (AAPL.MX, APC.DE) in local currency, with Local and Original chips in the panel header</li>
+          <li>The Original chip now appears in any market when you open a known local line such as AAPL34.SA or AAPL.MX</li>
+          <li>International Discovery follows every market: local lines of foreign stocks where the exchange lists them, otherwise US-listed stocks of companies from elsewhere, priced in USD</li>
+          <li>New Heatmap view &quot;Top 40&quot; shows the 40 largest companies of any market with screener data</li>
+          <li>The listing map ships lines for the new markets and refreshes weekly for the market you pick; after you switch to a new market, a few lines can take up to a week to appear</li>
+          <li>Downgrading to an older version puts you back on the US market</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 09 Nov 2026 16:50:10 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.20.0/aurantium-setup.exe"
+        sparkle:version="1.20.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76718351"
+        sparkle:edSignature="IF4ujSmpqc4N/sctXh44Pid9oum0RlNODf3yMFW0fwipHUjsekZ/6BkwNSRRZMBi8NzawowXFHVXUMCkVcMFBA=="
+        edMetaSignature="ojz7ETr5aBXTgiAB/uqj2zhm2F9QOkeCse94JcLwRDng59vMIy0WW2ms583jNzQQpsMlPz7rHM9z0vXs0af6BA=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.20.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.20.0</h3>
+        <ul>
+          <li>Market now covers 55 markets, grouped by region in Settings ▸ Market and searchable by name or region in Get started, and Currency gains 26 more currencies</li>
+          <li>Every market sets its own benchmark, Movers, Heatmap view and total currency; markets without screener data, such as Colombia and Peru, say Movers aren&#x27;t available</li>
+          <li>Mexico, Argentina, Canada, Germany, Austria and Thailand work like Brazil: typing a US symbol such as AAPL opens its local line (AAPL.MX, APC.DE) in local currency, with Local and Original chips in the panel header</li>
+          <li>The Original chip now appears in any market when you open a known local line such as AAPL34.SA or AAPL.MX</li>
+          <li>International Discovery follows every market: local lines of foreign stocks where the exchange lists them, otherwise US-listed stocks of companies from elsewhere, priced in USD</li>
+          <li>New Heatmap view &quot;Top 40&quot; shows the 40 largest companies of any market with screener data</li>
+          <li>The listing map ships lines for the new markets and refreshes weekly for the market you pick; after you switch to a new market, a few lines can take up to a week to appear</li>
+          <li>Downgrading to an older version puts you back on the US market</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 09 Nov 2026 16:50:10 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.20.0/aurantium-mac.zip"
+        sparkle:version="1.20.0"
+        sparkle:os="macos"
+        length="299689044"
+        sparkle:edSignature="dQThgpDXlhjcsSMMFvkA6cxyNMtYXZC+wes36/B3gcFfa6Nk8OjXnGxlf97iRqseADekaDX3Ra3GMIBdn9OQCw=="
+        edMetaSignature="1JyN8g/i2n+B6x7sWrgPKBAn+tgfQZfM5i4ExQYaEd3gcIKJ1D/AHGrKEIhPAJLwFDYk2GRNbNyPufIjrjnXCQ=="
+        type="application/zip" />
+    </item>
+    <item>
       <title>Aurantium 1.19.7</title>
       <description><![CDATA[
         <style>
