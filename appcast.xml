@@ -1,0 +1,3111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  aurantium update feed (Sparkle/WinSparkle format).
+
+  WinSparkle fetches this file, compares the newest <item>'s
+  sparkle:version against the running app's version, and if newer, downloads
+  the enclosure url, verifies sparkle:edSignature against the app's embedded
+  EdDSA public key, then runs the installer.
+
+  Per release (see docs/guides/RELEASING.md): add a new <item> at the TOP with the new
+  version, the GitHub release download url, and the length + signature printed
+  by tools/release/sign_update.py. Keep older <item>s for history (optional).
+
+  This file must be reachable at the APPCAST_URL set in aurantium/updater.py.
+-->
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>aurantium</title>
+    <description>aurantium updates</description>
+    <language>en</language>
+
+    <item>
+      <title>Aurantium 1.19.7</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.19.7</h3>
+        <ul>
+          <li>Links in News and other panels open only http and https addresses; anything else is ignored</li>
+          <li>Symbols, company names and headlines from the internet or from imported files always show as plain text</li>
+          <li>Updates carry a second signature that covers the version and size of the installer, and downloads come only from GitHub&#x27;s release servers</li>
+          <li>Imported layouts and portfolios are checked before they are applied; oversized or malformed files are refused</li>
+          <li>Password-protected portfolio exports use a stronger key derivation and need at least 8 characters</li>
+          <li>Spreadsheet exports neutralise cells that a spreadsheet would read as a formula</li>
+          <li>Provider API keys never appear in error messages or logs</li>
+          <li>Old update installers are removed from the temporary folder at launch</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 09 Nov 2026 13:24:47 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.19.7/aurantium-setup.exe"
+        sparkle:version="1.19.7"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76352715"
+        sparkle:edSignature="CgG2QZL3Av7inIkGzI2hNgZrInTVJnLe8a+YYmqsAbY0uzj2KytA0/Opa+vKwY4/9zQmpcVtpeP8+Ekzv7W6Cw=="
+        edMetaSignature="56hzEPevVN6X+uS9P+XVoahzxO75/VblXaNOV8vg46AepWU2b9o0G1HsKIy5qKKivWgZS65ZHPFX81+WKKpiCg=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.19.7</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.19.7</h3>
+        <ul>
+          <li>Links in News and other panels open only http and https addresses; anything else is ignored</li>
+          <li>Symbols, company names and headlines from the internet or from imported files always show as plain text</li>
+          <li>Updates carry a second signature that covers the version and size of the installer, and downloads come only from GitHub&#x27;s release servers</li>
+          <li>Imported layouts and portfolios are checked before they are applied; oversized or malformed files are refused</li>
+          <li>Password-protected portfolio exports use a stronger key derivation and need at least 8 characters</li>
+          <li>Spreadsheet exports neutralise cells that a spreadsheet would read as a formula</li>
+          <li>Provider API keys never appear in error messages or logs</li>
+          <li>Old update installers are removed from the temporary folder at launch</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 09 Nov 2026 13:24:47 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.19.7/aurantium-mac.zip"
+        sparkle:version="1.19.7"
+        sparkle:os="macos"
+        length="298906081"
+        sparkle:edSignature="a0E2wdhRhhdI0/1aproc+VGQrNEvo1+h3QK4+WI8hZ6sGJCVJCxppMidsa+L4d/Ze4kocGc1OugMtVW8NLlYDA=="
+        edMetaSignature="CvuyLOxN7MlSucFTdl1EZERJ0k3HsoptyIKNPF7vf6TkOWAL33o0Hj79je8WTUZhOaDZyTGgpoaYPgYna7dlBw=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.19.5</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.19.5</h3>
+        <ul>
+          <li>Search results are grouped under Recent, Symbols, Panels, Layouts and Commands, and the letters you typed show in bold</li>
+          <li>Type part of a panel&#x27;s name, such as &quot;heat&quot;, to find and open that panel without a slash command</li>
+          <li>Commands in the search results show their keyboard shortcut, and clicking into the empty search box lists your recent searches</li>
+          <li>Hover a symbol in Watchlist, Movers, Portfolio or World Indices for half a second to preview its price, change and day range</li>
+          <li>Symbol previews can be turned off in Settings with &quot;Symbol previews on hover&quot;</li>
+          <li>Closing a panel shows an Undo button that puts it back where it was, and Ctrl+Z does the same</li>
+          <li>An alert notice has an Open button that brings up the Alerts panel</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 09 Nov 2026 07:04:29 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.19.5/aurantium-setup.exe"
+        sparkle:version="1.19.5"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76311986"
+        sparkle:edSignature="S7IlpT57m0gnrKqCWUc2SbKbpAmNY/fOzL8T2Ej2FU16iwH3dEjnL7bN3gflEzYwXXBCsRLUEq7e8okwcPOHBA=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.19.5</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.19.5</h3>
+        <ul>
+          <li>Search results are grouped under Recent, Symbols, Panels, Layouts and Commands, and the letters you typed show in bold</li>
+          <li>Type part of a panel&#x27;s name, such as &quot;heat&quot;, to find and open that panel without a slash command</li>
+          <li>Commands in the search results show their keyboard shortcut, and clicking into the empty search box lists your recent searches</li>
+          <li>Hover a symbol in Watchlist, Movers, Portfolio or World Indices for half a second to preview its price, change and day range</li>
+          <li>Symbol previews can be turned off in Settings with &quot;Symbol previews on hover&quot;</li>
+          <li>Closing a panel shows an Undo button that puts it back where it was, and Ctrl+Z does the same</li>
+          <li>An alert notice has an Open button that brings up the Alerts panel</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 09 Nov 2026 07:04:29 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.19.5/aurantium-mac.zip"
+        sparkle:version="1.19.5"
+        sparkle:os="macos"
+        length="298861075"
+        sparkle:edSignature="aDU/aeYKthfOXH5MW0m0rWITtJy+lJmNx7XjnViAMrgyUwU3WdEKBsoEKRdeMBppc9q7LrP1rJsx22ezcF9DDw=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.19.4</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.19.4</h3>
+        <ul>
+          <li>Each dialog now shows its main action as one filled amber button, and Enter presses that button</li>
+          <li>Confirmations name the action, such as &quot;Delete layout&quot; or &quot;Switch and restart&quot;, in place of Yes and No</li>
+          <li>Selected chips no longer turn bold, so the chips next to them stay in place</li>
+          <li>Menus and dialog titles use sentence case, and the app says &quot;symbol&quot; everywhere it said &quot;ticker&quot;</li>
+          <li>Buttons say what they do: &quot;Add rule&quot;, &quot;Add symbol&quot;, &quot;Remove symbol&quot;, &quot;Add position&quot;, &quot;Compare&quot;, &quot;Apply range&quot;</li>
+          <li>A date that is not valid now shows the expected format, YYYY-MM-DD</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 09 Nov 2026 05:34:09 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.19.4/aurantium-setup.exe"
+        sparkle:version="1.19.4"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76263654"
+        sparkle:edSignature="lpbaQXGdX1lt32ChGPDdaxAC96nt98SeWIgV1CFthAEqEAkpwrM36AJR+QjM4drifgRI5Eo8//Wt6NbmoRrfAQ=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.19.4</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.19.4</h3>
+        <ul>
+          <li>Each dialog now shows its main action as one filled amber button, and Enter presses that button</li>
+          <li>Confirmations name the action, such as &quot;Delete layout&quot; or &quot;Switch and restart&quot;, in place of Yes and No</li>
+          <li>Selected chips no longer turn bold, so the chips next to them stay in place</li>
+          <li>Menus and dialog titles use sentence case, and the app says &quot;symbol&quot; everywhere it said &quot;ticker&quot;</li>
+          <li>Buttons say what they do: &quot;Add rule&quot;, &quot;Add symbol&quot;, &quot;Remove symbol&quot;, &quot;Add position&quot;, &quot;Compare&quot;, &quot;Apply range&quot;</li>
+          <li>A date that is not valid now shows the expected format, YYYY-MM-DD</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 09 Nov 2026 05:34:09 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.19.4/aurantium-mac.zip"
+        sparkle:version="1.19.4"
+        sparkle:os="macos"
+        length="298824073"
+        sparkle:edSignature="lhx7o1XfpQlkivUeqHk7wz2LST4xm2w9Npv8K1K/N/c1KPBZ9IlrXWBaEVVao/BQD1WV91tJXY2J0SattyOYBg=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.19.3</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.19.3</h3>
+        <ul>
+          <li>Keyboard actions no longer animate: tab switches, menus opened from the keyboard, F1, Escape and Backspace land instantly; clicks keep their motion</li>
+          <li>Stepping through a list with the arrow keys no longer flashes every linked panel or morphs the chart on each step</li>
+          <li>Joining a link group from a panel&#x27;s badge menu briefly tints its header in the group&#x27;s colour</li>
+          <li>Comparison lines on the chart draw in when added and fade out when removed, like indicators</li>
+          <li>Closing a gauge&#x27;s detail card is quicker, and notices stay up while your pointer is over them</li>
+          <li>The loading sweep moves at one speed across the whole window and costs far less to draw at startup</li>
+          <li>Fixed loading tiles that could freeze with the highlight stuck partway across</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 09 Nov 2026 04:51:25 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.19.3/aurantium-setup.exe"
+        sparkle:version="1.19.3"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76269006"
+        sparkle:edSignature="VMcI84wzHRwlIYnJ81PJ6nusjBXNK+Lx4yX1GlbEhd3LN9KFUWAW+cCJE+EOHfsyFhNDaVaIt9lkjlPoxQVTCA=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.19.3</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.19.3</h3>
+        <ul>
+          <li>Keyboard actions no longer animate: tab switches, menus opened from the keyboard, F1, Escape and Backspace land instantly; clicks keep their motion</li>
+          <li>Stepping through a list with the arrow keys no longer flashes every linked panel or morphs the chart on each step</li>
+          <li>Joining a link group from a panel&#x27;s badge menu briefly tints its header in the group&#x27;s colour</li>
+          <li>Comparison lines on the chart draw in when added and fade out when removed, like indicators</li>
+          <li>Closing a gauge&#x27;s detail card is quicker, and notices stay up while your pointer is over them</li>
+          <li>The loading sweep moves at one speed across the whole window and costs far less to draw at startup</li>
+          <li>Fixed loading tiles that could freeze with the highlight stuck partway across</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 09 Nov 2026 04:51:25 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.19.3/aurantium-mac.zip"
+        sparkle:version="1.19.3"
+        sparkle:os="macos"
+        length="298823472"
+        sparkle:edSignature="JQUU8EkmByBWhNYDPwlMbneaYtm9Aq6Kdeur5kMjHC+dTCLxOljZvm0Qlene3ShentqzT47NVj+SwpyALZT8CQ=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.19.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.19.2</h3>
+        <ul>
+          <li>Chart crosshair figures now use the app&#x27;s monospace font instead of Courier New</li>
+          <li>Every text size now comes from the one type scale, including the list editor, chart range dialog and notices</li>
+          <li>List editor symbol check shows proper check and alert icons instead of text characters</li>
+          <li>Warning prefixes are consistent across panels</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 09 Nov 2026 04:13:18 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.19.2/aurantium-setup.exe"
+        sparkle:version="1.19.2"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76265157"
+        sparkle:edSignature="lfm0M0itc2ih/4hcYSdAb+ky3e1QKxWZk+aUB+3v6UMx6BvPQRWFrg4aJWn2bkQnMb3U7MRctgyD4nagnK1uDw=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.19.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.19.2</h3>
+        <ul>
+          <li>Chart crosshair figures now use the app&#x27;s monospace font instead of Courier New</li>
+          <li>Every text size now comes from the one type scale, including the list editor, chart range dialog and notices</li>
+          <li>List editor symbol check shows proper check and alert icons instead of text characters</li>
+          <li>Warning prefixes are consistent across panels</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 09 Nov 2026 04:13:18 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.19.2/aurantium-mac.zip"
+        sparkle:version="1.19.2"
+        sparkle:os="macos"
+        length="298815431"
+        sparkle:edSignature="xBCpMWo6lk+f9GR+aY4zeaZRVuE0XYIJ+SqoHZVz+26rKOWLZ2Qv+f6S3tIGlyr1Spl8LhZP589NgzgNXWm2DQ=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.19.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.19.1</h3>
+        <ul>
+          <li>Panels show their outline while they load, with a soft highlight sweeping left to right, now also when you open a panel from the menu and for panels like Watchlist, FX, Movers and Performance.</li>
+          <li>Macro gauge tiles, positioning bars and heatmap tiles that are still loading sweep in step with the panel outlines.</li>
+          <li>Hover hints on controls that had none: chart range and interval chips, Performance periods, Movers and Discovery screens, filter boxes, Add/Remove/Edit buttons, Portfolio and Company tabs, and the settings dialogs.</li>
+          <li>The update card now lists everything new since the version you have, including updates you skipped, each under its version number.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 09 Nov 2026 02:47:44 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.19.1/aurantium-setup.exe"
+        sparkle:version="1.19.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76269240"
+        sparkle:edSignature="ZjJNGCbOeQSaLxV4SngPDP+W/U9EOxiHA4YzXUnIxRW6y8cQWvQaVZ7wOippHe3fYsl83NQmzLGujDSHrcyyAQ=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.19.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.19.1</h3>
+        <ul>
+          <li>Panels show their outline while they load, with a soft highlight sweeping left to right, now also when you open a panel from the menu and for panels like Watchlist, FX, Movers and Performance.</li>
+          <li>Macro gauge tiles, positioning bars and heatmap tiles that are still loading sweep in step with the panel outlines.</li>
+          <li>Hover hints on controls that had none: chart range and interval chips, Performance periods, Movers and Discovery screens, filter boxes, Add/Remove/Edit buttons, Portfolio and Company tabs, and the settings dialogs.</li>
+          <li>The update card now lists everything new since the version you have, including updates you skipped, each under its version number.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 09 Nov 2026 02:47:44 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.19.1/aurantium-mac.zip"
+        sparkle:version="1.19.1"
+        sparkle:os="macos"
+        length="298814551"
+        sparkle:edSignature="WHZ1XU7NXcO15U3hqT6m3ojcVcyCtRTkele7Yzm8zHpTYJbPs6mPfoZjpTrIG12mryF5BUQbGPIrdAEHkN1eDw=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.19.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.19.0</h3>
+        <ul>
+          <li>Move your portfolio to another computer: export it to a file and import it there, from Settings ▸ Portfolio or the Portfolio panel&#x27;s File ▾ button.</li>
+          <li>Your portfolio stays on your computer and is never linked to an account.</li>
+          <li>Exported files can be locked with a password; without it, the file reveals nothing about your holdings.</li>
+          <li>Importing into a portfolio that already has positions asks whether to replace it or add to it, and Ctrl+Z undoes the import.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 09 Nov 2026 00:51:41 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.19.0/aurantium-setup.exe"
+        sparkle:version="1.19.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76252680"
+        sparkle:edSignature="qNNjwuu/hbsIDN5UXBNbn1Vw0/ik7wd7zgLNQj3jXRIP68ulWqtM6JWot45wzvNZqZNrjnqxr30eZUfZk1/+AA=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.19.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.19.0</h3>
+        <ul>
+          <li>Move your portfolio to another computer: export it to a file and import it there, from Settings ▸ Portfolio or the Portfolio panel&#x27;s File ▾ button.</li>
+          <li>Your portfolio stays on your computer and is never linked to an account.</li>
+          <li>Exported files can be locked with a password; without it, the file reveals nothing about your holdings.</li>
+          <li>Importing into a portfolio that already has positions asks whether to replace it or add to it, and Ctrl+Z undoes the import.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 09 Nov 2026 00:51:41 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.19.0/aurantium-mac.zip"
+        sparkle:version="1.19.0"
+        sparkle:os="macos"
+        length="298804686"
+        sparkle:edSignature="4M3NJLqEW2oNIHEZYy6JjC6u5LhQXoV8Y+nH3rov3TF4rQlpA8d9tBAOfKO+BTIIqs6YyMnvWxIv3oTcGfDkBQ=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.18.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.18.1</h3>
+        <ul>
+          <li>Nothing needs an API key any more: the Macro panel&#x27;s FRED series now load without one.</li>
+          <li>First launch offers optional API keys as a skippable Advanced step, shown once per install. Each source says what it adds and links to its free sign-up.</li>
+          <li>The unused EIA key is no longer listed.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 09 Nov 2026 00:17:09 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.18.1/aurantium-setup.exe"
+        sparkle:version="1.18.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76238718"
+        sparkle:edSignature="R2upzhleTheKA7yv39a9GoMCJUzijXyfb+up9eQH6r9fjMyqq0KBqlawZEOiKMcwPFIRUtJ0Bn4h6TKqH7DpDA=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.18.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.18.1</h3>
+        <ul>
+          <li>Nothing needs an API key any more: the Macro panel&#x27;s FRED series now load without one.</li>
+          <li>First launch offers optional API keys as a skippable Advanced step, shown once per install. Each source says what it adds and links to its free sign-up.</li>
+          <li>The unused EIA key is no longer listed.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 09 Nov 2026 00:17:09 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.18.1/aurantium-mac.zip"
+        sparkle:version="1.18.1"
+        sparkle:os="macos"
+        length="298791588"
+        sparkle:edSignature="S0TQ10C/vWAXQwNywVSEbqDWJ1cCdbZRI0LE5ut4+OJRjQ8rfOHKFRvepOj0gg/0XVYTQs3dtXYvP64nNRIJCA=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.18.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.18.0</h3>
+        <ul>
+          <li>New Market setting: choose United States or Brazil and a preferred currency in Get started or Settings ▸ Market (existing installs are asked once).</li>
+          <li>Brazil market: typing a US ticker such as AAPL opens its B3 BDR (AAPL34) in BRL and every linked panel follows; an &quot;Original: AAPL (NASDAQ)&quot; chip in the panel header switches to the original listing in one click.</li>
+          <li>Market-aware defaults: benchmark, heatmap index, movers and new chart panels follow the chosen market; the BDR map ships with the app and refreshes weekly.</li>
+          <li>Portfolio rows are back in each holding&#x27;s listing currency (new Ccy column), replacing 1.17.0&#x27;s per-row conversion.</li>
+          <li>Portfolio totals convert into a per-portfolio total currency you pick in place on the totals row, with P&amp;L split into price and FX parts and the FX rates and their time shown.</li>
+          <li>If an FX rate is unavailable the total says so instead of adding up mixed currencies.</li>
+          <li>New International Discovery panel (Markets): Momentum, Quality, Value, Dividend and Near 52w high presets with region and sector filters, listing BDRs in Brazil and ADRs in the US; click a row to link it.</li>
+          <li>New users start with an empty watchlist.</li>
+          <li>Downgrading to an older version ignores the per-portfolio total currency and converts every row again.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sun, 08 Nov 2026 18:54:12 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.18.0/aurantium-setup.exe"
+        sparkle:version="1.18.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76231328"
+        sparkle:edSignature="c8mG+cdeNprP46zZojt/ob1LrGcw8luKGQWibYxgW4Q1wM9C1YFei1pNGtncYd2SUCfBoCHJaiILEfP1RdDUAg=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.18.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.18.0</h3>
+        <ul>
+          <li>New Market setting: choose United States or Brazil and a preferred currency in Get started or Settings ▸ Market (existing installs are asked once).</li>
+          <li>Brazil market: typing a US ticker such as AAPL opens its B3 BDR (AAPL34) in BRL and every linked panel follows; an &quot;Original: AAPL (NASDAQ)&quot; chip in the panel header switches to the original listing in one click.</li>
+          <li>Market-aware defaults: benchmark, heatmap index, movers and new chart panels follow the chosen market; the BDR map ships with the app and refreshes weekly.</li>
+          <li>Portfolio rows are back in each holding&#x27;s listing currency (new Ccy column), replacing 1.17.0&#x27;s per-row conversion.</li>
+          <li>Portfolio totals convert into a per-portfolio total currency you pick in place on the totals row, with P&amp;L split into price and FX parts and the FX rates and their time shown.</li>
+          <li>If an FX rate is unavailable the total says so instead of adding up mixed currencies.</li>
+          <li>New International Discovery panel (Markets): Momentum, Quality, Value, Dividend and Near 52w high presets with region and sector filters, listing BDRs in Brazil and ADRs in the US; click a row to link it.</li>
+          <li>New users start with an empty watchlist.</li>
+          <li>Downgrading to an older version ignores the per-portfolio total currency and converts every row again.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sun, 08 Nov 2026 18:54:12 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.18.0/aurantium-mac.zip"
+        sparkle:version="1.18.0"
+        sparkle:os="macos"
+        length="298789326"
+        sparkle:edSignature="UC85ROu3i5rW9gGTXupw5LjDXYUAckG+n+QdPg+EEahGKPfpElIfXNpTXQh08CieKAvBEFy828P3VgRWPt4rBw=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.17.7</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.17.7</h3>
+        <ul>
+          <li>Check for Updates now answers right away: a card shows &quot;Checking for updates…&quot;, then up to date, a new version, or what went wrong with Try again</li>
+          <li>A new version&#x27;s card appears as soon as it is found, with what&#x27;s new and the download&#x27;s progress, instead of a few seconds later</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sun, 08 Nov 2026 05:06:29 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.17.7/aurantium-setup.exe"
+        sparkle:version="1.17.7"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76134064"
+        sparkle:edSignature="Mo8QDqqJSzE5zOFCXFs0U/o4PqBYWXpfIxiDa9hzJE4dRF7TePmGbbHRNVC1jDxo2YwQ/orzAbhUPmmCo35/BA=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.17.7</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.17.7</h3>
+        <ul>
+          <li>Check for Updates now answers right away: a card shows &quot;Checking for updates…&quot;, then up to date, a new version, or what went wrong with Try again</li>
+          <li>A new version&#x27;s card appears as soon as it is found, with what&#x27;s new and the download&#x27;s progress, instead of a few seconds later</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sun, 08 Nov 2026 05:06:29 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.17.7/aurantium-mac.zip"
+        sparkle:version="1.17.7"
+        sparkle:os="macos"
+        length="298623430"
+        sparkle:edSignature="QCztmyp186yn85lPl+MKDhNwku3NdCYUEAypKkrEHr3qUxUPZ06/0FCmhtWOFWzIAmb6ZAOF7vJeK6LxHLnJDg=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.17.6</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.17.6</h3>
+        <ul>
+          <li>Aurantium 1.17.6</li>
+          <li>Panel windows remember which monitor they belong to, and layouts save it</li>
+          <li>Unplug a monitor and the main workspace takes the remaining screen; windows of the missing monitor step aside and come back when it is plugged in again</li>
+          <li>A layout saved across several monitors opens correctly on fewer</li>
+          <li>The main window no longer stays minimized after unplugging a monitor</li>
+          <li>Minimizing a panel window leaves a small Aurantium icon on its own monitor; click it to bring the window back</li>
+          <li>Fixed panel windows on a second monitor opening completely black</li>
+          <li>Fixed the white line at the bottom of the screen with an auto-hiding taskbar; the taskbar still slides up on hover</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sun, 08 Nov 2026 04:20:56 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.17.6/aurantium-setup.exe"
+        sparkle:version="1.17.6"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76129621"
+        sparkle:edSignature="JsmgQ7YWWFpM47QBLAJJh71Mhrr9x83vPNkJhKl+lrAGZuR7UgLdGIfJ+DWUo2I2J5Sty2XTBh9CQmwziLMlCw=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.17.6</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.17.6</h3>
+        <ul>
+          <li>Aurantium 1.17.6</li>
+          <li>Panel windows remember which monitor they belong to, and layouts save it</li>
+          <li>Unplug a monitor and the main workspace takes the remaining screen; windows of the missing monitor step aside and come back when it is plugged in again</li>
+          <li>A layout saved across several monitors opens correctly on fewer</li>
+          <li>The main window no longer stays minimized after unplugging a monitor</li>
+          <li>Minimizing a panel window leaves a small Aurantium icon on its own monitor; click it to bring the window back</li>
+          <li>Fixed panel windows on a second monitor opening completely black</li>
+          <li>Fixed the white line at the bottom of the screen with an auto-hiding taskbar; the taskbar still slides up on hover</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sun, 08 Nov 2026 04:20:56 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.17.6/aurantium-mac.zip"
+        sparkle:version="1.17.6"
+        sparkle:os="macos"
+        length="298620073"
+        sparkle:edSignature="lPMkuK/3LdYM1A0OLExAuQRm0rY0fOodGOJbsgHNgnQl/L1Hc7SbB6PClS2UBXYW9W9szyMspn9ONyUJ4wFFCw=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.17.5</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.17.5</h3>
+        <ul>
+          <li>Aurantium 1.17.5</li>
+          <li>Fixed a white bar at the bottom of the screen when the window is maximized and the Windows taskbar is set to auto-hide</li>
+          <li>With an auto-hide taskbar, a maximized window again lets the taskbar slide up over it (newer Windows 11 builds no longer report where an auto-hide taskbar sits)</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sun, 08 Nov 2026 02:16:00 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.17.5/aurantium-setup.exe"
+        sparkle:version="1.17.5"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76114396"
+        sparkle:edSignature="dfUuC0IriT9nrwYcVu8/kxYHq7/Av+F19jSBPS7Ux3z4ah171djXLJ/wEr/kYWHCg4/NFYUl9NGC4vouazOhBg=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.17.5</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.17.5</h3>
+        <ul>
+          <li>Aurantium 1.17.5</li>
+          <li>Fixed a white bar at the bottom of the screen when the window is maximized and the Windows taskbar is set to auto-hide</li>
+          <li>With an auto-hide taskbar, a maximized window again lets the taskbar slide up over it (newer Windows 11 builds no longer report where an auto-hide taskbar sits)</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sun, 08 Nov 2026 02:16:00 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.17.5/aurantium-mac.zip"
+        sparkle:version="1.17.5"
+        sparkle:os="macos"
+        length="298603081"
+        sparkle:edSignature="5fiWRibJWf7J/gBOCDw4I1hlPbFhrgoKPPHRq76TduxLUeeMdoMm+UrPg7H7sIJVMoBWqGT4FhCn6ZqNoXnoAQ=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.17.4</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.17.4</h3>
+        <ul>
+          <li>Aurantium 1.17.4</li>
+          <li>Fixed the old Windows caption buttons showing through the title bar of a restored window, while resizing it, and as a flash when restoring it from minimize</li>
+          <li>Resizing the window is much smoother: panels reflow live while tables and charts hold their picture and redraw once when you let go</li>
+          <li>Tables and panel rows lay out faster while a window is resized</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sun, 08 Nov 2026 01:07:22 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.17.4/aurantium-setup.exe"
+        sparkle:version="1.17.4"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76114231"
+        sparkle:edSignature="3TmyGNaLE0kMDDhKP5d51fHAG56LndLGzXC7FjAT1HI1dqffuQjpX1HdpvzDW+kYWWs33Knl9QaMt++7J0k6AA=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.17.4</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.17.4</h3>
+        <ul>
+          <li>Aurantium 1.17.4</li>
+          <li>Fixed the old Windows caption buttons showing through the title bar of a restored window, while resizing it, and as a flash when restoring it from minimize</li>
+          <li>Resizing the window is much smoother: panels reflow live while tables and charts hold their picture and redraw once when you let go</li>
+          <li>Tables and panel rows lay out faster while a window is resized</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sun, 08 Nov 2026 01:07:22 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.17.4/aurantium-mac.zip"
+        sparkle:version="1.17.4"
+        sparkle:os="macos"
+        length="298603158"
+        sparkle:edSignature="UQd5hOcZG7Gma5gVjb4RPs/Ot4panSlpuchAW4Ac+afdftGZdUy7s8Ahh/DfUj85rH16MPeyGJ0U1+iyq93PAg=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.17.3</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.17.3</h3>
+        <ul>
+          <li>Aurantium 1.17.3</li>
+          <li>Fixed a crash when dragging panels quickly between monitors that use different display scaling</li>
+          <li>Dragging panels across monitors no longer lags: the drag preview keeps its size instead of growing</li>
+          <li>A panel window dropped on a smaller screen now fits that screen</li>
+          <li>Crash reports now include Qt&#x27;s own error messages, so rare crashes can be diagnosed</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sat, 07 Nov 2026 20:54:43 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.17.3/aurantium-setup.exe"
+        sparkle:version="1.17.3"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76112467"
+        sparkle:edSignature="/8MHnk70J/dVFT2a7KhIAqox8RRA16rcEaJoXJLkW/KPwMxMhundUGkY73VeeRFCuzPis5xn3EA8r8LnP8l7Dg=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.17.3</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.17.3</h3>
+        <ul>
+          <li>Aurantium 1.17.3</li>
+          <li>Fixed a crash when dragging panels quickly between monitors that use different display scaling</li>
+          <li>Dragging panels across monitors no longer lags: the drag preview keeps its size instead of growing</li>
+          <li>A panel window dropped on a smaller screen now fits that screen</li>
+          <li>Crash reports now include Qt&#x27;s own error messages, so rare crashes can be diagnosed</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sat, 07 Nov 2026 20:54:43 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.17.3/aurantium-mac.zip"
+        sparkle:version="1.17.3"
+        sparkle:os="macos"
+        length="298595187"
+        sparkle:edSignature="90Hxe9HWxchFpmCu3ICnOiAbyHT5XSPgZ0DmzUqS/7qQESsP+n/5PljOQ67ALa+hS0ZSzZiKE/ox/3QkcAEkAg=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.17.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.17.2</h3>
+        <ul>
+          <li>Aurantium 1.17.2</li>
+          <li>Cleaner company news: games and concerts at venues named after a company (like NRG Stadium) no longer show up as that company&#x27;s news</li>
+          <li>Day Brief headlines are now checked for relevance, the same way the News panel&#x27;s are</li>
+          <li>A company with no on-topic news now shows an empty list instead of unrelated headlines</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sat, 07 Nov 2026 19:17:43 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.17.2/aurantium-setup.exe"
+        sparkle:version="1.17.2"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76114709"
+        sparkle:edSignature="3bAxc8ql/luO0zCO8a4iy4ISuq5ewjUBpZCbxU3Qwj/LE9HuKUFgBLXS8HuAtxXRB338OZUu5u0EbOBBRj+wDQ=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.17.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.17.2</h3>
+        <ul>
+          <li>Aurantium 1.17.2</li>
+          <li>Cleaner company news: games and concerts at venues named after a company (like NRG Stadium) no longer show up as that company&#x27;s news</li>
+          <li>Day Brief headlines are now checked for relevance, the same way the News panel&#x27;s are</li>
+          <li>A company with no on-topic news now shows an empty list instead of unrelated headlines</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sat, 07 Nov 2026 19:17:43 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.17.2/aurantium-mac.zip"
+        sparkle:version="1.17.2"
+        sparkle:os="macos"
+        length="298592791"
+        sparkle:edSignature="G1g6uaCpQc81f8dq7uAQmNCEqyuekbeE/KS+BO7H3Am/gpwa8z3lK0vjLBCAsk+u619n6etxpBaJGblFb5lCAA=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.17.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.17.0</h3>
+        <ul>
+          <li>aurantium 1.17.0</li>
+          <li>New Heatmap panel replaces Sector Heatmap: sectors, companies in a sector, index members, your Watchlist, Portfolio or a Custom list</li>
+          <li>Heatmap indexes include S&amp;P 500, Nasdaq 100, Dow, Ibovespa, FTSE 100, DAX, CAC 40, Euro Stoxx 50, Nikkei 225, Hang Seng and S&amp;P/TSX 60</li>
+          <li>Heatmap tiles are sized by market cap in any region, converted to one currency when a view mixes currencies</li>
+          <li>Redesigned Macro / Rates panel: country switch, editable gauge strip, comparable yield curve and positioning bars</li>
+          <li>Click a Macro gauge to open it into a detail card with 1M / 6M / 1Y / 5Y history, high and low, and its source; click again or press Esc to close</li>
+          <li>New yield curves for Canada (Bank of Canada) and Brazil (Tesouro Nacional)</li>
+          <li>Preferred currency (Settings menu): Portfolio totals, weights, risk and performance, and Portfolio news ranking, are converted into it</li>
+          <li>Panels menu has a search box</li>
+          <li>Edit button moved beside the filter box in Commodities, World Indices and FX Monitor</li>
+          <li>Faster, smoother startup: secure connections no longer stall the window while data loads</li>
+          <li>Note: going back to an older version loses the Heatmap Custom list and the new Macro gauges and country choice</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sat, 07 Nov 2026 04:52:15 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.17.0/aurantium-setup.exe"
+        sparkle:version="1.17.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76104960"
+        sparkle:edSignature="+TYydj/YhzJ7GkynOi7L0gR2EAH6k8CoknQjMgExjr5bBzFLclSuziQpajE9pubCcC3T0zcVF8NUdGiJvGISBw=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.17.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.17.0</h3>
+        <ul>
+          <li>aurantium 1.17.0</li>
+          <li>New Heatmap panel replaces Sector Heatmap: sectors, companies in a sector, index members, your Watchlist, Portfolio or a Custom list</li>
+          <li>Heatmap indexes include S&amp;P 500, Nasdaq 100, Dow, Ibovespa, FTSE 100, DAX, CAC 40, Euro Stoxx 50, Nikkei 225, Hang Seng and S&amp;P/TSX 60</li>
+          <li>Heatmap tiles are sized by market cap in any region, converted to one currency when a view mixes currencies</li>
+          <li>Redesigned Macro / Rates panel: country switch, editable gauge strip, comparable yield curve and positioning bars</li>
+          <li>Click a Macro gauge to open it into a detail card with 1M / 6M / 1Y / 5Y history, high and low, and its source; click again or press Esc to close</li>
+          <li>New yield curves for Canada (Bank of Canada) and Brazil (Tesouro Nacional)</li>
+          <li>Preferred currency (Settings menu): Portfolio totals, weights, risk and performance, and Portfolio news ranking, are converted into it</li>
+          <li>Panels menu has a search box</li>
+          <li>Edit button moved beside the filter box in Commodities, World Indices and FX Monitor</li>
+          <li>Faster, smoother startup: secure connections no longer stall the window while data loads</li>
+          <li>Note: going back to an older version loses the Heatmap Custom list and the new Macro gauges and country choice</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sat, 07 Nov 2026 04:52:15 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.17.0/aurantium-mac.zip"
+        sparkle:version="1.17.0"
+        sparkle:os="macos"
+        length="298591016"
+        sparkle:edSignature="xEExjZlp7Y8MYke3eiui7QLucAc6dXGOZUtsIkcv6/xC6meTWXkM3OGmADpHDXj7frRpyAJg0xFdGCJ/rcgMCA=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.16.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.16.1</h3>
+        <ul>
+          <li>Updates now arrive in a card in Aurantium&#x27;s own design, centred over the window</li>
+          <li>The card lists what&#x27;s new in the update</li>
+          <li>One click on Update &amp; restart installs the update and reopens Aurantium</li>
+          <li>Updates download and are verified in the background, so the click never waits on a download</li>
+          <li>Help &gt; Check for Updates reports back in the app instead of a separate window</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 04 Nov 2026 17:46:18 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.16.1/aurantium-setup.exe"
+        sparkle:version="1.16.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75845433"
+        sparkle:edSignature="H6cVxIFBxhp0lG0xKIZdpP9gklPPhvWb3sb9ymO/WpdvlMmF0xA/p1PzCJZ9uwvpzXQCyExJt6W6E0XGXxGtCw=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.16.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.16.1</h3>
+        <ul>
+          <li>Updates now arrive in a card in Aurantium&#x27;s own design, centred over the window</li>
+          <li>The card lists what&#x27;s new in the update</li>
+          <li>One click on Update &amp; restart installs the update and reopens Aurantium</li>
+          <li>Updates download and are verified in the background, so the click never waits on a download</li>
+          <li>Help &gt; Check for Updates reports back in the app instead of a separate window</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 04 Nov 2026 17:46:18 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.16.1/aurantium-mac.zip"
+        sparkle:version="1.16.1"
+        sparkle:os="macos"
+        length="298333995"
+        sparkle:edSignature="7UNRFI7oBYVDg++9uAXQS37D3IOBjlSz3VZYK2Y4Re9J44WVJ3k9r0cP9SAQ+rXUye4e39fkZhSg86jUQYSmCQ=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.16.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.16.0</h3>
+        <ul>
+          <li>One News panel: Topic, Linked or Portfolio news, picked with the link badge in its header</li>
+          <li>Topic news is the default: unlinked, it follows your own query (e.g. &quot;Brazil&quot;)</li>
+          <li>Put it in a link group and it becomes Linked news for that group&#x27;s symbol</li>
+          <li>New Portfolio news: headlines that can move your open positions, on your holdings, the sectors you lean on, and macro events</li>
+          <li>Each portfolio headline is tagged with why it matters: a ticker, a sector and its weight, or Macro</li>
+          <li>Clicking a ticker-tagged portfolio headline sends that ticker to the panel&#x27;s link group</li>
+          <li>Portfolio news works even with the Portfolio panel closed; an empty portfolio shows nothing</li>
+          <li>Your portfolio is now one book shared by every workspace, and closing the Portfolio panel no longer loses positions</li>
+          <li>Positions saved in your layouts are brought into the shared portfolio once, automatically, with a backup kept</li>
+          <li>Topic News panels become News panels in Topic mode, keeping their queries</li>
+          <li>The topic box and filter share one slim row, so headlines start right under the header</li>
+          <li>New panels now open unlinked; saved layouts and presets keep their groups</li>
+          <li>A Day Brief you opened yourself joins the group of the chart you pick a date in</li>
+          <li>Going back to 1.15.1 after this shows an empty Portfolio panel, and Topic docks revert to plain News</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 03 Nov 2026 23:06:39 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.16.0/aurantium-setup.exe"
+        sparkle:version="1.16.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76717418"
+        sparkle:edSignature="6DaCSCPAQXFuNfNbHdbeUJdXqTr0ffg+BC90en4Pm3/bDh1JHCQDKmra7G8P+A0cCydvABTNb3qCQ0nm/SENDQ=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.16.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.16.0</h3>
+        <ul>
+          <li>One News panel: Topic, Linked or Portfolio news, picked with the link badge in its header</li>
+          <li>Topic news is the default: unlinked, it follows your own query (e.g. &quot;Brazil&quot;)</li>
+          <li>Put it in a link group and it becomes Linked news for that group&#x27;s symbol</li>
+          <li>New Portfolio news: headlines that can move your open positions, on your holdings, the sectors you lean on, and macro events</li>
+          <li>Each portfolio headline is tagged with why it matters: a ticker, a sector and its weight, or Macro</li>
+          <li>Clicking a ticker-tagged portfolio headline sends that ticker to the panel&#x27;s link group</li>
+          <li>Portfolio news works even with the Portfolio panel closed; an empty portfolio shows nothing</li>
+          <li>Your portfolio is now one book shared by every workspace, and closing the Portfolio panel no longer loses positions</li>
+          <li>Positions saved in your layouts are brought into the shared portfolio once, automatically, with a backup kept</li>
+          <li>Topic News panels become News panels in Topic mode, keeping their queries</li>
+          <li>The topic box and filter share one slim row, so headlines start right under the header</li>
+          <li>New panels now open unlinked; saved layouts and presets keep their groups</li>
+          <li>A Day Brief you opened yourself joins the group of the chart you pick a date in</li>
+          <li>Going back to 1.15.1 after this shows an empty Portfolio panel, and Topic docks revert to plain News</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 03 Nov 2026 23:06:39 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.16.0/aurantium-mac.zip"
+        sparkle:version="1.16.0"
+        sparkle:os="macos"
+        length="298316333"
+        sparkle:edSignature="ueNLzVCMmlgGes3YyDbKzbdKhvhMSbdodpBzQYkCBS5zWZxJdjcwS3Gzhwuus1HLgP25zTMc9LuAWWiqVsU3CQ=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.15.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.15.1</h3>
+        <ul>
+          <li>The app no longer shows &quot;Not responding&quot; while it opens your workspace</li>
+          <li>Opening a saved layout is about 7x faster (23s down to ~3s on a typical desk)</li>
+          <li>The Company panel builds only the tab you are looking at; the others build when you first open them</li>
+          <li>Data fetches start once your panels are in place, so the window stays responsive while it loads</li>
+          <li>Cached data still appears instantly while live data loads</li>
+          <li>Fixed an intermittent error in the symbol search dropdown</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 02 Nov 2026 21:52:04 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.15.1/aurantium-setup.exe"
+        sparkle:version="1.15.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76662903"
+        sparkle:edSignature="lB4gzM+bydCmvwUeT1hnPLuMr1p5I3EFsty/AMRYP9S6/LH9RUL6nBbWHiJxwQcC9XBSDqInxLRyPb+hJdo0Cg=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.15.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.15.1</h3>
+        <ul>
+          <li>The app no longer shows &quot;Not responding&quot; while it opens your workspace</li>
+          <li>Opening a saved layout is about 7x faster (23s down to ~3s on a typical desk)</li>
+          <li>The Company panel builds only the tab you are looking at; the others build when you first open them</li>
+          <li>Data fetches start once your panels are in place, so the window stays responsive while it loads</li>
+          <li>Cached data still appears instantly while live data loads</li>
+          <li>Fixed an intermittent error in the symbol search dropdown</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 02 Nov 2026 21:52:04 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.15.1/aurantium-mac.zip"
+        sparkle:version="1.15.1"
+        sparkle:os="macos"
+        length="298253452"
+        sparkle:edSignature="+dTwSX8hGwMEI/2r+xqNFHxiUTIZQGbNBuhFY4dTya+AianpnWG5UIrop4NeW6RKD6cgjvWkIJnUouOJQ+g/CA=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.15.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.15.0</h3>
+        <ul>
+          <li>News and Topic News now show current headlines, newest first</li>
+          <li>Every source is searched at once and merged: publisher feeds, Google News and Finnhub</li>
+          <li>Headlines older than a week give way to fresher ones; nothing older than a month is shown</li>
+          <li>Up to 75 headlines per panel, so a topic covers most of the day</li>
+          <li>Company news is searched by name, so short tickers like F no longer pull in unrelated quote pages</li>
+          <li>Topic search matches whole words, so &quot;ai&quot; no longer matches &quot;said&quot;</li>
+          <li>Panels load in a few seconds instead of 20 or more</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 02 Nov 2026 20:35:35 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.15.0/aurantium-setup.exe"
+        sparkle:version="1.15.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76649359"
+        sparkle:edSignature="ScECa+8B8j1gUEAXmckBKDniPUxS9BOKGIJ5hpEc7fMo+Wgnqoxs3qUO1NozCzXnxtYoJasOSIzp3QGnOUjXAQ=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.15.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.15.0</h3>
+        <ul>
+          <li>News and Topic News now show current headlines, newest first</li>
+          <li>Every source is searched at once and merged: publisher feeds, Google News and Finnhub</li>
+          <li>Headlines older than a week give way to fresher ones; nothing older than a month is shown</li>
+          <li>Up to 75 headlines per panel, so a topic covers most of the day</li>
+          <li>Company news is searched by name, so short tickers like F no longer pull in unrelated quote pages</li>
+          <li>Topic search matches whole words, so &quot;ai&quot; no longer matches &quot;said&quot;</li>
+          <li>Panels load in a few seconds instead of 20 or more</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 02 Nov 2026 20:35:35 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.15.0/aurantium-mac.zip"
+        sparkle:version="1.15.0"
+        sparkle:os="macos"
+        length="298248179"
+        sparkle:edSignature="VorGRwVrxvZvFCTufkux7G1e4eKe1DDtauJHjF/Bw/lXZqH88y/r7TRnIDLaHK5gxD9Wuw1bGSYm4Gq5hea5DQ=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.14.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.14.2</h3>
+        <ul>
+          <li>Switching symbols no longer flashes a second chart beside the animating one</li>
+          <li>The price axis finishes rescaling before the new candles fade in</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sat, 31 Oct 2026 19:54:11 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.14.2/aurantium-setup.exe"
+        sparkle:version="1.14.2"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76611003"
+        sparkle:edSignature="vPSGJ0M1CmbiAw0Een2HqwP0ijRO/TCk57p8OiQZgO6DkLViP4aC3Knd7zRSwrFbIM87l6ek21lsISYmB8PCBw=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.14.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.14.2</h3>
+        <ul>
+          <li>Switching symbols no longer flashes a second chart beside the animating one</li>
+          <li>The price axis finishes rescaling before the new candles fade in</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sat, 31 Oct 2026 19:54:11 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.14.2/aurantium-mac.zip"
+        sparkle:version="1.14.2"
+        sparkle:os="macos"
+        length="298252028"
+        sparkle:edSignature="j1nrk2+sUk0YgRjPD6Y0WPfTjoxwF6aanjCfEkmJdtC594XbH4clLYOR+n2yZ+5fyGUeklrzDAkeVd0TgQYRCQ=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.14.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.14.1</h3>
+        <ul>
+          <li>Resize panels individually: dragging a divider moves only the panels pressed against that edge</li>
+          <li>Other panels keep their exact size, so you can widen news without stretching analyst or company</li>
+          <li>Shift+drag a divider to move the whole straight line, as before</li>
+          <li>Edges snap level with nearby edges to line panels up; hold Alt while dragging to skip the snap</li>
+          <li>Existing saved layouts open unchanged and gain the new freedom</li>
+        </ul>
+      ]]></description>
+      <pubDate>Fri, 30 Oct 2026 23:12:51 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.14.1/aurantium-setup.exe"
+        sparkle:version="1.14.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76607545"
+        sparkle:edSignature="lnOpoZ9GMNfE75R+eu9Zt3FVClBlc96kd2ioKtXXHySaJaxW1G6KIfueB+CgCyjm+Rh7jKy8S3/ngv+eIrXBCg=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.14.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.14.1</h3>
+        <ul>
+          <li>Resize panels individually: dragging a divider moves only the panels pressed against that edge</li>
+          <li>Other panels keep their exact size, so you can widen news without stretching analyst or company</li>
+          <li>Shift+drag a divider to move the whole straight line, as before</li>
+          <li>Edges snap level with nearby edges to line panels up; hold Alt while dragging to skip the snap</li>
+          <li>Existing saved layouts open unchanged and gain the new freedom</li>
+        </ul>
+      ]]></description>
+      <pubDate>Fri, 30 Oct 2026 23:12:51 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.14.1/aurantium-mac.zip"
+        sparkle:version="1.14.1"
+        sparkle:os="macos"
+        length="298251786"
+        sparkle:edSignature="JDx2ZN7CO+ZLF/YROMj5D2FAcYWevc2otxS2r9DnLKNxZhPF+gy6TGDUqU+5BRqtV8hihvbwwIscwedH/q5wCg=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.13.3</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.13.3</h3>
+        <ul>
+          <li>Fixed a thin white bar along the bottom of the maximized window when the taskbar is set to auto-hide</li>
+          <li>The strip now matches the app background, and the taskbar still slides up when you reach the screen edge</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 28 Oct 2026 20:33:13 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.13.3/aurantium-setup.exe"
+        sparkle:version="1.13.3"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76596292"
+        sparkle:edSignature="KXRiZ/RcA4NQbcJ5WjF9Rwm99IaDF+uIe/xp5T9MyMOLK4LQxo7WV0XL1mDBxniqHhvGBoOPoEiR4EGEfusfDQ=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.13.3</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.13.3</h3>
+        <ul>
+          <li>Fixed a thin white bar along the bottom of the maximized window when the taskbar is set to auto-hide</li>
+          <li>The strip now matches the app background, and the taskbar still slides up when you reach the screen edge</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 28 Oct 2026 20:33:13 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.13.3/aurantium-mac.zip"
+        sparkle:version="1.13.3"
+        sparkle:os="macos"
+        length="298227790"
+        sparkle:edSignature="slkTnlF8w3uqMYGOIZnGbotPopr1H1RY0taz2o2/lov2hzF3OmvJiDLBJ819um6m+410D2i1GNtARWaDa2dzAg=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.13.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.13.2</h3>
+        <ul>
+          <li>Chart symbol changes animate smoothly instead of stuttering or cutting to the end</li>
+          <li>The first chart of the day no longer jumps when today&#x27;s prices replace yesterday&#x27;s</li>
+          <li>Line and area charts keep a steady frame rate through the whole transition</li>
+          <li>Faster chart repaints when panning, zooming and changing symbols</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 27 Oct 2026 15:28:37 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.13.2/aurantium-setup.exe"
+        sparkle:version="1.13.2"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76542432"
+        sparkle:edSignature="N+2GG1RUkMNcnAkOfBw/B14XfHGM3GZlX14MCrZ3TBvlX7ypbpn4GSM1wq8485VaLVH5zHl2n+pFfjuWUMRkAA=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.13.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.13.2</h3>
+        <ul>
+          <li>Chart symbol changes animate smoothly instead of stuttering or cutting to the end</li>
+          <li>The first chart of the day no longer jumps when today&#x27;s prices replace yesterday&#x27;s</li>
+          <li>Line and area charts keep a steady frame rate through the whole transition</li>
+          <li>Faster chart repaints when panning, zooming and changing symbols</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 27 Oct 2026 15:28:37 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.13.2/aurantium-mac.zip"
+        sparkle:version="1.13.2"
+        sparkle:os="macos"
+        length="298182717"
+        sparkle:edSignature="55bwN0hBT1w6xdscgdE/DwqMjQ8QYGFAKGQvvcVrF9Q3wvhVxquZh4zQKWUWlOj5fOZJQpb5DIkBUv9YLDwnCg=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.13.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.13.1</h3>
+        <ul>
+          <li>Charts morph smoothly between symbols and keep their chart type (candles stay candles)</li>
+          <li>Indicators draw in when added and fade out when removed; volume bars rise in</li>
+          <li>Workspaces open in their exact saved layout, with each panel showing a loading outline until it&#x27;s ready</li>
+          <li>Startup splash shows a progress bar</li>
+          <li>Sharper, even-weight icons on every screen scaling, with a symmetric close X</li>
+          <li>Fixed flat bars on market holidays drawing as a solid block on yield charts</li>
+          <li>Fixed an internal error when closing a Company panel</li>
+          <li>Smoother animation while linked panels load</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 27 Oct 2026 02:18:38 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.13.1/aurantium-setup.exe"
+        sparkle:version="1.13.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76545526"
+        sparkle:edSignature="bhwBhw+TLIE7gCcGEoKos7dh/scFaSYqllEkipt5iLeYenDsYBXsdOQbWJF+4JXSI9w06q/RQb1aqiuvGApsCw=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.13.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.13.1</h3>
+        <ul>
+          <li>Charts morph smoothly between symbols and keep their chart type (candles stay candles)</li>
+          <li>Indicators draw in when added and fade out when removed; volume bars rise in</li>
+          <li>Workspaces open in their exact saved layout, with each panel showing a loading outline until it&#x27;s ready</li>
+          <li>Startup splash shows a progress bar</li>
+          <li>Sharper, even-weight icons on every screen scaling, with a symmetric close X</li>
+          <li>Fixed flat bars on market holidays drawing as a solid block on yield charts</li>
+          <li>Fixed an internal error when closing a Company panel</li>
+          <li>Smoother animation while linked panels load</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 27 Oct 2026 02:18:38 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.13.1/aurantium-mac.zip"
+        sparkle:version="1.13.1"
+        sparkle:os="macos"
+        length="298182658"
+        sparkle:edSignature="D4AZjPAW49zzetXnv9JxWkWJfT+/T5Cvs2qCgV+WNWxAHL+R+zOvRh2F9QPZWjY0EEi/1ERHd0VpdxRDUmguAQ=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.12.3</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.12.3</h3>
+        <ul>
+          <li>Chart export: choose Dark or Light for the image, whatever theme the app is in</li>
+          <li>Save as PNG and Copy chart image each offer Dark and Light</li>
+          <li>Colors carry over by role: price line, up/down candles, axes and indicator slots</li>
+          <li>A color you picked is kept when it still reads on the chosen background</li>
+          <li>The logo mark now sits at the image&#x27;s top right, and the empty strip at the bottom is gone</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 26 Oct 2026 16:07:08 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.12.3/aurantium-setup.exe"
+        sparkle:version="1.12.3"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76513846"
+        sparkle:edSignature="OSh5EOnS2OVfJ9Gnf0peONzyfqdooPjGyOQb+V6CSdOi3kYyUZCvfpL0G3/RITm+4wCRoTzh2uXRB/ip5kqJBA=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.12.3</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.12.3</h3>
+        <ul>
+          <li>Chart export: choose Dark or Light for the image, whatever theme the app is in</li>
+          <li>Save as PNG and Copy chart image each offer Dark and Light</li>
+          <li>Colors carry over by role: price line, up/down candles, axes and indicator slots</li>
+          <li>A color you picked is kept when it still reads on the chosen background</li>
+          <li>The logo mark now sits at the image&#x27;s top right, and the empty strip at the bottom is gone</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 26 Oct 2026 16:07:08 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.12.3/aurantium-mac.zip"
+        sparkle:version="1.12.3"
+        sparkle:os="macos"
+        length="298153519"
+        sparkle:edSignature="O9VBser/OBWnb0BxGRIuAY1+Qwg2hvXukdrY17xCPyN2o7Z2FtwpSGx1eIHrsmyBfgT78Ro1lyL09+HQ64SaBQ=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.12.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.12.2</h3>
+        <ul>
+          <li>Aurantium 1.12.2</li>
+          <li>Fixed: the top bar disappeared after dragging a panel to a second monitor</li>
+          <li>Fixed: a crash when adding another panel after moving one to a second monitor</li>
+          <li>Panel windows now use the same dark title bar as the main window instead of the grey Windows bar</li>
+          <li>F11 on a panel that is alone in its window now maximizes that window on its monitor</li>
+          <li>F1, Shift+F1 and Ctrl+Q now work inside panel windows</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 21 Oct 2026 23:24:10 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.12.2/aurantium-setup.exe"
+        sparkle:version="1.12.2"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75441145"
+        sparkle:edSignature="USjFBmQn2XjocxDPuGsx9kXGgwYcFiKLaN8FAA7Glrr03fKMO5K+Eko7Cs8ehxM+PBvVYGjKAVCiJCeyQKIxCg=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.12.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.12.2</h3>
+        <ul>
+          <li>Aurantium 1.12.2</li>
+          <li>Fixed: the top bar disappeared after dragging a panel to a second monitor</li>
+          <li>Fixed: a crash when adding another panel after moving one to a second monitor</li>
+          <li>Panel windows now use the same dark title bar as the main window instead of the grey Windows bar</li>
+          <li>F11 on a panel that is alone in its window now maximizes that window on its monitor</li>
+          <li>F1, Shift+F1 and Ctrl+Q now work inside panel windows</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 21 Oct 2026 23:24:10 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.12.2/aurantium-mac.zip"
+        sparkle:version="1.12.2"
+        sparkle:os="macos"
+        length="292296030"
+        sparkle:edSignature="2mo82uRzlC9JzorFZspqnjudr8dt1yXFTpc1fqtnOuoO66dghmmzMSJQ4Wf5lrOY4gUTAjpv2Kts92c/rrI0BQ=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.12.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.12.1</h3>
+        <ul>
+          <li>Fixed a crash when closing a window or dialog with tabs, or when applying a saved layout</li>
+          <li>Fixed a burst of errors logged every time the main window closed</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 21 Oct 2026 00:31:40 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.12.1/aurantium-setup.exe"
+        sparkle:version="1.12.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75434116"
+        sparkle:edSignature="OWC2RQE4rIkx/Q+Y7anAK/vQm6nHtEhBAzsVCgT1KMjAwWwsNkeouW85mvE4WvleO6iZ30t81xTDyo4k//GDBQ=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.12.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.12.1</h3>
+        <ul>
+          <li>Fixed a crash when closing a window or dialog with tabs, or when applying a saved layout</li>
+          <li>Fixed a burst of errors logged every time the main window closed</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 21 Oct 2026 00:31:40 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.12.1/aurantium-mac.zip"
+        sparkle:version="1.12.1"
+        sparkle:os="macos"
+        length="292293269"
+        sparkle:edSignature="Ll5Qs8uTmZqgsTr7SuOGecThTrkMc4e18afdYAInLBY1vyG16hVdJb59rcwiXdhzjPNoKEuh+E1U/pUKh1AwCA=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.12.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.12.0</h3>
+        <ul>
+          <li>New title bar in the app&#x27;s own style, with Windows Snap Layouts</li>
+          <li>Fresh icon set across the whole app</li>
+          <li>Every button, tab and chip now answers a click with a quick press response</li>
+          <li>Tab indicators slide between tabs, range chips crossfade, menus fade in</li>
+          <li>Export a chart as a sharp 2x image (Save as PNG or Copy) with symbol, range and legend</li>
+          <li>Chart ranges: 5y shown at regular width, plus a custom &quot;last N minutes/hours/days&quot;</li>
+          <li>Link-group button shows a chain icon and fills smoothly on hover</li>
+          <li>Fixed log-scale charts drawing in the wrong place</li>
+          <li>Fixed charts with bars before 1970 crashing the readout on Windows</li>
+          <li>Fixed inactive dock tabs sitting on a white/black band</li>
+          <li>Removed the stray arrow under &quot;List all tabs&quot;</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 20 Oct 2026 15:40:40 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.12.0/aurantium-setup.exe"
+        sparkle:version="1.12.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75444818"
+        sparkle:edSignature="gtCTdalZ+KecoREEJ8FRB9C5b6PvnyRomPP+EG4wMxZ7HMuYuBRrtf+/lo2GrJoku9J0zXRe94RNLXF1mclVCg=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.12.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.12.0</h3>
+        <ul>
+          <li>New title bar in the app&#x27;s own style, with Windows Snap Layouts</li>
+          <li>Fresh icon set across the whole app</li>
+          <li>Every button, tab and chip now answers a click with a quick press response</li>
+          <li>Tab indicators slide between tabs, range chips crossfade, menus fade in</li>
+          <li>Export a chart as a sharp 2x image (Save as PNG or Copy) with symbol, range and legend</li>
+          <li>Chart ranges: 5y shown at regular width, plus a custom &quot;last N minutes/hours/days&quot;</li>
+          <li>Link-group button shows a chain icon and fills smoothly on hover</li>
+          <li>Fixed log-scale charts drawing in the wrong place</li>
+          <li>Fixed charts with bars before 1970 crashing the readout on Windows</li>
+          <li>Fixed inactive dock tabs sitting on a white/black band</li>
+          <li>Removed the stray arrow under &quot;List all tabs&quot;</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 20 Oct 2026 15:40:40 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.12.0/aurantium-mac.zip"
+        sparkle:version="1.12.0"
+        sparkle:os="macos"
+        length="292293073"
+        sparkle:edSignature="8k9RIRFehT/yCuiieX6MV2bHFaEnZJVNtO2JPleufMjCyS/WnKledrGJAYFvUduX2TrIIeylGD74f/j3JrDeCQ=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.11.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.11.0</h3>
+        <ul>
+          <li>Charts skip market-closed hours: multi-day views no longer have blank gaps between sessions</li>
+          <li>Compare overlay: plot a stock against its sector ETF, an index or any symbol (up to 4 dashed lines)</li>
+          <li>Overlapping chart events now merge into one numbered mark; click it to zoom in</li>
+          <li>Multiple monitors: drag a panel out of the window to give it its own window on any screen</li>
+          <li>Light mode redesigned: neutral greys, crisp near-black text and blue tickers</li>
+          <li>Logo sits closer to the corner and lines up with the menu</li>
+          <li>Loading card border stays intact at every display scaling</li>
+          <li>F1 guide for every panel, plus many design polish fixes</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 19 Oct 2026 20:35:05 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.11.0/aurantium-setup.exe"
+        sparkle:version="1.11.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75381464"
+        sparkle:edSignature="H/cLVDT6hR4JDbS6wz3IDHeGr2R2NgrIqb7budr59+xwaCEtfPWdHO3o9KgK0FpFXK9d1JLZLYE6oeBSEUn8CQ=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.11.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.11.0</h3>
+        <ul>
+          <li>Charts skip market-closed hours: multi-day views no longer have blank gaps between sessions</li>
+          <li>Compare overlay: plot a stock against its sector ETF, an index or any symbol (up to 4 dashed lines)</li>
+          <li>Overlapping chart events now merge into one numbered mark; click it to zoom in</li>
+          <li>Multiple monitors: drag a panel out of the window to give it its own window on any screen</li>
+          <li>Light mode redesigned: neutral greys, crisp near-black text and blue tickers</li>
+          <li>Logo sits closer to the corner and lines up with the menu</li>
+          <li>Loading card border stays intact at every display scaling</li>
+          <li>F1 guide for every panel, plus many design polish fixes</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 19 Oct 2026 20:35:05 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.11.0/aurantium-mac.zip"
+        sparkle:version="1.11.0"
+        sparkle:os="macos"
+        length="292231776"
+        sparkle:edSignature="klgKlLjOGIaGNWH63/hCulxA1aOcNHWOBMKgICVl21r+dBjDyP8FYOdePba1FwKahyKFiSEp5dIBvfi9bkmRBw=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.10.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.10.2</h3>
+        <ul>
+          <li>Hover any Financials line (e.g. Minority Interest) or jargon column header (IV%, OI, Surprise%) for a plain-language explanation</li>
+          <li>Menus, dropdowns and tooltips now have properly rounded corners — no more square edges behind them</li>
+          <li>New Ctrl shortcuts for laptops whose F-keys need Fn: Ctrl+R refresh, Ctrl+Shift+M maximize panel, Ctrl+Shift+F full screen, Ctrl+Shift+H shortcuts guide</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 13 Oct 2026 01:01:20 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.10.2/aurantium-setup.exe"
+        sparkle:version="1.10.2"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75268226"
+        sparkle:edSignature="A1nfs8v2sluw2MsqZahl53I/uaU4izdQl7iHcXhu8vHwicVBLnCtNhDEs5oPH4GKf2AvzkdjsZy2JxFaoTNtBw=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.10.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.10.2</h3>
+        <ul>
+          <li>Hover any Financials line (e.g. Minority Interest) or jargon column header (IV%, OI, Surprise%) for a plain-language explanation</li>
+          <li>Menus, dropdowns and tooltips now have properly rounded corners — no more square edges behind them</li>
+          <li>New Ctrl shortcuts for laptops whose F-keys need Fn: Ctrl+R refresh, Ctrl+Shift+M maximize panel, Ctrl+Shift+F full screen, Ctrl+Shift+H shortcuts guide</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 13 Oct 2026 01:01:20 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.10.2/aurantium-mac.zip"
+        sparkle:version="1.10.2"
+        sparkle:os="macos"
+        length="291828839"
+        sparkle:edSignature="eI7cZe/89I0bI6yyDb1Tdt/yI4YDmZOw8t88ZP0Z+w5o0QMueYmFZQiBROdIcTUIeHSTQLJl/t5H2QCWPxR+CA=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.10.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.10.1</h3>
+        <ul>
+          <li>New Company panel: Profile, Key Metrics, Financials and Earnings together as tabs in one panel</li>
+          <li>Redesigned Profile with live price, a 52-week range bar, and stat tiles that jump to the tab that explains them</li>
+          <li>Key Metrics: group tabs instead of one long scroll, a Custom tab with the metrics you pick, and alpha alongside beta</li>
+          <li>Every panel now fits its size: no more sideways scrolling, tables shrink to fit and controls fold into menus when narrow</li>
+          <li>Financials keeps its controls on one line so the table gets the height; dates shorten to Sep &#x27;25 when narrow</li>
+          <li>News panels now only show headlines that actually name the company</li>
+          <li>Your existing layouts open the old Profile, Key Metrics, Financials and Earnings panels as one Company panel</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 13 Oct 2026 00:05:27 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.10.1/aurantium-setup.exe"
+        sparkle:version="1.10.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75262016"
+        sparkle:edSignature="Jugkn0q3+9kDn1daoT3j7L9+FDsycpi36A467gAPsUoTQDoCcjiqUknwpLDhh3TI+QQf0eRH6m46swxRbq3UAg=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.10.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.10.1</h3>
+        <ul>
+          <li>New Company panel: Profile, Key Metrics, Financials and Earnings together as tabs in one panel</li>
+          <li>Redesigned Profile with live price, a 52-week range bar, and stat tiles that jump to the tab that explains them</li>
+          <li>Key Metrics: group tabs instead of one long scroll, a Custom tab with the metrics you pick, and alpha alongside beta</li>
+          <li>Every panel now fits its size: no more sideways scrolling, tables shrink to fit and controls fold into menus when narrow</li>
+          <li>Financials keeps its controls on one line so the table gets the height; dates shorten to Sep &#x27;25 when narrow</li>
+          <li>News panels now only show headlines that actually name the company</li>
+          <li>Your existing layouts open the old Profile, Key Metrics, Financials and Earnings panels as one Company panel</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 13 Oct 2026 00:05:27 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.10.1/aurantium-mac.zip"
+        sparkle:version="1.10.1"
+        sparkle:os="macos"
+        length="291812365"
+        sparkle:edSignature="cO8NyYehixntOKm+WA7Lj4u4wirl7eGGabXq828sqBC8uznPomJq+Q0T/cnIE/IS+M1MobQgcLcYTN9Q05tgCw=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.10.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.10.0</h3>
+        <ul>
+          <li>New Key Metrics panel (Panels ▸ Research): about 110 metrics across valuation, growth, profitability, returns on capital, balance sheet, efficiency, per-share, dividends, performance, risk, ownership and analysts</li>
+          <li>Every metric is shown against its own 5-year average, low, high and percentile</li>
+          <li>Click any metric to open its history chart, with 1Y–Max ranges, average and ±1σ lines, and copy to clipboard</li>
+          <li>ETFs and funds get a Fund group: AUM, expense ratio, yield, NAV premium/discount, reported returns and category</li>
+          <li>Financials has a new Debt tab: debt structure, net debt, implied cost of debt, interest coverage, leverage and debt issuance</li>
+          <li>Financials now explains an empty table (for example, an ETF doesn&#x27;t file statements) instead of showing a blank panel</li>
+          <li>Panels opened from the menu or /add now open as their own window; drag one into the layout to dock it</li>
+        </ul>
+      ]]></description>
+      <pubDate>Thu, 24 Sep 2026 19:01:15 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.10.0/aurantium-setup.exe"
+        sparkle:version="1.10.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75329672"
+        sparkle:edSignature="ofoEvOTs1cXHf47nfPn259cRG8OLPLkjsHRTGpgGcNsn2DZr9Pc2HDKwvsNYQ/XVmJmbbyZP+lgOfWKZIbwMDQ=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.10.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.10.0</h3>
+        <ul>
+          <li>New Key Metrics panel (Panels ▸ Research): about 110 metrics across valuation, growth, profitability, returns on capital, balance sheet, efficiency, per-share, dividends, performance, risk, ownership and analysts</li>
+          <li>Every metric is shown against its own 5-year average, low, high and percentile</li>
+          <li>Click any metric to open its history chart, with 1Y–Max ranges, average and ±1σ lines, and copy to clipboard</li>
+          <li>ETFs and funds get a Fund group: AUM, expense ratio, yield, NAV premium/discount, reported returns and category</li>
+          <li>Financials has a new Debt tab: debt structure, net debt, implied cost of debt, interest coverage, leverage and debt issuance</li>
+          <li>Financials now explains an empty table (for example, an ETF doesn&#x27;t file statements) instead of showing a blank panel</li>
+          <li>Panels opened from the menu or /add now open as their own window; drag one into the layout to dock it</li>
+        </ul>
+      ]]></description>
+      <pubDate>Thu, 24 Sep 2026 19:01:15 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.10.0/aurantium-mac.zip"
+        sparkle:version="1.10.0"
+        sparkle:os="macos"
+        length="291757710"
+        sparkle:edSignature="wJPXVMzYVxWM6De5F36osk8s+ZgQ0RlnII4EkVXdIBgQ7gRHyWuBpBM5KyRyIWvQ7IqUvoZjHtTuTCr11dq5Aw=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.9.3</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.9.3</h3>
+        <ul>
+          <li>Charts can now show less than a day: new 1h and 4h ranges, with the interval switching to minute bars automatically</li>
+          <li>Picking any range now adjusts the interval for you instead of greying the button out</li>
+          <li>Zooming and dragging now move time only, and the price axis refits to the bars in view</li>
+          <li>Double-click a chart to reset its view; zooming can no longer drift off into empty space</li>
+          <li>Intraday charts refresh about every minute instead of every 30 minutes</li>
+        </ul>
+      ]]></description>
+      <pubDate>Fri, 18 Sep 2026 16:18:01 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.9.3/aurantium-setup.exe"
+        sparkle:version="1.9.3"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75272061"
+        sparkle:edSignature="HOAvZN9Tb2Mz1BxnZtKMVp6BtXi7450ep+ZVrt2nAaH5cvksyXgDXwaOexMzXm/KdwAi5aGBrw12oPIiT/2bCw=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.9.3</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.9.3</h3>
+        <ul>
+          <li>Charts can now show less than a day: new 1h and 4h ranges, with the interval switching to minute bars automatically</li>
+          <li>Picking any range now adjusts the interval for you instead of greying the button out</li>
+          <li>Zooming and dragging now move time only, and the price axis refits to the bars in view</li>
+          <li>Double-click a chart to reset its view; zooming can no longer drift off into empty space</li>
+          <li>Intraday charts refresh about every minute instead of every 30 minutes</li>
+        </ul>
+      ]]></description>
+      <pubDate>Fri, 18 Sep 2026 16:18:01 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.9.3/aurantium-mac.zip"
+        sparkle:version="1.9.3"
+        sparkle:os="macos"
+        length="291694750"
+        sparkle:edSignature="yIqVRAsvSjBd3IHO2AulHI2kdT4yGqyyz6+Eh8aRj72hxT62amqSvUHfym98ewsINJ6R1DSEV1zsLFDN4lfRDg=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.9.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.9.2</h3>
+        <ul>
+          <li>Fixed Analyst Recs, Holders, Earnings, Financials and other panels getting stuck on &quot;Loading…&quot; when switching to a previously viewed symbol</li>
+          <li>Fixed an error logged whenever a chart gained or lost keyboard focus</li>
+        </ul>
+      ]]></description>
+      <pubDate>Fri, 18 Sep 2026 14:40:13 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.9.2/aurantium-setup.exe"
+        sparkle:version="1.9.2"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75264784"
+        sparkle:edSignature="sJ/vTS960kE5FDQQl1QuqK/CFGk34CY07b/DqYLg8+mMI+vr0mC6LsLIw3xApAK4ac4kQCvvZdZ5CCaK9LN+BQ=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.9.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.9.2</h3>
+        <ul>
+          <li>Fixed Analyst Recs, Holders, Earnings, Financials and other panels getting stuck on &quot;Loading…&quot; when switching to a previously viewed symbol</li>
+          <li>Fixed an error logged whenever a chart gained or lost keyboard focus</li>
+        </ul>
+      ]]></description>
+      <pubDate>Fri, 18 Sep 2026 14:40:13 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.9.2/aurantium-mac.zip"
+        sparkle:version="1.9.2"
+        sparkle:os="macos"
+        length="291691428"
+        sparkle:edSignature="wRlTDblwiENPdSkOyZxUh6uua0SDrljp5+NoqNlxv9Vhxorm/7F3RlGErE7BEhBp6SttxZjgFdjymXd1bEXsDg=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.9.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.9.1</h3>
+        <ul>
+          <li>Volume axis labels no longer pile on top of each other when a chart&#x27;s indicator pane is short</li>
+          <li>Short Volume, RSI and MACD panes always keep at least one readable y-axis label, and two from about 30px tall</li>
+          <li>Tall indicator panes show more y-axis labels, spaced at round steps</li>
+        </ul>
+      ]]></description>
+      <pubDate>Fri, 18 Sep 2026 13:59:20 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.9.1/aurantium-setup.exe"
+        sparkle:version="1.9.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75268152"
+        sparkle:edSignature="oT97d9LYZPvnpdmEaW5nt44MqBpvPUN1Fcj350fBN3Tnspnl/zAfiJAw/95tnbN33DnY4uVLgp/+wYjy7wtQAg=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.9.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.9.1</h3>
+        <ul>
+          <li>Volume axis labels no longer pile on top of each other when a chart&#x27;s indicator pane is short</li>
+          <li>Short Volume, RSI and MACD panes always keep at least one readable y-axis label, and two from about 30px tall</li>
+          <li>Tall indicator panes show more y-axis labels, spaced at round steps</li>
+        </ul>
+      ]]></description>
+      <pubDate>Fri, 18 Sep 2026 13:59:20 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.9.1/aurantium-mac.zip"
+        sparkle:version="1.9.1"
+        sparkle:os="macos"
+        length="291691294"
+        sparkle:edSignature="FM7vPxVyhrXMYhhpLXdqsZ5rG6r8MtTJrg2lFQTGK9z+x4BbutJVciSy3H8KrEnIBOvGv7L/OPlDq4FKlGiuBg=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.9.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.9.0</h3>
+        <ul>
+          <li>Buttons, chips, tabs and panel controls now respond to a click: the control sinks into shadow the moment you press it, and eases back when you let go.</li>
+          <li>Every clickable surface has a full set of states - hover, pressed, selected, keyboard focus and disabled - including panel tabs, column headers, dropdowns and scrollbars.</li>
+          <li>Table rows now highlight under the pointer, so it is clear what a click will re-centre the workspace on.</li>
+          <li>Panel chrome now sits visibly above the data: the SYMBOL bar and each panel&#x27;s header strip read as a layer rather than merging into the black.</li>
+          <li>Softer corners on buttons, inputs and chips, proportioned to each control&#x27;s size.</li>
+          <li>The drag grip and remove mark in every Edit... dialog are now drawn to match the panel icons instead of borrowed from a system font.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Thu, 17 Sep 2026 15:29:49 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.9.0/aurantium-setup.exe"
+        sparkle:version="1.9.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75278003"
+        sparkle:edSignature="M3dBUVoi/edzRJrvMFv0QcfUUFhJQvTgXZVknG8sRd69oN4CCpcOC9B8axw/Oil/Nvo0Cz24TIDdOZmX+cvbAg=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.9.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.9.0</h3>
+        <ul>
+          <li>Buttons, chips, tabs and panel controls now respond to a click: the control sinks into shadow the moment you press it, and eases back when you let go.</li>
+          <li>Every clickable surface has a full set of states - hover, pressed, selected, keyboard focus and disabled - including panel tabs, column headers, dropdowns and scrollbars.</li>
+          <li>Table rows now highlight under the pointer, so it is clear what a click will re-centre the workspace on.</li>
+          <li>Panel chrome now sits visibly above the data: the SYMBOL bar and each panel&#x27;s header strip read as a layer rather than merging into the black.</li>
+          <li>Softer corners on buttons, inputs and chips, proportioned to each control&#x27;s size.</li>
+          <li>The drag grip and remove mark in every Edit... dialog are now drawn to match the panel icons instead of borrowed from a system font.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Thu, 17 Sep 2026 15:29:49 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.9.0/aurantium-mac.zip"
+        sparkle:version="1.9.0"
+        sparkle:os="macos"
+        length="291635292"
+        sparkle:edSignature="m4xrKjk0PvVPGpzKsQzyOAgzkzs+iAVBd6DxaxlpPBuUa6JW//ZgBYZ1Vq3mUvQDEZ3K12c5qtnZNaNGVcB/BA=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.7.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.7.0</h3>
+        <ul>
+          <li>New Day Brief panel — why a stock moved on any past date</li>
+          <li>Chart events lane marks days with earnings, dividends, splits, rating changes or an unusually large move</li>
+          <li>Click a mark, hover a bar and press D, or right-click the chart to open a brief for that day</li>
+          <li>Command bar: /day 2026-03-14, /day 2026-03-09..2026-03-15, or just AAPL 2026-03-14</li>
+          <li>EXCESS line gives the stock&#x27;s move minus its benchmark — was it the company or the whole market</li>
+          <li>Historical headlines for any date, years back, with no API key needed</li>
+          <li>Briefs open as their own window, so they never squeeze your layout</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 24 Aug 2026 23:19:38 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.7.0/aurantium-setup.exe"
+        sparkle:version="1.7.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="71127818"
+        sparkle:edSignature="m2lzPy7RPMyy/pIcrnZAqu18MInBchKyIdgMClhB7QD1qfWsFbFPmquO+w7t9a2syNwmYsP/WqIfocgtqu80Bg=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.7.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.7.0</h3>
+        <ul>
+          <li>New Day Brief panel — why a stock moved on any past date</li>
+          <li>Chart events lane marks days with earnings, dividends, splits, rating changes or an unusually large move</li>
+          <li>Click a mark, hover a bar and press D, or right-click the chart to open a brief for that day</li>
+          <li>Command bar: /day 2026-03-14, /day 2026-03-09..2026-03-15, or just AAPL 2026-03-14</li>
+          <li>EXCESS line gives the stock&#x27;s move minus its benchmark — was it the company or the whole market</li>
+          <li>Historical headlines for any date, years back, with no API key needed</li>
+          <li>Briefs open as their own window, so they never squeeze your layout</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 24 Aug 2026 23:19:38 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.7.0/aurantium-mac.zip"
+        sparkle:version="1.7.0"
+        sparkle:os="macos"
+        length="281570437"
+        sparkle:edSignature="geiRUI5nkPnssNXsOfAzxHPhNnwHsow0tTnHmxXN6g4QQKO2LcNeejsOYfDL/UX+ShYLrWmmeTy4Bc0/M79MBQ=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.6.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.6.1</h3>
+        <ul>
+          <li>News now appears only in the languages you read — pick a main language plus any others on first launch, or anytime from Settings &gt; News Languages.</li>
+          <li>Added market news feeds for 17 more languages, so adding a language brings you more coverage, not just less noise.</li>
+          <li>Headlines in your main language are listed first.</li>
+          <li>Fixed: news could arrive in any language, because NewsAPI was queried without a language filter.</li>
+          <li>Checkboxes now show a visible box instead of blending into the dark background.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sat, 15 Aug 2026 03:30:30 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.6.1/aurantium-setup.exe"
+        sparkle:version="1.6.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="71046711"
+        sparkle:edSignature="rPOv9SbG+IToYtut4CHiVeqfARcBtrJ5nu0/0PLIi7un2L2PJ0HTR6WwqTYN3zW5qol5Fr9lvhihkbLNJA+xDQ=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.6.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.6.1</h3>
+        <ul>
+          <li>News now appears only in the languages you read — pick a main language plus any others on first launch, or anytime from Settings &gt; News Languages.</li>
+          <li>Added market news feeds for 17 more languages, so adding a language brings you more coverage, not just less noise.</li>
+          <li>Headlines in your main language are listed first.</li>
+          <li>Fixed: news could arrive in any language, because NewsAPI was queried without a language filter.</li>
+          <li>Checkboxes now show a visible box instead of blending into the dark background.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sat, 15 Aug 2026 03:30:30 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.6.1/aurantium-mac.zip"
+        sparkle:version="1.6.1"
+        sparkle:os="macos"
+        length="281455722"
+        sparkle:edSignature="Q2Nibk3jNuLT4TAuQsYlETb7t+bKYis1qymFLGjlKaqBS23BiXnO+9CG2MME5pdFRYpDWAOAVlSqCF542bEZDw=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.6.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.6.0</h3>
+        <ul>
+          <li>Panels now reshape themselves to fit, and the terminal tells you what it&#x27;s doing.</li>
+          <li>Workspaces</li>
+          <li>Three ready-made desks — Macro, Commodities and Equity Research — under Settings &gt; Workspaces, offered on first run instead of an empty window.</li>
+          <li>Panels fit their size</li>
+          <li>Drag a panel narrow and its table drops the least important columns instead of squashing every one; the symbol and its price always survive. Prices no longer get cut to &quot;4,432.&quot; to make room for a column you can&#x27;t read anyway.</li>
+          <li>Widen it and the columns come back. Columns you switch off yourself stay off at every size.</li>
+          <li>Charts trim their range and interval chips when narrow, so nothing sits off the edge where you can&#x27;t click it.</li>
+          <li>Tables scroll by pixel rather than jumping a whole row per wheel notch.</li>
+          <li>You can see what the terminal is doing</li>
+          <li>&quot;Layout saved&quot;, &quot;Nothing to undo&quot;, &quot;Unknown command&quot;, a panel that failed to open and fired price alerts now appear in a notice at the bottom right. All of it was previously invisible.</li>
+          <li>Empty panels say which thing is missing — no symbol picked yet, no coverage for this name, or a filter that matched nothing — instead of showing a blank rectangle.</li>
+          <li>Linking is visible</li>
+          <li>Every panel prints the symbol it&#x27;s showing in its header, so you can tell at a glance which name each panel is on and spot one that&#x27;s fallen out of its group.</li>
+          <li>When a symbol arrives from another panel, that header briefly flashes its group colour, so you can see a click travel across the workspace.</li>
+          <li>A watchlist price that moves flashes green or red in place.</li>
+          <li>Colour and accessibility</li>
+          <li>Chart indicator colours are now chosen per theme and checked for red-green colour blindness. The old set had two indicators that were identical under deuteranopia, and a yellow that was effectively invisible on the light theme.</li>
+          <li>Indicator colours also stay clear of the green, red and amber that mean gain, loss and price, so a line is never mistaken for a signal.</li>
+          <li>Motion follows your system&#x27;s reduce-motion setting.</li>
+          <li>Rates and data</li>
+          <li>Policy rates joined across BIS, US Treasury, ECB and MOF, with country-scoped panel linking.</li>
+          <li>FRED series are vetted against the copyright filter and fail closed.</li>
+          <li>Fixes</li>
+          <li>A corrupt preset or layout file no longer stops the app from launching.</li>
+          <li>The first-run workspace chooser is offered exactly once.</li>
+          <li>The add-indicator &quot;+&quot; button was rendering as an empty box.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sat, 15 Aug 2026 02:15:45 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.6.0/aurantium-setup.exe"
+        sparkle:version="1.6.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="70263791"
+        sparkle:edSignature="WOnxuAq64JquoCFtKgjWh6rjlWjMluBqiS/1zq87/dwrKecLLeCTjTuT+fUmNqUg2oidA+CC9RveZ/SiuBT4Bw=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.6.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.6.0</h3>
+        <ul>
+          <li>Panels now reshape themselves to fit, and the terminal tells you what it&#x27;s doing.</li>
+          <li>Workspaces</li>
+          <li>Three ready-made desks — Macro, Commodities and Equity Research — under Settings &gt; Workspaces, offered on first run instead of an empty window.</li>
+          <li>Panels fit their size</li>
+          <li>Drag a panel narrow and its table drops the least important columns instead of squashing every one; the symbol and its price always survive. Prices no longer get cut to &quot;4,432.&quot; to make room for a column you can&#x27;t read anyway.</li>
+          <li>Widen it and the columns come back. Columns you switch off yourself stay off at every size.</li>
+          <li>Charts trim their range and interval chips when narrow, so nothing sits off the edge where you can&#x27;t click it.</li>
+          <li>Tables scroll by pixel rather than jumping a whole row per wheel notch.</li>
+          <li>You can see what the terminal is doing</li>
+          <li>&quot;Layout saved&quot;, &quot;Nothing to undo&quot;, &quot;Unknown command&quot;, a panel that failed to open and fired price alerts now appear in a notice at the bottom right. All of it was previously invisible.</li>
+          <li>Empty panels say which thing is missing — no symbol picked yet, no coverage for this name, or a filter that matched nothing — instead of showing a blank rectangle.</li>
+          <li>Linking is visible</li>
+          <li>Every panel prints the symbol it&#x27;s showing in its header, so you can tell at a glance which name each panel is on and spot one that&#x27;s fallen out of its group.</li>
+          <li>When a symbol arrives from another panel, that header briefly flashes its group colour, so you can see a click travel across the workspace.</li>
+          <li>A watchlist price that moves flashes green or red in place.</li>
+          <li>Colour and accessibility</li>
+          <li>Chart indicator colours are now chosen per theme and checked for red-green colour blindness. The old set had two indicators that were identical under deuteranopia, and a yellow that was effectively invisible on the light theme.</li>
+          <li>Indicator colours also stay clear of the green, red and amber that mean gain, loss and price, so a line is never mistaken for a signal.</li>
+          <li>Motion follows your system&#x27;s reduce-motion setting.</li>
+          <li>Rates and data</li>
+          <li>Policy rates joined across BIS, US Treasury, ECB and MOF, with country-scoped panel linking.</li>
+          <li>FRED series are vetted against the copyright filter and fail closed.</li>
+          <li>Fixes</li>
+          <li>A corrupt preset or layout file no longer stops the app from launching.</li>
+          <li>The first-run workspace chooser is offered exactly once.</li>
+          <li>The add-indicator &quot;+&quot; button was rendering as an empty box.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sat, 15 Aug 2026 02:15:45 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.6.0/aurantium-mac.zip"
+        sparkle:version="1.6.0"
+        sparkle:os="macos"
+        length="279391861"
+        sparkle:edSignature="PBpn41hRlVpQ1S6gTJ61VRwBIGSIMHl4d6A7qDjf3wMzpm4NLquyAS4xUCh7EaGej/oJ8xL3uFgD6AlMqYXeBQ=="
+        type="application/zip" />
+    </item>
+    <item>
+      <title>Aurantium 1.5.3</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.5.3 &mdash; Bug fix</h3>
+        <ul>
+          <li><b>Ctrl+Q now quits:</b> the Quit shortcut relied on a Windows key binding that doesn't actually exist, so it silently did nothing. It's now bound explicitly and works.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 22 Jul 2026 19:45:36 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.5.3/aurantium-setup.exe"
+        sparkle:version="1.5.3"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76111893"
+        sparkle:edSignature="KjOrHwVGuxwLVyN6Ey3W/g1XUmyHo+aNVApVQj2V2iR/RAEYjVXrWf1d13MrfWyaDfUDN7aq0M5H1wxwUmGpDQ=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>Aurantium 1.5.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.5.2 &mdash; Notification polish</h3>
+        <ul>
+          <li><b>Aurantium icon in notifications:</b> price alerts and the &ldquo;still running in the tray&rdquo; message now show the Aurantium icon instead of the generic Windows info symbol.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 22 Jul 2026 18:10:00 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.5.2/aurantium-setup.exe"
+        sparkle:version="1.5.2"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="74546255"
+        sparkle:edSignature="rSgV89mDIyCpPY8gT6DMLx188q4iL2c+aSvwNbzn6a6AjUUmW5Mu0Y2ewRzpeGNvLIujiahlF8ibai0nUKdxDg=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>Aurantium 1.5.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.5.1 &mdash; Search by name, everywhere</h3>
+        <ul>
+          <li><b>Type a name, get the instrument:</b> the SYMBOL bar now suggests as you type &mdash; &ldquo;nvidia&rdquo;, &ldquo;gold&rdquo;, &ldquo;10 year treasury&rdquo;, &ldquo;cattle&rdquo; all resolve to the right ticker. Commodities, indices, FX, treasury yields and sector ETFs answer instantly and offline; any listed company worldwide is found by live lookup.</li>
+          <li><b>Everywhere symbols are typed:</b> the same suggestions appear when adding to the Watchlist, creating a Price Alert, adding a Portfolio position, or building a Performance comparison list.</li>
+          <li><b>Keyboard-first:</b> Tab / Shift+Tab cycle the suggestions, Enter or click jumps straight to one, Esc dismisses. History recall (&#8593;/&#8595;) and /commands work as before.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 22 Jul 2026 21:00:00 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.5.1/aurantium-setup.exe"
+        sparkle:version="1.5.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76118700"
+        sparkle:edSignature="ZJjpdgbHxDohdwqNKF+P4OH7R2DZtSHiQY6fl7ZHIgJnG+1UaprCk8WucMjLmTUu/Ml2N6PVTtBlC6KNlz0RDg=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>Aurantium 1.5.0 — The Commodities Update</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.5.0 &mdash; The Commodities Update</h3>
+        <ul>
+          <li><b>The full commodity universe:</b> 27 markets across Metals, Energy, Agriculture, and a new Livestock category &mdash; Live Cattle, Feeder Cattle, Lean Hogs, Orange Juice, KC Wheat, Oats, Soybean Oil &amp; Meal, Rough Rice, Aluminum and more, everywhere: Commodities, Futures Curve, Positioning History, and Macro/Rates positioning, all with verified live CFTC data.</li>
+          <li><b>Redesigned Edit dialogs:</b> pick instruments by plain-English search (&ldquo;10 year&rdquo;, &ldquo;cattle&rdquo;, &ldquo;euro&rdquo;) instead of typing ticker codes &mdash; with one-click presets, drag-to-reorder rows, and live symbol validation.</li>
+          <li><b>Right-click quick edits:</b> right-click any row, tile, or mini chart to add or remove instruments without opening a dialog. Ctrl+Z undoes any edit.</li>
+          <li><b>Commodities panel:</b> now four groups &mdash; adding a commodity files it into the right group automatically.</li>
+          <li><b>Smarter charts:</b> Positioning History gains a real date axis, 6M/1Y/All range buttons, a marked latest reading, and hover readouts; the Futures Curve shows per-contract prices on hover with a front-month tag; the yield curve shows per-tenor yields on hover. All charts stay clamped to their data &mdash; no more zooming into empty space.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 22 Jul 2026 17:06:00 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.5.0/aurantium-setup.exe"
+        sparkle:version="1.5.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76105915"
+        sparkle:edSignature="zvAKnoJKvEYjqqIvkL65dVHiaBxYOLeBulKfjOiQ6lHoLFLM5B9yidr+Kzh1Ryv1YBxJyhbqQBsw9l2qlFvHBg=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>Aurantium 1.4.6</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>What&rsquo;s new in 1.4.6</h3>
+        <ul>
+          <li><b>Startup splash:</b> the Aurantium logo now appears the instant you launch and stays on screen &mdash; with a live loading status underneath &mdash; until the dashboard is ready. No more blank seconds after clicking the icon.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 22 Jul 2026 14:30:35 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.4.6/aurantium-setup.exe"
+        sparkle:version="1.4.6"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="75190999"
+        sparkle:edSignature="e/6153j4c8ZjiuWMix0O6CGiTtPWH2hgh2hUyBLLsznCOwjcsjnPNeBuIdEoYc1VRXr3VCSxirlO601R1lQlAw=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>Aurantium 1.4.5</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>What&rsquo;s new in 1.4.5</h3>
+        <ul>
+          <li><b>New branding:</b> updated app icon and logo throughout &mdash; the taskbar/desktop icon, and a wordmark in the top bar right before the Panels menu.</li>
+          <li><b>Slimmer window chrome:</b> the bottom status bar is gone; that space now goes to a taller top bar that fits the new logo.</li>
+          <li>Cleaned up remaining lowercase &ldquo;aurantium&rdquo; mentions across the app to <b>Aurantium</b>.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 21 Jul 2026 23:43:35 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.4.5/aurantium-setup.exe"
+        sparkle:version="1.4.5"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="73887967"
+        sparkle:edSignature="HjKrvzeUAhLgOKQ6F67UxWK89RnfrH8uq+iJCt1bNnZ9Auas8W2Q1fkkV3z3a7MJkgCZBTgSJQakXvl4jSBxBQ=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>aurantium 1.4.4</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>What&rsquo;s new in 1.4.4</h3>
+        <ul>
+          <li><b>New name:</b> findash is now <b>Aurantium</b>. Nothing else changes &mdash; this update installs in place over your existing install, and your saved layouts, theme, alerts, and history all carry over automatically.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 21 Jul 2026 20:30:00 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.4.4/aurantium-setup.exe"
+        sparkle:version="1.4.4"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72947458"
+        sparkle:edSignature="SMoK/C5q+sRrTLXNqi0MVO66x+HcUDymvALAGtg56L8jQ5jofmJRPiATIbhzETk0buEYoCnC/8jDYsoKjAcKAQ=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>findash 1.4.3</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>What&rsquo;s new in 1.4.3</h3>
+        <ul>
+          <li><b>Fewer &ldquo;too many requests&rdquo; errors:</b> when Yahoo Finance rate-limits, panels now retry briefly and back off together instead of flashing an error &mdash; they keep showing the last good data and recover on their own.</li>
+          <li><b>Opens in full screen:</b> findash now launches borderless, filling the screen. Toggle it with <b>Shift+F11</b> or under <b>Settings &#9656; Full Screen</b>.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 21 Jul 2026 15:00:00 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.4.3/findash-setup.exe"
+        sparkle:version="1.4.3"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72944648"
+        sparkle:edSignature="TL3FJd6lbNtBhz7WrffS64uCWySLPqaRzbIhNdVteE/LGmoLh1+UG6XRAHM9dGCY946w/yIUf0yl6/l4rlnJDA=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>findash 1.4.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>What&rsquo;s new in 1.4.2</h3>
+        <ul>
+          <li><b>Single instance:</b> findash now runs as one window. Launching it again &mdash; from the taskbar, Start menu, or desktop &mdash; brings the existing window to the front instead of opening a duplicate, and re-surfaces it when it&rsquo;s tucked away in the system tray.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 21 Jul 2026 17:35:16 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.4.2/findash-setup.exe"
+        sparkle:version="1.4.2"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72940339"
+        sparkle:edSignature="2gf3OVVq7f75WYcy0zgmvzgvXwjcfavHWxbwtNvKWgk7iL940zb+c5mYgssBVOjfJObg7XHOeUTVJXRmIIaVBg=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>findash 1.4.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>What&rsquo;s new in 1.4.1</h3>
+        <ul>
+          <li>New <b>Settings</b> menu: everything except <b>Panels</b> now lives in one place &mdash; theme, layouts, API keys, the guide, updates, and quit.</li>
+          <li><b>Color-blind mode</b> (Settings &#9656; Color-blind mode): deuteranopia-safe up/down colors plus <b>&#9650;/&#9660;</b> direction marks, so gains and losses read without relying on red/green.</li>
+          <li>Turn on <b>Close to tray</b> right from Settings (previously only on the tray icon).</li>
+          <li>Visual refresh across dark and light: thinner panel dividers, a crisp new title-bar icon set (including a clearer maximize icon), sharper corners, and subtle hover feedback.</li>
+          <li>News: the article preview now closes when you click off the News panel.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 21 Jul 2026 17:14:49 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.4.1/findash-setup.exe"
+        sparkle:version="1.4.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72953613"
+        sparkle:edSignature="WzwJlj9tfsxBBXr4I8euTBEho0F9P8jBiVuPq5Ng/DPAIQ6KFXEwrGxP97aG0zEn5CgXnVUxBT2g3slKp+SLAQ=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>findash 1.4.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>What&rsquo;s new in 1.4.0</h3>
+        <ul>
+          <li>Data tables now <b>sort</b> (click a header), <b>filter</b> (type in the box above), and let you <b>show/hide columns</b> — Watchlist, Movers, Holders, Earnings, and more.</li>
+          <li>Charts: a <b>crosshair</b> with an O/H/L/C readout as you hover, plus <b>drawing tools</b> — trendlines and channels (parallel, flat-bottom, disjoint) that snap to candles and save with your layout.</li>
+          <li>News: filter headlines, read ones dim, and a single click shows a <b>preview snippet</b>.</li>
+          <li>Command bar: press <b>&uarr;/&darr;</b> for history, <b>Tab</b> to autocomplete, and run slash-commands (<code>/add</code>, <code>/layout</code>, <code>/save</code>, <code>/refresh</code>).</li>
+          <li>Options Chain: Black&ndash;Scholes <b>Greeks</b> (&Delta;, &Gamma;, &Theta;, Vega) as hideable columns, with plain-language tooltips.</li>
+          <li>Portfolio: new <b>Allocation</b>, <b>Performance</b> (vs SPY, measured from your buy dates), and <b>Risk</b> tabs; record buy/sell dates and leave price on &ldquo;market&rdquo; to use the live quote.</li>
+          <li><b>Price alerts</b> with system-tray notifications, and <b>Undo</b> (Ctrl+Z) for your edits.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Tue, 21 Jul 2026 15:29:02 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.4.0/findash-setup.exe"
+        sparkle:version="1.4.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72933532"
+        sparkle:edSignature="4+77pCnc3WjFpJtcnyYT/FOlL+zTF4mfVk/4zXbM+nLLFohHpurgUJutDXQ/TARqYYlU8gsiRTzR135aEIMAAg=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>findash 1.3.4</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>What&rsquo;s new in 1.3.4</h3>
+        <ul>
+          <li>Under-the-hood hardening: unexpected errors are now written to a local <code>findash.log</code> so problems can be diagnosed, and the data scheduler resolves feed timings faster.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 20 Jul 2026 17:48:15 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.3.4/findash-setup.exe"
+        sparkle:version="1.3.4"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72873044"
+        sparkle:edSignature="RPJs7J6S3EGizCHVa37V/42wb1VuoNN943tPy62N55sUlkD9Q1iIxMmlL6RxL6O/6YQCMuv4mYH9GPHpIU7FDg=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>findash 1.3.3</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>What&rsquo;s new in 1.3.3</h3>
+        <ul>
+          <li>Offline-friendly startup: recently-seen quotes, charts, and tables now appear instantly on the next launch — even with no connection — while fresh data loads in the background.</li>
+          <li>The F1 “Keyboard Shortcuts &amp; Guide” now lists the newer shortcuts (Ctrl+W close panel, Ctrl+Shift+T reopen last closed, Ctrl+1–4 link group) and the light/dark theme toggle.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 20 Jul 2026 17:34:25 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.3.3/findash-setup.exe"
+        sparkle:version="1.3.3"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72865739"
+        sparkle:edSignature="vMU2Yg+jMgy7wb8Y3bti4mz6zoE1fQdcA4TSwgiM/9Apw2ox+0ye8hNMRVPnr5TQ/ciclyHgQve5aQnOnMKFCQ=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>findash 1.3.2</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>What&rsquo;s new in 1.3.2</h3>
+        <ul>
+          <li>Light theme polish: charts now follow the theme (no more black chart background in light mode), table headers stand out, and low-contrast elements were darkened for readability.</li>
+          <li>New keyboard shortcuts: Ctrl+W closes the focused panel, Ctrl+Shift+T reopens the last one you closed, and Ctrl+1–4 set the focused panel’s link group (A/B/C/D).</li>
+          <li>Fixed a memory build-up when repeatedly adding and removing chart indicators.</li>
+          <li>Layout files saved by a newer version are now declined gracefully instead of loading incorrectly.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 20 Jul 2026 17:13:56 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.3.2/findash-setup.exe"
+        sparkle:version="1.3.2"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72854382"
+        sparkle:edSignature="/5jf1sGbWtue2TF0J1k0C6POYML1IFHpeSsF1UK/gNtjZVJHDAr4vQMa1UScFPHt0TNnqtd+OJMFYJlFwgu1Bw=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>findash 1.3.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+          a  { color:#0a58ca; }
+        </style>
+        <h3>What&rsquo;s new in 1.3.1</h3>
+        <ul>
+          <li>New light theme — switch under View ▸ Theme (dark stays the default; the app restarts to apply it).</li>
+          <li>This update window now shows dark text on a white background, so release notes are easy to read.</li>
+          <li>Reliability: data fetches that stall now time out and report an error instead of hanging a panel; the options chain ignores late data from a previously-typed symbol; layouts and saved API keys are written atomically so they can’t be corrupted by a crash mid-save.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 20 Jul 2026 16:43:44 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.3.1/findash-setup.exe"
+        sparkle:version="1.3.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72844324"
+        sparkle:edSignature="Pw3LVeWjxQOE6/bzPefx0HTAo3rHKjHi/mYcVT4oMWAUflw5NY5DLWZEhc9bdJUQKmp0QdCLtTvkLHsPDiRpBQ=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>findash 1.3.0</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+          a  { color:#0a58ca; }
+        </style>
+        <h3>What&rsquo;s new in 1.3.0</h3>
+        <ul>
+          <li>Export any data table to CSV — right-click a table and choose “Export Table to CSV…” (Movers, Holders, Dividends, Earnings, Analyst Recs, Commodities, FX Monitor, Macro, Financials).</li>
+          <li>Press Ctrl+F (Cmd+F on macOS) to jump to the SYMBOL box with its text selected, ready to overtype.</li>
+          <li>New Keyboard Shortcuts &amp; Guide window — shown once on first launch, and any time via F1 or Help ▸ Keyboard Shortcuts &amp; Guide… — with a full hotkey cheat sheet and a dashboard walkthrough.</li>
+          <li>Data tables now show a “Loading…” overlay while fetching.</li>
+          <li>Under the hood: faster news sorting, tighter cleanup of data subscriptions when panels close, and a failing panel now reports to the status bar instead of failing silently.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Mon, 20 Jul 2026 14:26:03 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.3.0/findash-setup.exe"
+        sparkle:version="1.3.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72848110"
+        sparkle:edSignature="/79Ur4r9xyEnDwiOmy6UvcR2IEMCbGW2V4FwiHwZnwwTRxSp09GMk/+oiuA8bDQgT6G7mOl+9X0ed8/8KlDuBw=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>findash 1.2.3</title>
+      <description><![CDATA[
+        <ul>
+          <li>Chart: hovering an entry in the indicator "+" menu (SMA, EMA, BB, VWAP, VOL, RSI, MACD) now shows a tooltip with its full name and a one-line description.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sun, 19 Jul 2026 15:50:59 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.2.3/findash-setup.exe"
+        sparkle:version="1.2.3"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72842571"
+        sparkle:edSignature="QL/b4p1y45DzaVLPghIQ1PI2GFmL153kUJLc34P0YBReZmfElK393+DKXQyaB/1vbu1sj1o5hsAM/6w4LUnACw=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>findash 1.2.2</title>
+      <description><![CDATA[
+        <ul>
+          <li>Fixed the indicator chip remove button added in 1.2.1, which rendered as an empty box instead of an × on some systems — removal is back to right-click a chip → Remove (also still reachable via Color…/Edit period…).</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sun, 19 Jul 2026 14:45:31 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.2.2/findash-setup.exe"
+        sparkle:version="1.2.2"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72836118"
+        sparkle:edSignature="G8YUIBYMLyD6KZB/pTEghkj0yxL2MayPnt1i/HJhIUN7JsT1pqMU3rGNY6AxcaM8K5bqVeVRBruP5J0UW7qqDw=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>findash 1.2.1</title>
+      <description><![CDATA[
+        <ul>
+          <li>Chart: pick a custom color when adding any indicator (SMA, EMA, Bollinger Bands, VWAP, Volume, RSI, MACD), instead of only an auto-assigned one.</li>
+          <li>Chart: each indicator chip now has a small × button for one-click removal — previously only available via the right-click menu.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sun, 19 Jul 2026 14:29:23 -0300</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.2.1/findash-setup.exe"
+        sparkle:version="1.2.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72842461"
+        sparkle:edSignature="PntquzXiR1xpUk5jkYVCEF/BNzgOBv/n19lK7VHf2ZmuaW4Td9mZyDj82AGL3k3psdHhPfrJ4PqVzZqT9SHKDQ=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>findash 1.2.0</title>
+      <description><![CDATA[
+        <ul>
+          <li>Press F5 to force-refresh every live feed at once — quotes, charts, news, financials — with status-bar feedback.</li>
+          <li>Financials: open the company's SEC filings (EDGAR, matched to Annual/Quarterly) or Yahoo Finance; download the displayed statement as a styled Excel workbook or clean CSV; copy it to the clipboard.</li>
+          <li>Chart: candlestick, OHLC bar, line, and area styles; add/remove/recolor indicators (SMA, EMA, Bollinger Bands, VWAP, MACD, RSI, volume); custom colors for candles, line, grid, and background.</li>
+          <li>Chart: pick range and candle interval independently — including a custom date range — with invalid combinations greyed out and explained; export the chart as PNG; everything persists with your layout.</li>
+          <li>The app now launches maximized; volume axis shows compact figures (150M, 2.5B); fixed clipped range/interval button labels.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Fri, 17 Jul 2026 21:08:01 +0000</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.2.0/findash-setup.exe"
+        sparkle:version="1.2.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72836419"
+        sparkle:edSignature="OT7zbjYe4SHP1U2wnjGKEFVsgUc3Rtpuc2Hcl1nc/6+iVDf2gPiIzjsK8JLbXO0BFMUDrRBgHj02stF/JuiBAw=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>findash 1.1.0</title>
+      <description><![CDATA[
+        <ul>
+          <li>Connect API keys in-app: new APIs menu shows each data source's connection status and opens a connect dialog — free-key links included, no .env editing needed. Keys apply immediately, no restart.</li>
+          <li>First launch of a new install or update now offers a one-time setup prompt when no keys are connected yet.</li>
+          <li>As always, everything keeps working with no keys — free keyless sources remain the default.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Fri, 17 Jul 2026 20:00:00 +0000</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.1.0/findash-setup.exe"
+        sparkle:version="1.1.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="70735600"
+        sparkle:edSignature="opuGQce9FL8ADa1xaLoE6fWA5FrDjUUKfiuXbyECzwfbXJiDw0gyo5L4m6ORrl0CZAxyo4X2SrMVHERAV0M7DQ=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>findash 1.0.3</title>
+      <description><![CDATA[
+        <ul>
+          <li>News: headlines now come from major publisher feeds first (Bloomberg, WSJ, MarketWatch, CNBC, and more) — fresher and broader than before, with the previous sources kept as fallback.</li>
+          <li>News: the feed is now sorted — headlines mentioning your active symbol rise to the top, newest first within each group.</li>
+          <li>Quotes: optional Finnhub / Twelve Data sources via FINNHUB_API_KEY / TWELVEDATA_API_KEY in .env; without keys, quotes work exactly as before.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Fri, 17 Jul 2026 15:37:19 +0000</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.0.3/findash-setup.exe"
+        sparkle:version="1.0.3"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="70728409"
+        sparkle:edSignature="vT/rw0bq7Jm3pphXFWFJHzuP2aR3eFpjWgZLbxLyTyqjKQlcmMfWRJwjb5vHiqb0yxEvFRnlBj7AKd5S6YANCg=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>findash 1.0.2</title>
+      <description><![CDATA[
+        <ul>
+          <li>Fix: the app now reopens correctly after an auto-update (the post-update relaunch waits for files to settle).</li>
+        </ul>
+      ]]></description>
+      <pubDate>Fri, 17 Jul 2026 09:00:00 +0000</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.0.2/findash-setup.exe"
+        sparkle:version="1.0.2"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72288655"
+        sparkle:edSignature="HQJr7ZoSV03/J5LiO1+exKwFT6ZgB0wrxFEFhljA7Ft9sn9tQ1MNhdtd6aZXXXzRMnErZsGAXIPiPaYqawsLCw=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>findash 1.0.1</title>
+      <description><![CDATA[
+        <ul>
+          <li>Share layouts with others: export a saved layout to a .findashlayout file, and import files straight into your saved layouts (Layout menu).</li>
+        </ul>
+      ]]></description>
+      <pubDate>Thu, 16 Jul 2026 16:30:00 +0000</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.0.1/findash-setup.exe"
+        sparkle:version="1.0.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72274961"
+        sparkle:edSignature="8yXem4vQSW8MGdCq9sMuajdYwCh6cg8gYaYh9AyWEitLSQyHTfVpZAShPtsEg6uusCGI0sj+S9cPHaPBrvuKDg=="
+        type="application/octet-stream" />
+    </item>
+
+    <item>
+      <title>findash 1.0.0</title>
+      <description><![CDATA[
+        <ul>
+          <li>Initial release.</li>
+        </ul>
+      ]]></description>
+      <pubDate>Thu, 16 Jul 2026 16:00:00 +0000</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.0.0/findash-setup.exe"
+        sparkle:version="1.0.0"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="72293024"
+        sparkle:edSignature="PBNHsL8BBmNHxNzKEPIiM0ZQVVNCRV7UYl24UQWyhso2RORGS1/3E2ECy9UIoc9wceVd+D/E1zACINjxYS80Cg=="
+        type="application/octet-stream" />
+    </item>
+
+  </channel>
+</rss>
