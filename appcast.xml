@@ -20,6 +20,67 @@
     <language>en</language>
 
     <item>
+      <title>Aurantium 1.21.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.21.1</h3>
+        <ul>
+          <li>Options Chain, Analyst Recs, Futures Curve, Holders and International Discovery now say they are beta only: they won&#x27;t be in the official launch, but will likely return in a later update (hover the note for why; close it to hide it until restart)</li>
+          <li>News headlines link out to the article; the in-app article preview is gone</li>
+          <li>B3 (Brazilian) prices are left out of CSV exports, and Key Metrics for B3 stocks can&#x27;t be copied</li>
+          <li>Brazilian stocks no longer show analyst ratings or price targets</li>
+          <li>The Macro dollar gauge is now the Fed&#x27;s Broad Dollar Index; ICE&#x27;s Dollar Index (DXY) and MOVE are gone, and saved gauges switch over by themselves</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 18 Nov 2026 13:05:19 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.21.1/aurantium-setup.exe"
+        sparkle:version="1.21.1"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76132730"
+        sparkle:edSignature="/Gl0b1McITP1QmW5rFK9vCWpgxSdSyPYgjRvOmZbyeI/EMl65MjKP5pd7IU2yOo2qPO8QcLPJI7PPqKIu/y8AQ=="
+        edMetaSignature="jh4chQC2MqHiXPy3OsbpB8oyJiusIPjJnO3DE3E0pxd+L61Vs/wYVxv0yOKS3WxQI0DE9qf2S6wDMASmD6fiAw=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.21.1</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.21.1</h3>
+        <ul>
+          <li>Options Chain, Analyst Recs, Futures Curve, Holders and International Discovery now say they are beta only: they won&#x27;t be in the official launch, but will likely return in a later update (hover the note for why; close it to hide it until restart)</li>
+          <li>News headlines link out to the article; the in-app article preview is gone</li>
+          <li>B3 (Brazilian) prices are left out of CSV exports, and Key Metrics for B3 stocks can&#x27;t be copied</li>
+          <li>Brazilian stocks no longer show analyst ratings or price targets</li>
+          <li>The Macro dollar gauge is now the Fed&#x27;s Broad Dollar Index; ICE&#x27;s Dollar Index (DXY) and MOVE are gone, and saved gauges switch over by themselves</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 18 Nov 2026 13:05:19 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.21.1/aurantium-mac.zip"
+        sparkle:version="1.21.1"
+        sparkle:os="macos"
+        length="298540652"
+        sparkle:edSignature="+W9tbtQocbEZZBHDPvaM0MFza6/0yfh5cxhzpX+8dweAslmmMLDlBbXTZyg9B1ETOkcMmd4tHqoukBZdtsROAg=="
+        edMetaSignature="D8hTal797eEyWLDtR0Ckr7qDr/7ogemL0KAGlz/hqaGjLZrYllq6w3GiBNIC5RKjJcrfpXjvVrQZBqdoL/7HBQ=="
+        type="application/zip" />
+    </item>
+    <item>
       <title>Aurantium 1.21.0</title>
       <description><![CDATA[
         <style>
