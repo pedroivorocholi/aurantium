@@ -20,6 +20,63 @@
     <language>en</language>
 
     <item>
+      <title>Aurantium 1.21.3</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.21.3</h3>
+        <ul>
+          <li>Financials ▸ Browser now opens each company&#x27;s own filings: SEC EDGAR for US-listed companies (and for BDRs, the US company behind them), the ASX or NSE filings page for Australian and Indian listings</li>
+          <li>For markets without a filings page we can link to, the option is hidden instead of sending you to EDGAR, which only covers SEC filers</li>
+          <li>The collapsed group dropdown in Key Metrics and Financials no longer gets cut off in narrow panels or after switching symbols</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 18 Nov 2026 21:03:12 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.21.3/aurantium-setup.exe"
+        sparkle:version="1.21.3"
+        sparkle:os="windows"
+        sparkle:installerArguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /FORCECLOSEAPPLICATIONS"
+        length="76156501"
+        sparkle:edSignature="RMRueSsJueFY30Dwq7Jn87UTDXb9e9uuab25jxUyVT+HmYTzYi/swO2hcCO/9PjXytJUEZVkyL/5h/7ftVMDBQ=="
+        edMetaSignature="bvCOpi+Lp89Mvb+wZhSAQTVLmLW9umUmA+znJmmf5r83YXb+5Aew3Bfn4bS46c/sSqsSTGrlddE3bGOKdo3cCA=="
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Aurantium 1.21.3</title>
+      <description><![CDATA[
+        <style>
+          html, body { background:#ffffff; color:#141414; margin:0;
+                       padding:10px 12px; font-family:'Segoe UI', Arial, sans-serif;
+                       font-size:13px; line-height:1.4; }
+          h3 { margin:0 0 8px; font-size:15px; color:#111111; }
+          ul { margin:0; padding-left:20px; }
+          li { margin:4px 0; }
+        </style>
+        <h3>1.21.3</h3>
+        <ul>
+          <li>Financials ▸ Browser now opens each company&#x27;s own filings: SEC EDGAR for US-listed companies (and for BDRs, the US company behind them), the ASX or NSE filings page for Australian and Indian listings</li>
+          <li>For markets without a filings page we can link to, the option is hidden instead of sending you to EDGAR, which only covers SEC filers</li>
+          <li>The collapsed group dropdown in Key Metrics and Financials no longer gets cut off in narrow panels or after switching symbols</li>
+        </ul>
+      ]]></description>
+      <pubDate>Wed, 18 Nov 2026 21:03:12 GMT</pubDate>
+      <enclosure
+        url="https://github.com/pedroivorocholi/aurantium/releases/download/v1.21.3/aurantium-mac.zip"
+        sparkle:version="1.21.3"
+        sparkle:os="macos"
+        length="298551405"
+        sparkle:edSignature="ZdNtYykzaTsgPzTX+uoCLKfIm9AzQO7b1zN4P61TkTx7EINQ2xeAULpK2Pn+CxLh0S1YHhAIcbXt8ph0TdxhCw=="
+        edMetaSignature="HiU0107L94/9crzacUSFIwyIataasjt8cTGN8MH7mMVtH2mMofrKjx1JB63TDgvm62I4xSfmwPGtjLgfbx1yDA=="
+        type="application/zip" />
+    </item>
+    <item>
       <title>Aurantium 1.21.2</title>
       <description><![CDATA[
         <style>
